@@ -23,6 +23,7 @@ export interface Exercise extends Timestamps {
 export interface Workout extends Timestamps {
   id: Id;
   date: string; // YYYY-MM-DD local date
+  status: WorkoutStatus;
   notes?: string;
   userId?: string;
   sessionStartedAt?: string;
@@ -95,3 +96,5 @@ export interface IntegrityAuditReport {
   summary: IntegrityAuditSummary;
   issues: IntegrityIssue[];
 }
+
+export type WorkoutStatus = "draft" | "active" | "completed";

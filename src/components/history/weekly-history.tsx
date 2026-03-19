@@ -99,13 +99,15 @@ export function WeeklyHistory() {
                   <CardHeader>
                     <div>
                       <CardTitle>
-                        Workout #{index + 1} · [{formatDurationLong(durationSeconds)}] ·{" "}
+                        Workout #{index + 1} · {entry.workout.status} · [{formatDurationLong(durationSeconds)}] ·{" "}
                         {formatTimeOfDay(entry.workout.sessionStartedAt)}
                       </CardTitle>
                       <p className="text-xs text-muted-foreground">
-                        {entry.workout.sessionEndedAt
+                        {entry.workout.status === "completed"
                           ? `Completed · ${formatDurationLong(durationSeconds)}`
-                          : "In progress"}
+                          : entry.workout.status === "active"
+                            ? "In progress"
+                            : "Draft"}
                       </p>
                     </div>
                   </CardHeader>

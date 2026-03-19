@@ -3,6 +3,12 @@ import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@
 import { createId, localDateIso, nowIso } from "@/lib/utils";
 import type { AppSettings, Exercise, MuscleGroup, SetEntry, Workout, WorkoutExercise } from "@/types/domain";
 
+function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
+  if (!workout.sessionStartedAt) return "draft";
+  if (!workout.sessionEndedAt) return "active";
+  return "completed";
+}
+
 class StrengthDatabase extends Dexie {
   muscles!: EntityTable<MuscleGroup, "id">;
   exercises!: EntityTable<Exercise, "id">;
@@ -26,7 +32,7 @@ class StrengthDatabase extends Dexie {
       .stores({
         muscles: "id, name, updatedAt",
         exercises: "id, name, updatedAt",
-        workouts: "id, date, updatedAt, userId",
+        workouts: "id, date, status, updatedAt, userId",
         workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
         setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
         settings: "id"
@@ -36,6 +42,24 @@ class StrengthDatabase extends Dexie {
           if (!workout.userId) {
             workout.userId = DEFAULT_USER_ID;
           }
+          if (!workout.status) {
+            workout.status = inferWorkoutStatus(workout);
+          }
+        });
+      });
+
+    this.version(3)
+      .stores({
+        muscles: "id, name, updatedAt",
+        exercises: "id, name, updatedAt",
+        workouts: "id, date, status, updatedAt, userId",
+        workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+        setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+        settings: "id"
+      })
+      .upgrade(async (tx) => {
+        await tx.table("workouts").toCollection().modify((workout: Partial<Workout>) => {
+          workout.status = inferWorkoutStatus(workout);
         });
       });
 
@@ -129,6 +153,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
   await database.workouts.put({
     id: workoutId,
     date: today,
+    status: "draft",
     notes: "Sample workout",
     createdAt: now,
     updatedAt: now,

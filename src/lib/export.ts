@@ -36,8 +36,8 @@ export function payloadToCsvMap(payload: ExportPayload): Record<string, string> 
       ])
     ),
     workouts: toCsv(
-      ["id", "date", "notes", "createdAt", "updatedAt"],
-      payload.workouts.map((w) => [w.id, w.date, w.notes ?? "", w.createdAt, w.updatedAt])
+      ["id", "date", "status", "notes", "createdAt", "updatedAt"],
+      payload.workouts.map((w) => [w.id, w.date, w.status, w.notes ?? "", w.createdAt, w.updatedAt])
     ),
     workout_exercises: toCsv(
       ["id", "workoutId", "exerciseId", "orderIndex", "createdAt"],

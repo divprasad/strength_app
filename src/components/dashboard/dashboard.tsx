@@ -87,7 +87,7 @@ export function Dashboard() {
                   <div>
                     <p className="font-medium">{workout.date}</p>
                     <p className="text-xs text-muted-foreground">
-                      Updated {formatDistanceToNowStrict(parseISO(workout.updatedAt), { addSuffix: true })}
+                      {workout.status} · Updated {formatDistanceToNowStrict(parseISO(workout.updatedAt), { addSuffix: true })}
                     </p>
                   </div>
                   <Button variant="ghost" onClick={() => router.push("/workouts")}>

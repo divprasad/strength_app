@@ -144,6 +144,19 @@ export async function runIntegrityAudit(): Promise<IntegrityAuditReport> {
   }
 
   for (const workout of workouts) {
+    const expectedStatus = !workout.sessionStartedAt
+      ? "draft"
+      : workout.sessionEndedAt
+        ? "completed"
+        : "active";
+    if (workout.status !== expectedStatus) {
+      addIssue(issues, "workout", "warning", "Workout status does not match session timestamps.", workout.id, {
+        status: workout.status,
+        expectedStatus,
+        sessionStartedAt: workout.sessionStartedAt,
+        sessionEndedAt: workout.sessionEndedAt
+      });
+    }
     if (workout.sessionStartedAt && workout.sessionEndedAt) {
       const started = Date.parse(workout.sessionStartedAt);
       const ended = Date.parse(workout.sessionEndedAt);

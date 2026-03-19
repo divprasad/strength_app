@@ -68,7 +68,7 @@ export function WorkoutLogger() {
     return map;
   }, [muscleGroups]);
 
-  const sessionActive = Boolean(workout?.sessionStartedAt && !workout?.sessionEndedAt);
+  const sessionActive = workout?.status === "active";
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [newExerciseId, setNewExerciseId] = useState("");
@@ -91,7 +91,7 @@ export function WorkoutLogger() {
       setActiveWorkoutId(workouts[0].id);
       return;
     }
-    const active = workouts.find((item) => item.sessionStartedAt && !item.sessionEndedAt);
+    const active = workouts.find((item) => item.status === "active");
     if (active) {
       setActiveWorkoutId(active.id);
       return;
@@ -198,7 +198,6 @@ export function WorkoutLogger() {
               <div className="space-y-2">
                 {workouts.map((item) => {
                   const isSelected = item.id === activeWorkoutId;
-                  const isRunning = Boolean(item.sessionStartedAt && !item.sessionEndedAt);
                   const durationSeconds = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
                   return (
                     <button
@@ -212,7 +211,11 @@ export function WorkoutLogger() {
                       <div>
                         <p className="font-medium">{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted session"}</p>
                         <p className="text-xs text-muted-foreground">
-                          {isRunning ? "Running" : item.sessionEndedAt ? `Completed · ${formatDurationLong(durationSeconds)}` : "Not started"}
+                          {item.status === "active"
+                            ? "Running"
+                            : item.status === "completed"
+                              ? `Completed · ${formatDurationLong(durationSeconds)}`
+                              : "Draft"}
                         </p>
                       </div>
                       <span className="text-xs text-muted-foreground">{isSelected ? "Selected" : "Tap to open"}</span>

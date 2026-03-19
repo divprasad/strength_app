@@ -1,8 +1,14 @@
 import { endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import { db } from "@/lib/db";
 import { createId, nowIso } from "@/lib/utils";
-import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise } from "@/types/domain";
+import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise, WorkoutStatus } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
+
+function inferWorkoutStatus(workout: Pick<Workout, "sessionStartedAt" | "sessionEndedAt">): WorkoutStatus {
+  if (!workout.sessionStartedAt) return "draft";
+  if (!workout.sessionEndedAt) return "active";
+  return "completed";
+}
 
 export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
   return db.workouts.where("date").equals(date).sortBy("updatedAt");
@@ -17,6 +23,7 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
   const workout: Workout = {
     id: createId("workout"),
     date,
+    status: inferWorkoutStatus(options ?? {}),
     notes: options?.notes,
     sessionStartedAt: options?.sessionStartedAt,
     sessionEndedAt: options?.sessionEndedAt,
@@ -231,6 +238,7 @@ export async function startWorkoutSessionForWorkout(workoutId: string): Promise<
   if (workout.sessionStartedAt && !workout.sessionEndedAt) return workout;
   const now = nowIso();
   await db.workouts.update(workoutId, {
+    status: "active",
     sessionStartedAt: now,
     sessionEndedAt: undefined,
     userId: workout.userId ?? DEFAULT_USER_ID,
@@ -244,6 +252,7 @@ export async function finishWorkoutSession(workoutId: string): Promise<void> {
   const now = nowIso();
   await finishActiveWorkoutExercise(workoutId);
   await db.workouts.update(workoutId, {
+    status: "completed",
     sessionEndedAt: now,
     updatedAt: now
   });
