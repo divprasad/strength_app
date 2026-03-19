@@ -36,15 +36,17 @@ export function ExportPanel() {
 
   async function exportJson() {
     const payload = await buildPayload();
-    triggerDownload(`strength-export-${new Date().toISOString().slice(0, 10)}.json`, payloadToJson(payload), "application/json");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    triggerDownload(`strength-export-${timestamp}.json`, payloadToJson(payload), "application/json");
     setStatus("JSON export downloaded.");
   }
 
   async function exportCsv() {
     const payload = await buildPayload();
     const csvMap = payloadToCsvMap(payload);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     for (const [name, csv] of Object.entries(csvMap)) {
-      triggerDownload(`${name}.csv`, csv, "text/csv;charset=utf-8");
+      triggerDownload(`${name}-${timestamp}.csv`, csv, "text/csv;charset=utf-8");
     }
     setStatus("CSV export downloaded as separate tables.");
   }

@@ -1,13 +1,15 @@
 "use client";
 
 import { addWeeks, eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subWeeks } from "date-fns";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { MuscleGroup } from "@/types/domain";
+import { computeDurationSeconds, formatDurationLong, formatTimeOfDay, muscleTimeSummary } from "@/lib/time";
 
 export function WeeklyHistory() {
   const [anchorDate, setAnchorDate] = useState(localDateIso(new Date()));
@@ -22,18 +24,30 @@ export function WeeklyHistory() {
     [anchorDate]
   );
 
-  const selectedWorkout = workouts?.find((w) => w.date === selectedDate);
-  const selectedItems = useLiveQuery(async () => {
-    if (!selectedWorkout) return [];
-    const items = await db.workoutExercises.where("workoutId").equals(selectedWorkout.id).sortBy("orderIndex");
+  const muscleGroups = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
+  const muscleMap = useMemo(() => {
+    const map = new Map<string, MuscleGroup>();
+    (muscleGroups ?? []).forEach((muscle) => map.set(muscle.id, muscle));
+    return map;
+  }, [muscleGroups]);
+
+  const workoutsForDate = useLiveQuery(async () => {
+    const dateWorkouts = await db.workouts.where("date").equals(selectedDate).toArray();
+    const sorted = dateWorkouts.sort((a, b) => (a.sessionStartedAt ?? a.createdAt).localeCompare(b.sessionStartedAt ?? b.createdAt));
     return Promise.all(
-      items.map(async (item) => {
-        const exercise = await db.exercises.get(item.exerciseId);
-        const sets = await db.setEntries.where("workoutExerciseId").equals(item.id).sortBy("setNumber");
-        return { item, exercise, sets };
+      sorted.map(async (workout) => {
+        const items = await db.workoutExercises.where("workoutId").equals(workout.id).sortBy("orderIndex");
+        const details = await Promise.all(
+          items.map(async (item) => {
+            const exercise = await db.exercises.get(item.exerciseId);
+            const sets = await db.setEntries.where("workoutExerciseId").equals(item.id).sortBy("setNumber");
+            return { item, exercise, sets };
+          })
+        );
+        return { workout, items: details };
       })
     );
-  }, [selectedWorkout?.id]);
+  }, [selectedDate]);
 
   return (
     <div className="space-y-4">
@@ -76,33 +90,76 @@ export function WeeklyHistory() {
           <CardTitle>{format(parseISO(selectedDate), "EEEE, MMM d")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {selectedWorkout ? (
-            selectedItems && selectedItems.length > 0 ? (
-              <div className="space-y-3">
-                {selectedItems.map((entry) => (
-                  <div key={entry.item.id} className="rounded-lg border p-3">
-                    <p className="font-medium">{entry.exercise?.name ?? "Unknown exercise"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {entry.sets.length} set{entry.sets.length === 1 ? "" : "s"}
-                    </p>
-                    <ul className="mt-2 space-y-1 text-sm">
-                      {entry.sets.map((setEntry) => (
-                        <li key={setEntry.id}>
-                          Set {setEntry.setNumber}: {setEntry.reps} reps × {setEntry.weight}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Workout exists but has no exercises.</p>
-            )
-          ) : (
-            <EmptyState title="No workout on this day" description="Tap another day to browse your history." />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        {workoutsForDate && workoutsForDate.length > 0 ? (
+          <div className="space-y-3">
+            {workoutsForDate.map((entry, index) => {
+              const durationSeconds = computeDurationSeconds(entry.workout.sessionStartedAt, entry.workout.sessionEndedAt);
+              return (
+                <Card key={entry.workout.id}>
+                  <CardHeader>
+                    <div>
+                      <CardTitle>
+                        Workout #{index + 1} · [{formatDurationLong(durationSeconds)}] ·{" "}
+                        {formatTimeOfDay(entry.workout.sessionStartedAt)}
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.workout.sessionEndedAt
+                          ? `Completed · ${formatDurationLong(durationSeconds)}`
+                          : "In progress"}
+                      </p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {entry.items.length > 0 ? (
+                      entry.items.map((exerciseEntry) => {
+                        const exerciseDuration = computeDurationSeconds(
+                          exerciseEntry.item.startedAt,
+                          exerciseEntry.item.completedAt ?? entry.workout.sessionEndedAt
+                        );
+                        const muscleTimes = exerciseEntry.exercise
+                          ? muscleTimeSummary(exerciseEntry.exercise, exerciseDuration, muscleMap)
+                          : [];
+                        return (
+                          <div key={exerciseEntry.item.id} className="rounded-lg border p-3">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
+                              <span className="text-xs text-muted-foreground">{formatDurationLong(exerciseDuration)}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {exerciseEntry.sets.length} set{exerciseEntry.sets.length === 1 ? "" : "s"}
+                            </p>
+                            {muscleTimes.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                {muscleTimes.map((muscle) => (
+                                  <span key={muscle.muscleId} className="rounded-full border border-border px-2 py-0.5">
+                                    {muscle.name} · {formatDurationLong(muscle.seconds)} ({muscle.tags.join(", ")})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <ul className="mt-2 space-y-1 text-sm">
+                              {exerciseEntry.sets.map((setEntry) => (
+                                <li key={setEntry.id}>
+                                  Set {setEntry.setNumber}: {setEntry.reps} reps × {setEntry.weight}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Workout exists but has no exercises.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState title="No workout on this day" description="Tap another day to browse your history." />
+        )}
+      </CardContent>
+    </Card>
+  </div>
   );
 }

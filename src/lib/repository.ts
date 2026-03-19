@@ -2,6 +2,7 @@ import { endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import { db } from "@/lib/db";
 import { createId, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise } from "@/types/domain";
+import { DEFAULT_USER_ID } from "@/lib/constants";
 
 export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
   const existing = await db.workouts.where("date").equals(date).first();
@@ -11,7 +12,8 @@ export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
     id: createId("workout"),
     date,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    userId: DEFAULT_USER_ID
   };
   await db.workouts.put(workout);
   return workout;
@@ -149,4 +151,95 @@ export async function createExercise(data: Omit<Exercise, "id" | "createdAt" | "
 
   await db.exercises.put(exercise);
   return exercise;
+}
+
+const WORKOUT_API_PATH = "/api/workouts";
+
+async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {
+  const bundle = await getWorkoutBundle(workoutId);
+  if (!bundle) return;
+
+  const payload = {
+    action,
+    userId: bundle.workout.userId ?? DEFAULT_USER_ID,
+    bundle
+  };
+
+  if (typeof fetch === "undefined") return;
+  try {
+    await fetch(WORKOUT_API_PATH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    console.warn("Unable to persist workout session", error);
+  }
+}
+
+export async function startWorkoutSession(date: string): Promise<Workout | null> {
+  const workout = await getOrCreateWorkoutByDate(date);
+  if (workout.sessionStartedAt && !workout.sessionEndedAt) return workout;
+  const now = nowIso();
+  await db.workouts.update(workout.id, {
+    sessionStartedAt: now,
+    sessionEndedAt: undefined,
+    userId: workout.userId ?? DEFAULT_USER_ID,
+    updatedAt: now
+  });
+  await persistWorkoutSession("start", workout.id);
+  return { ...workout, sessionStartedAt: now, sessionEndedAt: undefined, userId: workout.userId ?? DEFAULT_USER_ID, updatedAt: now };
+}
+
+export async function finishWorkoutSession(workoutId: string): Promise<void> {
+  const now = nowIso();
+  await finishActiveWorkoutExercise(workoutId);
+  await db.workouts.update(workoutId, {
+    sessionEndedAt: now,
+    updatedAt: now
+  });
+  await persistWorkoutSession("finish", workoutId);
+}
+
+export async function startWorkoutExercise(workoutExerciseId: string): Promise<void> {
+  const now = nowIso();
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (!workoutExercise) return;
+  await db.workoutExercises.update(workoutExerciseId, {
+    startedAt: now,
+    completedAt: undefined
+  });
+  await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
+  await persistWorkoutSession("sync", workoutExercise.workoutId);
+}
+
+export async function finishWorkoutExercise(workoutExerciseId: string): Promise<void> {
+  const now = nowIso();
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (!workoutExercise) return;
+  await db.workoutExercises.update(workoutExerciseId, {
+    completedAt: now
+  });
+  await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
+  await persistWorkoutSession("sync", workoutExercise.workoutId);
+}
+
+export async function finishActiveWorkoutExercise(workoutId: string): Promise<void> {
+  const activeExercise = await db.workoutExercises
+    .where("workoutId")
+    .equals(workoutId)
+    .filter((exercise) => !!exercise.startedAt && !exercise.completedAt)
+    .first();
+  if (activeExercise) {
+    await finishWorkoutExercise(activeExercise.id);
+  }
+}
+
+export function summarizeSets(sets: SetEntry[]) {
+  return {
+    totalReps: sets.reduce((sum, setEntry) => sum + setEntry.reps, 0),
+    totalVolume: sets.reduce((sum, setEntry) => sum + setEntry.reps * setEntry.weight, 0)
+  };
 }

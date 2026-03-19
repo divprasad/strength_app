@@ -64,7 +64,7 @@ export function AnalyticsView() {
     .slice(0, 8);
 
   return (
-    <div className="space-y-4">
+      <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Weekly Total Volume</CardTitle>
@@ -85,11 +85,11 @@ export function AnalyticsView() {
               <MeasuredChart height={288}>
                 {({ width, height }) => (
                   <BarChart width={width} height={height} data={muscleRows}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-20} textAnchor="end" height={70} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="volume" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148, 163, 184, 0.25)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#bfdbfe" }} interval={0} angle={-20} textAnchor="end" height={70} stroke="#475569" />
+                    <YAxis tick={{ fontSize: 12, fill: "#bfdbfe" }} stroke="#475569" />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#94a3b8" }} labelStyle={{ color: "#e2e8f0" }} />
+                    <Bar dataKey="volume" fill="#4dd0e1" radius={[6, 6, 4, 4]} stroke="#38bdf8" strokeWidth={1.2} />
                   </BarChart>
                 )}
               </MeasuredChart>
@@ -108,11 +108,11 @@ export function AnalyticsView() {
               <MeasuredChart height={288}>
                 {({ width, height }) => (
                   <BarChart width={width} height={height} data={exerciseRows}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-20} textAnchor="end" height={70} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="volume" fill="hsl(var(--accent-foreground))" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148, 163, 184, 0.2)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#e0f2fe" }} interval={0} angle={-20} textAnchor="end" height={70} stroke="#475569" />
+                    <YAxis tick={{ fontSize: 12, fill: "#e0f2fe" }} stroke="#475569" />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#94a3b8" }} labelStyle={{ color: "#e2e8f0" }} />
+                    <Bar dataKey="volume" fill="#f4d35e" radius={[6, 6, 4, 4]} stroke="#fbbf24" strokeWidth={1.2} />
                   </BarChart>
                 )}
               </MeasuredChart>
@@ -142,22 +142,22 @@ export function AnalyticsView() {
               <MeasuredChart height={256}>
                 {({ width, height }) => (
                   <LineChart width={width} height={height} data={progress}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="maxWeight" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    <CartesianGrid strokeDasharray="4 4" stroke="rgba(148, 163, 184, 0.25)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#cbd5f5" }} stroke="#475569" />
+                    <YAxis tick={{ fontSize: 12, fill: "#cbd5f5" }} stroke="#475569" />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#94a3b8" }} labelStyle={{ color: "#e2e8f0" }} />
+                    <Line type="monotone" dataKey="maxWeight" stroke="#38bdf8" strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
                   </LineChart>
                 )}
               </MeasuredChart>
               <MeasuredChart height={256}>
                 {({ width, height }) => (
                   <LineChart width={width} height={height} data={progress}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="bestE1rm" stroke="hsl(var(--accent-foreground))" strokeWidth={2} dot={false} />
+                    <CartesianGrid strokeDasharray="4 4" stroke="rgba(148, 163, 184, 0.2)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#fde68a" }} stroke="#475569" />
+                    <YAxis tick={{ fontSize: 12, fill: "#fde68a" }} stroke="#475569" />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#94a3b8" }} labelStyle={{ color: "#e2e8f0" }} />
+                    <Line type="monotone" dataKey="bestE1rm" stroke="#facc15" strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
                   </LineChart>
                 )}
               </MeasuredChart>

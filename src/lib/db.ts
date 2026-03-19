@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG } from "@/lib/constants";
+import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@/lib/constants";
 import { createId, localDateIso, nowIso } from "@/lib/utils";
 import type { AppSettings, Exercise, MuscleGroup, SetEntry, Workout, WorkoutExercise } from "@/types/domain";
 
@@ -21,6 +21,23 @@ class StrengthDatabase extends Dexie {
       setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
       settings: "id"
     });
+
+    this.version(2)
+      .stores({
+        muscles: "id, name, updatedAt",
+        exercises: "id, name, updatedAt",
+        workouts: "id, date, updatedAt, userId",
+        workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+        setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+        settings: "id"
+      })
+      .upgrade(async (tx) => {
+        await tx.table("workouts").toCollection().modify((workout: Partial<Workout>) => {
+          if (!workout.userId) {
+            workout.userId = DEFAULT_USER_ID;
+          }
+        });
+      });
 
     this.on("populate", async () => {
       await seedDatabase(this);
@@ -114,7 +131,8 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
     date: today,
     notes: "Sample workout",
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    userId: DEFAULT_USER_ID
   });
 
   await database.workoutExercises.put({

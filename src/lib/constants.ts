@@ -17,3 +17,5 @@ export const DEFAULT_VOLUME_CONFIG = {
   primary: 1,
   secondary: 0.5
 } as const;
+
+export const DEFAULT_USER_ID = "primary";

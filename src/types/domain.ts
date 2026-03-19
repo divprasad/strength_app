@@ -24,6 +24,9 @@ export interface Workout extends Timestamps {
   id: Id;
   date: string; // YYYY-MM-DD local date
   notes?: string;
+  userId?: string;
+  sessionStartedAt?: string;
+  sessionEndedAt?: string;
 }
 
 export interface WorkoutExercise {
@@ -32,6 +35,8 @@ export interface WorkoutExercise {
   exerciseId: Id;
   orderIndex: number;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export interface SetEntry extends Timestamps {
