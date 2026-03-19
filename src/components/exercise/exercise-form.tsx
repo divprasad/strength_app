@@ -47,6 +47,20 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
     values: defaults
   });
 
+  function applyValidationIssues(error: unknown) {
+    if (!(error instanceof z.ZodError)) {
+      form.setError("root", { message: error instanceof Error ? error.message : "Unable to save exercise." });
+      return;
+    }
+
+    for (const issue of error.issues) {
+      const field = issue.path[0];
+      if (field === "name" || field === "primaryMuscleIds" || field === "secondaryMuscleIds" || field === "notes" || field === "category" || field === "equipment") {
+        form.setError(field, { message: issue.message });
+      }
+    }
+  }
+
   async function submit(values: FormValues) {
     const payload = {
       name: values.name.trim(),
@@ -77,11 +91,38 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
     });
   }
 
+  const handleValidSubmit = form.handleSubmit(
+    async (values) => {
+      form.clearErrors("root");
+      try {
+        await submit(values);
+      } catch (error) {
+        applyValidationIssues(error);
+      }
+    },
+    (errors) => {
+      form.clearErrors("root");
+      if (errors.name || errors.primaryMuscleIds) {
+        return;
+      }
+      form.setError("root", { message: "Fix the highlighted fields and try again." });
+    }
+  );
+
   return (
-    <form className="space-y-3" onSubmit={form.handleSubmit(submit)}>
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleValidSubmit(event).catch((error: unknown) => {
+          applyValidationIssues(error);
+        });
+      }}
+    >
       <div>
         <Label htmlFor="name">Name</Label>
         <Input id="name" placeholder="Incline Dumbbell Press" {...form.register("name")} />
+        {form.formState.errors.name ? <p className="mt-1 text-sm text-destructive">{form.formState.errors.name.message}</p> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -135,6 +176,7 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
           </Button>
         ) : null}
       </div>
+      {form.formState.errors.root ? <p className="text-sm text-destructive">{form.formState.errors.root.message}</p> : null}
     </form>
   );
 }
