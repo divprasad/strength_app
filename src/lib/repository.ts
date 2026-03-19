@@ -29,6 +29,7 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
 }
 
 export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
+  // Deprecated compatibility helper. New session flows should create/select by workoutId.
   const existing = await db.workouts.where("date").equals(date).first();
   if (existing) return existing;
   return createWorkoutForDate(date);
@@ -220,17 +221,8 @@ async function persistWorkoutSession(action: "start" | "finish" | "sync", workou
 }
 
 export async function startWorkoutSession(date: string): Promise<Workout | null> {
-  const workout = await getOrCreateWorkoutByDate(date);
-  if (workout.sessionStartedAt && !workout.sessionEndedAt) return workout;
-  const now = nowIso();
-  await db.workouts.update(workout.id, {
-    sessionStartedAt: now,
-    sessionEndedAt: undefined,
-    userId: workout.userId ?? DEFAULT_USER_ID,
-    updatedAt: now
-  });
-  await persistWorkoutSession("start", workout.id);
-  return { ...workout, sessionStartedAt: now, sessionEndedAt: undefined, userId: workout.userId ?? DEFAULT_USER_ID, updatedAt: now };
+  const workout = await createWorkoutForDate(date);
+  return startWorkoutSessionForWorkout(workout.id);
 }
 
 export async function startWorkoutSessionForWorkout(workoutId: string): Promise<Workout | null> {
