@@ -1,0 +1,155 @@
+import Dexie, { type EntityTable } from "dexie";
+import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG } from "@/lib/constants";
+import { createId, localDateIso, nowIso } from "@/lib/utils";
+import type { AppSettings, Exercise, MuscleGroup, SetEntry, Workout, WorkoutExercise } from "@/types/domain";
+
+class StrengthDatabase extends Dexie {
+  muscles!: EntityTable<MuscleGroup, "id">;
+  exercises!: EntityTable<Exercise, "id">;
+  workouts!: EntityTable<Workout, "id">;
+  workoutExercises!: EntityTable<WorkoutExercise, "id">;
+  setEntries!: EntityTable<SetEntry, "id">;
+  settings!: EntityTable<AppSettings, "id">;
+
+  constructor() {
+    super("strength-app-db");
+    this.version(1).stores({
+      muscles: "id, name, updatedAt",
+      exercises: "id, name, updatedAt",
+      workouts: "id, date, updatedAt",
+      workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+      setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+      settings: "id"
+    });
+
+    this.on("populate", async () => {
+      await seedDatabase(this);
+    });
+  }
+}
+
+export const db = new StrengthDatabase();
+
+let bootstrapPromise: Promise<void> | null = null;
+
+export function ensureBootstrapped(): Promise<void> {
+  if (!bootstrapPromise) {
+    bootstrapPromise = bootstrapIfNeeded();
+  }
+  return bootstrapPromise;
+}
+
+async function bootstrapIfNeeded(): Promise<void> {
+  const settings = await db.settings.get("default");
+  if (!settings) {
+    await seedDatabase(db);
+  }
+}
+
+async function seedDatabase(database: StrengthDatabase): Promise<void> {
+  const now = nowIso();
+
+  const muscles: MuscleGroup[] = DEFAULT_MUSCLE_GROUPS.map((name) => ({
+    id: createId("muscle"),
+    name,
+    createdAt: now,
+    updatedAt: now
+  }));
+
+  await database.muscles.bulkPut(muscles);
+
+  const chest = muscles.find((m) => m.name === "Chest")?.id;
+  const shoulders = muscles.find((m) => m.name === "Shoulders")?.id;
+  const triceps = muscles.find((m) => m.name === "Triceps")?.id;
+  const back = muscles.find((m) => m.name === "Back")?.id;
+  const biceps = muscles.find((m) => m.name === "Biceps")?.id;
+  const quads = muscles.find((m) => m.name === "Quads")?.id;
+  const glutes = muscles.find((m) => m.name === "Glutes")?.id;
+  const hamstrings = muscles.find((m) => m.name === "Hamstrings")?.id;
+
+  const exercises: Exercise[] = [
+    {
+      id: createId("exercise"),
+      name: "Barbell Bench Press",
+      category: "Push",
+      equipment: "Barbell",
+      primaryMuscleIds: chest ? [chest] : [],
+      secondaryMuscleIds: [shoulders, triceps].filter(Boolean) as string[],
+      notes: "Pause briefly on chest.",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: createId("exercise"),
+      name: "Pull-Up",
+      category: "Pull",
+      equipment: "Bodyweight",
+      primaryMuscleIds: back ? [back] : [],
+      secondaryMuscleIds: [biceps].filter(Boolean) as string[],
+      notes: "Full range of motion.",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: createId("exercise"),
+      name: "Back Squat",
+      category: "Legs",
+      equipment: "Barbell",
+      primaryMuscleIds: [quads, glutes].filter(Boolean) as string[],
+      secondaryMuscleIds: [hamstrings].filter(Boolean) as string[],
+      notes: "Controlled descent.",
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+
+  await database.exercises.bulkPut(exercises);
+
+  const workoutId = createId("workout");
+  const workoutExerciseId = createId("workoutExercise");
+  const today = localDateIso(new Date());
+
+  await database.workouts.put({
+    id: workoutId,
+    date: today,
+    notes: "Sample workout",
+    createdAt: now,
+    updatedAt: now
+  });
+
+  await database.workoutExercises.put({
+    id: workoutExerciseId,
+    workoutId,
+    exerciseId: exercises[0].id,
+    orderIndex: 0,
+    createdAt: now
+  });
+
+  await database.setEntries.bulkPut([
+    {
+      id: createId("set"),
+      workoutExerciseId,
+      setNumber: 1,
+      reps: 5,
+      weight: 60,
+      notes: "Warm-up",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: createId("set"),
+      workoutExerciseId,
+      setNumber: 2,
+      reps: 5,
+      weight: 70,
+      createdAt: now,
+      updatedAt: now
+    }
+  ]);
+
+  await database.settings.put({
+    id: "default",
+    volumePrimaryMultiplier: DEFAULT_VOLUME_CONFIG.primary,
+    volumeSecondaryMultiplier: DEFAULT_VOLUME_CONFIG.secondary
+  });
+}

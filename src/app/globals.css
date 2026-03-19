@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 44 33% 98%;
+  --foreground: 205 19% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 205 19% 15%;
+  --border: 206 14% 87%;
+  --muted: 36 35% 94%;
+  --muted-foreground: 210 12% 38%;
+  --primary: 199 67% 22%;
+  --primary-foreground: 36 40% 97%;
+  --accent: 33 42% 90%;
+  --accent-foreground: 205 19% 15%;
+  --destructive: 2 72% 42%;
+  --destructive-foreground: 40 30% 97%;
+  --radius: 0.8rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 205 31% 8%;
+    --foreground: 36 22% 93%;
+    --card: 205 24% 12%;
+    --card-foreground: 36 22% 93%;
+    --border: 204 16% 24%;
+    --muted: 205 17% 18%;
+    --muted-foreground: 203 13% 72%;
+    --primary: 186 53% 56%;
+    --primary-foreground: 205 28% 12%;
+    --accent: 205 16% 24%;
+    --accent-foreground: 36 22% 93%;
+    --destructive: 2 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+  }
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
