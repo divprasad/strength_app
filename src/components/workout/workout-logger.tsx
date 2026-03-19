@@ -7,13 +7,15 @@ import { db } from "@/lib/db";
 import {
   addExerciseToWorkout,
   addSetToWorkoutExercise,
+  createWorkoutForDate,
   finishWorkoutExercise,
   finishWorkoutSession,
-  getOrCreateWorkoutByDate,
+  getWorkoutById,
+  listWorkoutsByDate,
   renumberSets,
   reorderSet,
+  startWorkoutSessionForWorkout,
   startWorkoutExercise,
-  startWorkoutSession,
   summarizeSets
 } from "@/lib/repository";
 import { useUiStore } from "@/lib/store";
@@ -41,14 +43,18 @@ function computeElapsed(startedAt?: string) {
 }
 
 export function WorkoutLogger() {
-  const activeDate = useUiStore((s) => s.activeWorkoutDate);
-  const setActiveDate = useUiStore((s) => s.setActiveWorkoutDate);
+  const selectedDate = useUiStore((s) => s.selectedDate);
+  const activeWorkoutId = useUiStore((s) => s.activeWorkoutId);
+  const setSelectedDate = useUiStore((s) => s.setSelectedDate);
+  const setActiveWorkoutId = useUiStore((s) => s.setActiveWorkoutId);
+  const clearActiveWorkout = useUiStore((s) => s.clearActiveWorkout);
 
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
-  const workout = useLiveQuery(() => db.workouts.where("date").equals(activeDate).first(), [activeDate]);
+  const workouts = useLiveQuery(() => listWorkoutsByDate(selectedDate), [selectedDate]);
+  const workout = useLiveQuery(() => (activeWorkoutId ? getWorkoutById(activeWorkoutId) : Promise.resolve(null)), [activeWorkoutId]);
   const workoutExercises = useLiveQuery(
-    () => (workout ? db.workoutExercises.where("workoutId").equals(workout.id).sortBy("orderIndex") : []),
-    [workout?.id]
+    () => (activeWorkoutId ? db.workoutExercises.where("workoutId").equals(activeWorkoutId).sortBy("orderIndex") : []),
+    [activeWorkoutId]
   );
 
   const exerciseMap = useLiveQuery(async () => {
@@ -68,6 +74,33 @@ export function WorkoutLogger() {
   const [newExerciseId, setNewExerciseId] = useState("");
 
   useEffect(() => {
+    if (!workouts) return;
+    if (activeWorkoutId && !workouts.some((item) => item.id === activeWorkoutId)) {
+      clearActiveWorkout();
+    }
+  }, [activeWorkoutId, clearActiveWorkout, workouts]);
+
+  useEffect(() => {
+    if (!workouts) return;
+    if (workouts.length === 0) {
+      clearActiveWorkout();
+      return;
+    }
+    if (activeWorkoutId && workouts.some((item) => item.id === activeWorkoutId)) return;
+    if (workouts.length === 1) {
+      setActiveWorkoutId(workouts[0].id);
+      return;
+    }
+    const active = workouts.find((item) => item.sessionStartedAt && !item.sessionEndedAt);
+    if (active) {
+      setActiveWorkoutId(active.id);
+      return;
+    }
+    const mostRecent = [...workouts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    if (mostRecent) setActiveWorkoutId(mostRecent.id);
+  }, [activeWorkoutId, clearActiveWorkout, setActiveWorkoutId, workouts]);
+
+  useEffect(() => {
     if (!sessionActive || !workout?.sessionStartedAt) {
       setSessionElapsed(0);
       return;
@@ -82,10 +115,11 @@ export function WorkoutLogger() {
 
   const activeExerciseId = workoutExercises?.find((item) => item.startedAt && !item.completedAt)?.id ?? null;
 
-  async function handleStartWorkout() {
+  async function handleCreateWorkout() {
     setSessionBusy(true);
     try {
-      await startWorkoutSession(activeDate);
+      const created = await createWorkoutForDate(selectedDate);
+      setActiveWorkoutId(created.id);
     } finally {
       setSessionBusy(false);
     }
@@ -101,15 +135,24 @@ export function WorkoutLogger() {
     }
   }
 
+  async function handleStartWorkout() {
+    if (!workout?.id) return;
+    setSessionBusy(true);
+    try {
+      await startWorkoutSessionForWorkout(workout.id);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
   async function handleAddExercise() {
-    if (!newExerciseId) return;
-    const currentWorkout = await getOrCreateWorkoutByDate(activeDate);
-    await addExerciseToWorkout(currentWorkout.id, newExerciseId);
+    if (!newExerciseId || !workout?.id) return;
+    await addExerciseToWorkout(workout.id, newExerciseId);
     setNewExerciseId("");
   }
 
   async function handleStartExercise(workoutExerciseId: string) {
-    if (!sessionActive) return;
+    if (!sessionActive || !workout?.id) return;
     if (activeExerciseId && activeExerciseId !== workoutExerciseId) {
       await finishWorkoutExercise(activeExerciseId);
     }
@@ -134,23 +177,66 @@ export function WorkoutLogger() {
               <Input
                 id="workout-date"
                 type="date"
-                value={activeDate}
-                onChange={(e) => setActiveDate(e.target.value || localDateIso(new Date()))}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value || localDateIso(new Date()))}
               />
             </div>
             <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">{formatLocalDate(activeDate, "EEEE, MMMM d")}</p>
+              <p className="font-medium text-foreground">{formatLocalDate(selectedDate, "EEEE, MMMM d")}</p>
               <p>Focus on fast logging: tap an exercise, tap add set, adjust reps/weight if needed.</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!sessionActive ? (
-              <Button onClick={handleStartWorkout} disabled={sessionBusy}>
-                Start Workout
+
+          <div className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label>Sessions for this date</Label>
+              <Button size="sm" variant="secondary" onClick={handleCreateWorkout} disabled={sessionBusy}>
+                New Session
               </Button>
+            </div>
+            {workouts && workouts.length > 0 ? (
+              <div className="space-y-2">
+                {workouts.map((item) => {
+                  const isSelected = item.id === activeWorkoutId;
+                  const isRunning = Boolean(item.sessionStartedAt && !item.sessionEndedAt);
+                  const durationSeconds = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveWorkoutId(item.id)}
+                      className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
+                        isSelected ? "border-primary bg-accent" : ""
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium">{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted session"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isRunning ? "Running" : item.sessionEndedAt ? `Completed · ${formatDurationLong(durationSeconds)}` : "Not started"}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{isSelected ? "Selected" : "Tap to open"}</span>
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
+              <p className="text-sm text-muted-foreground">No sessions yet for this date.</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {!workout ? (
+              <Button onClick={handleCreateWorkout} disabled={sessionBusy}>
+                Create Workout
+              </Button>
+            ) : sessionActive ? (
               <Button variant="destructive" onClick={handleStopWorkout} disabled={sessionBusy}>
                 Stop Workout
+              </Button>
+            ) : (
+              <Button onClick={handleStartWorkout} disabled={sessionBusy}>
+                Start Workout
               </Button>
             )}
             <p className="text-sm text-muted-foreground">
@@ -181,9 +267,7 @@ export function WorkoutLogger() {
               </Button>
             </div>
           ) : (
-            <Button onClick={handleStartWorkout} disabled={sessionBusy}>
-              Create Workout
-            </Button>
+            <EmptyState title="No selected workout" description="Select a session or create a new one for this date." />
           )}
         </CardContent>
       </Card>

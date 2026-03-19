@@ -4,19 +4,34 @@ import { createId, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 
-export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
-  const existing = await db.workouts.where("date").equals(date).first();
-  if (existing) return existing;
+export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
+  return db.workouts.where("date").equals(date).sortBy("updatedAt");
+}
+
+export async function getWorkoutById(workoutId: string): Promise<Workout | null> {
+  return (await db.workouts.get(workoutId)) ?? null;
+}
+
+export async function createWorkoutForDate(date: string, options?: Pick<Workout, "notes" | "sessionStartedAt" | "sessionEndedAt">): Promise<Workout> {
   const now = nowIso();
   const workout: Workout = {
     id: createId("workout"),
     date,
+    notes: options?.notes,
+    sessionStartedAt: options?.sessionStartedAt,
+    sessionEndedAt: options?.sessionEndedAt,
     createdAt: now,
     updatedAt: now,
     userId: DEFAULT_USER_ID
   };
   await db.workouts.put(workout);
   return workout;
+}
+
+export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
+  const existing = await db.workouts.where("date").equals(date).first();
+  if (existing) return existing;
+  return createWorkoutForDate(date);
 }
 
 export async function getWorkoutBundle(workoutId: string): Promise<WorkoutBundle | null> {
@@ -190,6 +205,21 @@ export async function startWorkoutSession(date: string): Promise<Workout | null>
     updatedAt: now
   });
   await persistWorkoutSession("start", workout.id);
+  return { ...workout, sessionStartedAt: now, sessionEndedAt: undefined, userId: workout.userId ?? DEFAULT_USER_ID, updatedAt: now };
+}
+
+export async function startWorkoutSessionForWorkout(workoutId: string): Promise<Workout | null> {
+  const workout = await db.workouts.get(workoutId);
+  if (!workout) return null;
+  if (workout.sessionStartedAt && !workout.sessionEndedAt) return workout;
+  const now = nowIso();
+  await db.workouts.update(workoutId, {
+    sessionStartedAt: now,
+    sessionEndedAt: undefined,
+    userId: workout.userId ?? DEFAULT_USER_ID,
+    updatedAt: now
+  });
+  await persistWorkoutSession("start", workoutId);
   return { ...workout, sessionStartedAt: now, sessionEndedAt: undefined, userId: workout.userId ?? DEFAULT_USER_ID, updatedAt: now };
 }
 
