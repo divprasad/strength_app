@@ -73,3 +73,25 @@ export interface ExportPayload {
   workoutExercises: WorkoutExercise[];
   setEntries: SetEntry[];
 }
+
+export type IntegrityIssueSeverity = "error" | "warning";
+
+export interface IntegrityIssue {
+  entity: string;
+  id?: string;
+  severity: IntegrityIssueSeverity;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface IntegrityAuditSummary {
+  total: number;
+  errors: number;
+  warnings: number;
+}
+
+export interface IntegrityAuditReport {
+  ok: boolean;
+  summary: IntegrityAuditSummary;
+  issues: IntegrityIssue[];
+}
