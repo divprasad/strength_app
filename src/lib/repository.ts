@@ -168,6 +168,31 @@ export async function createExercise(data: Omit<Exercise, "id" | "createdAt" | "
   return exercise;
 }
 
+export async function isExerciseReferenced(exerciseId: string): Promise<boolean> {
+  return db.workoutExercises.where("exerciseId").equals(exerciseId).first().then(Boolean);
+}
+
+export async function deleteExercise(exerciseId: string): Promise<void> {
+  if (await isExerciseReferenced(exerciseId)) {
+    throw new Error("Cannot delete this exercise because it is used in a workout.");
+  }
+  await db.exercises.delete(exerciseId);
+}
+
+export async function isMuscleGroupReferenced(muscleId: string): Promise<boolean> {
+  const exercises = await db.exercises.toArray();
+  return exercises.some(
+    (exercise) => exercise.primaryMuscleIds.includes(muscleId) || exercise.secondaryMuscleIds.includes(muscleId)
+  );
+}
+
+export async function deleteMuscleGroup(muscleId: string): Promise<void> {
+  if (await isMuscleGroupReferenced(muscleId)) {
+    throw new Error("Cannot delete this muscle group because it is referenced by an exercise.");
+  }
+  await db.muscles.delete(muscleId);
+}
+
 const WORKOUT_API_PATH = "/api/workouts";
 
 async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {

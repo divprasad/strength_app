@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { createMuscleGroup } from "@/lib/repository";
+import { createMuscleGroup, deleteMuscleGroup } from "@/lib/repository";
 import { nowIso } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ export function MuscleManager() {
   const muscles = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -53,6 +54,15 @@ export function MuscleManager() {
     setEditingName("");
   }
 
+  async function handleDelete(id: string) {
+    try {
+      setDeleteError(null);
+      await deleteMuscleGroup(id);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Unable to delete muscle group.");
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -64,6 +74,7 @@ export function MuscleManager() {
           <Button type="submit">Add</Button>
         </form>
         {form.formState.errors.name ? <p className="text-sm text-destructive">{form.formState.errors.name.message}</p> : null}
+        {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
 
         <ul className="space-y-2">
           {(muscles ?? []).map((muscle) => (
@@ -91,7 +102,7 @@ export function MuscleManager() {
                   >
                     Edit
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={() => db.muscles.delete(muscle.id)}>
+                  <Button size="sm" variant="destructive" onClick={() => handleDelete(muscle.id)}>
                     Delete
                   </Button>
                 </>

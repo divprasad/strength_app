@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
-import { createExercise } from "@/lib/repository";
+import { createExercise, deleteExercise } from "@/lib/repository";
 import type { Exercise } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,15 @@ export function ExerciseList() {
       setEditing(null);
     } catch {
       setError("Unable to update exercise.");
+    }
+  }
+
+  async function handleDelete(exerciseId: string) {
+    try {
+      setError(null);
+      await deleteExercise(exerciseId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete exercise.");
     }
   }
 
@@ -86,7 +95,7 @@ export function ExerciseList() {
                       <Button size="sm" variant="ghost" onClick={() => setEditing(exercise)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => db.exercises.delete(exercise.id)}>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(exercise.id)}>
                         Delete
                       </Button>
                     </div>
