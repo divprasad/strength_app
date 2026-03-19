@@ -53,30 +53,19 @@ export function ExportPanel() {
     const text = await file.text();
     const payload = JSON.parse(text) as ExportPayload;
 
-    await db.transaction(
-      "rw",
-      db.muscles,
-      db.exercises,
-      db.workouts,
-      db.workoutExercises,
-      db.setEntries,
-      db.settings,
-      async () => {
-        await db.muscles.clear();
-        await db.exercises.clear();
-        await db.workouts.clear();
-        await db.workoutExercises.clear();
-        await db.setEntries.clear();
-        await db.settings.clear();
+    await db.muscles.clear();
+    await db.exercises.clear();
+    await db.workouts.clear();
+    await db.workoutExercises.clear();
+    await db.setEntries.clear();
+    await db.settings.clear();
 
-        await db.muscles.bulkPut(payload.muscleGroups);
-        await db.exercises.bulkPut(payload.exercises);
-        await db.workouts.bulkPut(payload.workouts);
-        await db.workoutExercises.bulkPut(payload.workoutExercises);
-        await db.setEntries.bulkPut(payload.setEntries);
-        await db.settings.put(payload.settings);
-      }
-    );
+    await db.muscles.bulkPut(payload.muscleGroups);
+    await db.exercises.bulkPut(payload.exercises);
+    await db.workouts.bulkPut(payload.workouts);
+    await db.workoutExercises.bulkPut(payload.workoutExercises);
+    await db.setEntries.bulkPut(payload.setEntries);
+    await db.settings.put(payload.settings);
 
     setStatus("Import complete.");
   }
