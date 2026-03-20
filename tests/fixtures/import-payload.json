@@ -1,0 +1,66 @@
+{
+  "exportedAt": "2026-03-20T08:00:00.000Z",
+  "version": "1.0.0",
+  "settings": {
+    "id": "default",
+    "volumePrimaryMultiplier": 1,
+    "volumeSecondaryMultiplier": 0.5
+  },
+  "muscleGroups": [
+    {
+      "id": "muscle_imported_biceps",
+      "name": "Imported Biceps",
+      "createdAt": "2026-03-20T08:00:00.000Z",
+      "updatedAt": "2026-03-20T08:00:00.000Z"
+    }
+  ],
+  "exercises": [
+    {
+      "id": "exercise_imported_curl",
+      "name": "E2E Imported Curl",
+      "category": "Pull",
+      "equipment": "Dumbbell",
+      "primaryMuscleIds": ["muscle_imported_biceps"],
+      "secondaryMuscleIds": [],
+      "notes": "Imported from fixture",
+      "createdAt": "2026-03-20T08:00:00.000Z",
+      "updatedAt": "2026-03-20T08:00:00.000Z"
+    }
+  ],
+  "workouts": [
+    {
+      "id": "workout_imported_2026_03_20",
+      "date": "2026-03-20",
+      "status": "completed",
+      "notes": "Imported workout",
+      "userId": "user-local",
+      "sessionStartedAt": "2026-03-20T08:00:00.000Z",
+      "sessionEndedAt": "2026-03-20T08:45:00.000Z",
+      "createdAt": "2026-03-20T08:00:00.000Z",
+      "updatedAt": "2026-03-20T08:45:00.000Z"
+    }
+  ],
+  "workoutExercises": [
+    {
+      "id": "workout_exercise_imported_curl",
+      "workoutId": "workout_imported_2026_03_20",
+      "exerciseId": "exercise_imported_curl",
+      "orderIndex": 0,
+      "createdAt": "2026-03-20T08:00:00.000Z",
+      "startedAt": "2026-03-20T08:05:00.000Z",
+      "completedAt": "2026-03-20T08:40:00.000Z"
+    }
+  ],
+  "setEntries": [
+    {
+      "id": "set_imported_curl_1",
+      "workoutExerciseId": "workout_exercise_imported_curl",
+      "setNumber": 1,
+      "reps": 12,
+      "weight": 14,
+      "notes": "Fixture set",
+      "createdAt": "2026-03-20T08:10:00.000Z",
+      "updatedAt": "2026-03-20T08:10:00.000Z"
+    }
+  ]
+}
