@@ -5,7 +5,7 @@ import { createId, nowIso } from "@/lib/utils";
 import { getCurrentUser } from "@/server/current-user";
 import { getDb } from "@/server/db";
 import { workoutExercises, workouts } from "@/server/db/schema";
-import type { Workout, WorkoutStatus } from "@/types/domain";
+import type { Workout, WorkoutBundle, WorkoutStatus } from "@/types/domain";
 
 function toWorkout(row: typeof workouts.$inferSelect): Workout {
   return {
@@ -25,6 +25,47 @@ function inferStatus(sessionStartedAt?: string | null, sessionEndedAt?: string |
   if (!sessionStartedAt) return "draft";
   if (!sessionEndedAt) return "active";
   return "completed";
+}
+
+export async function upsertWorkoutSession(bundle: WorkoutBundle): Promise<Workout> {
+  const db = getDb();
+  const user = getCurrentUser();
+  const workout = bundle.workout;
+  const status = inferStatus(workout.sessionStartedAt, workout.sessionEndedAt);
+
+  db.transaction((tx) => {
+    tx.insert(workouts)
+      .values({
+        id: workout.id,
+        userId: user.id,
+        date: workout.date,
+        status,
+        notes: workout.notes ?? null,
+        sessionStartedAt: workout.sessionStartedAt ?? null,
+        sessionEndedAt: workout.sessionEndedAt ?? null,
+        createdAt: workout.createdAt,
+        updatedAt: workout.updatedAt
+      })
+      .onConflictDoUpdate({
+        target: workouts.id,
+        set: {
+          userId: user.id,
+          date: workout.date,
+          status,
+          notes: workout.notes ?? null,
+          sessionStartedAt: workout.sessionStartedAt ?? null,
+          sessionEndedAt: workout.sessionEndedAt ?? null,
+          updatedAt: workout.updatedAt
+        }
+      })
+      .run();
+  });
+
+  return {
+    ...workout,
+    status,
+    userId: user.id
+  };
 }
 
 export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
