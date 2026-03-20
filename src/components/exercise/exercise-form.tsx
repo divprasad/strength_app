@@ -138,10 +138,13 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
 
       <div>
         <Label>Primary Muscles</Label>
-        <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
+        <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] border border-border/70 bg-background/60 p-3">
           {muscles.map((muscle) => (
-            <label key={muscle.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" value={muscle.id} {...form.register("primaryMuscleIds")} />
+            <label
+              key={muscle.id}
+              className="flex items-center gap-2 rounded-[0.95rem] border border-border/65 bg-card/78 px-3 py-2 text-sm shadow-[0_12px_28px_-28px_hsl(var(--foreground)/0.45)]"
+            >
+              <input className="h-4 w-4 accent-[hsl(var(--primary))]" type="checkbox" value={muscle.id} {...form.register("primaryMuscleIds")} />
               {muscle.name}
             </label>
           ))}
@@ -153,10 +156,18 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
 
       <div>
         <Label>Secondary Muscles</Label>
-        <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
+        <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] border border-border/70 bg-background/60 p-3">
           {muscles.map((muscle) => (
-            <label key={`${muscle.id}-secondary`} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" value={muscle.id} {...form.register("secondaryMuscleIds")} />
+            <label
+              key={`${muscle.id}-secondary`}
+              className="flex items-center gap-2 rounded-[0.95rem] border border-border/65 bg-card/78 px-3 py-2 text-sm shadow-[0_12px_28px_-28px_hsl(var(--foreground)/0.45)]"
+            >
+              <input
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+                type="checkbox"
+                value={muscle.id}
+                {...form.register("secondaryMuscleIds")}
+              />
               {muscle.name}
             </label>
           ))}

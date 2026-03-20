@@ -6,8 +6,10 @@ import { payloadToCsvMap, payloadToJson } from "@/lib/export";
 import { runIntegrityAudit } from "@/lib/integrity-audit";
 import { nowIso, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
+import { PageIntro } from "@/components/layout/page-intro";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 async function buildPayload(): Promise<ExportPayload> {
@@ -95,13 +97,42 @@ export function ExportPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
+    <div className="space-y-6">
+      <PageIntro
+        eyebrow="Backup & Integrity"
+        title="Settings"
+        description="Export or replace local data, then run an integrity audit to make sure the training log still looks structurally sound."
+        action={
+          <Button onClick={runAudit} disabled={auditLoading}>
+            {auditLoading ? "Running..." : "Run Check"}
+          </Button>
+        }
+        meta={
+          <>
+            <Badge className="bg-accent px-3 py-1 text-accent-foreground">Local-first data tools</Badge>
+            {auditReport ? <Badge>{auditReport.ok ? "Healthy" : `${auditReport.summary.total} issue${auditReport.summary.total === 1 ? "" : "s"}`}</Badge> : null}
+          </>
+        }
+      />
+
+      {status ? (
+        <div className="rounded-[1.3rem] border border-border/70 bg-card/82 px-4 py-3 text-sm text-muted-foreground shadow-[0_18px_40px_-34px_hsl(var(--foreground)/0.42)]">
+          {status}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-4">
           <CardTitle>Export Data</CardTitle>
+          <CardDescription>
+            Export includes exercises, muscles, workouts, workout exercises, set entries, and settings.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">Export includes exercises, muscles, workouts, workout-exercises, set entries, and settings.</p>
+        <CardContent className="space-y-4">
+          <div className="rounded-[1.25rem] border border-border/70 bg-background/55 p-4">
+            <p className="text-sm text-muted-foreground">Use JSON for full restore workflows. CSV exports each table separately for inspection or spreadsheet use.</p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={exportJson}>Export JSON</Button>
             <Button variant="secondary" onClick={exportCsv}>
@@ -109,42 +140,41 @@ export function ExportPanel() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+        </Card>
 
-      <Card>
-        <CardHeader>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-4">
           <CardTitle>Import JSON (Optional)</CardTitle>
+          <CardDescription>Import replaces local data fully. Use the fixture or a recent export when validating flows.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            type="file"
-            accept="application/json"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                void importJson(file);
-              }
-            }}
-          />
-          <p className="text-xs text-muted-foreground">Import replaces local data fully.</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <div>
-            <CardTitle>Integrity Report</CardTitle>
-            <p className="text-sm text-muted-foreground">Runs a read-only audit of local IndexedDB data.</p>
+          <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/55 p-4">
+            <Input
+              type="file"
+              accept="application/json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void importJson(file);
+                }
+              }}
+            />
+            <p className="mt-3 text-xs text-muted-foreground">Import replaces local data fully.</p>
           </div>
-          <Button onClick={runAudit} disabled={auditLoading}>
-            {auditLoading ? "Running..." : "Run Check"}
-          </Button>
+        </CardContent>
+        </Card>
+      </div>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">
+          <CardTitle>Integrity Report</CardTitle>
+          <CardDescription>Runs a read-only audit of local IndexedDB data and reports structural issues.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {auditError ? <p className="text-sm text-destructive">{auditError}</p> : null}
           {auditReport ? (
             <div className="space-y-3">
-              <div className="rounded-lg border p-3">
+              <div className="rounded-[1.2rem] border border-border/70 bg-background/55 p-4">
                 <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
                 <p className="text-sm text-muted-foreground">
                   {auditReport.summary.total} issue{auditReport.summary.total === 1 ? "" : "s"} total · {auditReport.summary.errors} errors ·{" "}
@@ -157,9 +187,12 @@ export function ExportPanel() {
                   <p className="text-sm font-medium">Issues</p>
                   <ul className="space-y-2">
                     {auditReport.issues.map((issue, index) => (
-                      <li key={`${issue.entity}-${issue.id ?? "unknown"}-${index}`} className="rounded-lg border p-3 text-sm">
+                      <li
+                        key={`${issue.entity}-${issue.id ?? "unknown"}-${index}`}
+                        className="rounded-[1.15rem] border border-border/70 bg-background/55 p-4 text-sm"
+                      >
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                             {issue.severity}
                           </span>
                           <span className="font-medium">{issue.entity}</span>
@@ -182,8 +215,6 @@ export function ExportPanel() {
           )}
         </CardContent>
       </Card>
-
-      {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
     </div>
   );
 }
