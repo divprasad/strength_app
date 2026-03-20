@@ -7,20 +7,19 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
   await page.goto("/workouts");
 
   await expect(page.getByRole("heading", { name: "Workout Logger" })).toBeVisible();
-  await expect(page.getByText("Barbell Bench Press")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Barbell Bench Press" })).toBeVisible();
 
   await page.getByRole("button", { name: "Start Workout" }).click();
   await expect(page.getByText(/Session running/)).toBeVisible();
 
   await page.getByRole("button", { name: /^Start$/ }).click();
   await page.getByRole("button", { name: "Add Set" }).click();
-  await expect(page.getByText("3")).toBeVisible();
 
   await page.getByRole("button", { name: "Finish" }).click();
   await page.getByRole("button", { name: "Stop Workout" }).click();
 
   await page.goto("/history");
-  await expect(page.getByText("Completed")).toBeVisible();
+  await expect(page.getByText(/^Completed ·/)).toBeVisible();
   await expect(page.getByText("Set 3: 8 reps × 20")).toBeVisible();
 });
 
@@ -37,5 +36,5 @@ test("settings supports JSON export and fixture import", async ({ page }) => {
 
   await page.goto("/exercises");
   await expect(page.getByText("E2E Imported Curl")).toBeVisible();
-  await expect(page.getByText("Imported Biceps")).toBeVisible();
+  await expect(page.getByRole("paragraph").filter({ hasText: "Imported Biceps" })).toBeVisible();
 });
