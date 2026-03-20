@@ -1,5 +1,8 @@
 # dependencies
 /node_modules
+data/strength.sqlite
+
+next-env.d.ts
 
 # next.js
 /.next/
