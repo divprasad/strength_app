@@ -21,15 +21,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen pb-20 md:pb-6">
-      <header className="sticky top-0 z-30 border-b border-white/30 bg-background/78 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/30 bg-background/72 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-4 py-3 md:px-6 md:py-4">
-          <div className="flex items-center justify-between gap-4 rounded-[1.6rem] border border-white/55 bg-card/88 px-4 py-3 shadow-[0_20px_60px_-32px_hsl(var(--foreground)/0.45)] ring-1 ring-black/5 md:px-5">
+          <div className="flex items-center justify-between gap-4 rounded-[1.7rem] border border-white/55 bg-card/90 px-4 py-3 shadow-[0_20px_60px_-32px_hsl(var(--foreground)/0.45)] ring-1 ring-black/5 md:px-5">
             <div className="min-w-0">
               <p className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-primary/80">Training System</p>
               <p className="text-xl font-semibold tracking-[-0.04em] md:text-2xl">{APP_NAME}</p>
               <p className="truncate text-xs text-muted-foreground md:text-sm">Fast local workout logging for repeatable sessions</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="shrink-0">
                 <CommandPalette />
               </div>
@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       "rounded-full border px-4 py-2 text-sm transition-colors",
                       pathname === item.href
                         ? "border-primary/20 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
-                        : "border-transparent bg-background/60 text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
+                        : "border-transparent bg-background/55 text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
                     )}
                   >
                     {item.label}

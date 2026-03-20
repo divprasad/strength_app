@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { createMuscleGroup, deleteMuscleGroup } from "@/lib/repository";
 import { nowIso } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 const schema = z.object({
@@ -64,9 +64,10 @@ export function MuscleManager() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-4">
         <CardTitle>Muscle Groups</CardTitle>
+        <CardDescription>Maintain the muscle taxonomy used in exercise setup, timing, and analytics.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form className="flex gap-2" onSubmit={form.handleSubmit(onSubmit)}>
@@ -78,7 +79,10 @@ export function MuscleManager() {
 
         <ul className="space-y-2">
           {(muscles ?? []).map((muscle) => (
-            <li key={muscle.id} className="flex items-center gap-2 rounded-lg border p-2">
+            <li
+              key={muscle.id}
+              className="flex items-center gap-2 rounded-[1.1rem] border border-border/70 bg-background/58 p-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.4)]"
+            >
               {editingId === muscle.id ? (
                 <>
                   <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} className="h-9" />
@@ -94,7 +98,7 @@ export function MuscleManager() {
                   <p className="flex-1 text-sm">{muscle.name}</p>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     onClick={() => {
                       setEditingId(muscle.id);
                       setEditingName(muscle.name);
