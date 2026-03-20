@@ -32,6 +32,12 @@ export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
 export async function getWorkoutById(workoutId: string): Promise<Workout | null> {
   const localWorkout = (await db.workouts.get(workoutId)) ?? null;
 
+  // The workout detail view is selected from local state during the bridge.
+  // Avoid re-fetching local-only workouts by id before they exist on the server.
+  if (localWorkout) {
+    return localWorkout;
+  }
+
   try {
     const response = await fetch(`${WORKOUT_API_PATH}/${encodeURIComponent(workoutId)}`);
     if (response.status === 404) {
