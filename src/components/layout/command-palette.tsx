@@ -55,15 +55,18 @@ export function CommandPalette() {
     <>
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="sm"
-        className="gap-2"
+        className="h-10 rounded-full border border-border/70 bg-background/72 px-3 text-muted-foreground shadow-[0_14px_30px_-22px_hsl(var(--foreground)/0.45)] transition-all hover:border-primary/25 hover:bg-card hover:text-foreground"
         onClick={openPalette}
         aria-label="Open command palette"
       >
-        <Search className="h-4 w-4" />
-        <span className="hidden sm:inline">Jump to…</span>
-        <span className="sm:hidden">Jump</span>
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="ml-2 hidden text-xs font-medium uppercase tracking-[0.18em] sm:inline">Jump to page</span>
+        <span className="ml-2 sm:hidden">Jump</span>
+        <span className="ml-3 hidden rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground lg:inline">
+          Search
+        </span>
       </Button>
 
       {open ? (
@@ -79,9 +82,9 @@ export function CommandPalette() {
               role="dialog"
               aria-modal="true"
               aria-label="Jump to command palette"
-              className="relative w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl"
+              className="relative w-full overflow-hidden rounded-[1.75rem] border border-white/40 bg-card/95 text-card-foreground shadow-[0_36px_90px_-44px_hsl(var(--foreground)/0.85)] ring-1 ring-black/5"
             >
-              <div className="border-b p-4">
+              <div className="border-b border-border/70 p-4">
                 <Input
                   autoFocus
                   value={query}
@@ -101,8 +104,8 @@ export function CommandPalette() {
                             type="button"
                             onClick={() => goTo(command.href)}
                             className={cn(
-                              "flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm transition-colors hover:bg-accent",
-                              active && "bg-accent"
+                              "flex w-full items-center justify-between rounded-[1rem] border border-transparent px-3 py-3 text-left text-sm transition-colors hover:border-border/70 hover:bg-accent/55",
+                              active && "border-primary/15 bg-accent"
                             )}
                           >
                             <span className="font-medium">{command.label}</span>

@@ -30,23 +30,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="truncate text-xs text-muted-foreground md:text-sm">Fast local workout logging for repeatable sessions</p>
             </div>
             <div className="flex items-center gap-2">
-              <CommandPalette />
+              <div className="shrink-0">
+                <CommandPalette />
+              </div>
               <nav className="hidden gap-2 md:flex md:flex-wrap md:justify-end">
-              {desktopLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-sm transition-colors",
-                    pathname === item.href
-                      ? "border-primary/20 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
-                      : "border-transparent bg-background/60 text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+                {desktopLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "rounded-full border px-4 py-2 text-sm transition-colors",
+                      pathname === item.href
+                        ? "border-primary/20 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
+                        : "border-transparent bg-background/60 text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
           </div>
         </div>
       </header>
