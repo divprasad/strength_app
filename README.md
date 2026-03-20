@@ -22,7 +22,7 @@ The app is currently at a functional MVP stage:
 - The web app UI works
 - The main workout flow works locally
 - History, analytics, export, and import are present
-- The app builds and current automated checks pass
+- Typecheck, lint, build, and unit tests pass locally
 
 The important limitation is that persistence is still primarily local-first:
 
@@ -31,6 +31,11 @@ The important limitation is that persistence is still primarily local-first:
 - New browser sessions or devices do not yet bootstrap from a true server-side database
 
 That means the app is usable for prototyping, but it is not yet stable as a server-backed multi-session system.
+
+The current end-to-end coverage is still being stabilized:
+
+- Playwright scenarios exist for workout and settings flows
+- Those scenarios are not yet the required merge gate in CI
 
 ## Broad technical implementation
 
@@ -118,9 +123,16 @@ npm run dev
 ```bash
 npm run typecheck
 npm run lint
+npm run test:unit
 npm run test:e2e
 npm run build
 ```
+
+## Automated checks
+
+- Unit tests use `Vitest` for pure `src/lib/**` logic.
+- Fast CI runs `lint`, `typecheck`, `test:unit`, and `build` on every branch push and on pull requests into `main`.
+- Playwright E2E runs as a separate manual GitHub Actions workflow until the suite is stable enough to block merges.
 
 ## Short-term product direction
 
