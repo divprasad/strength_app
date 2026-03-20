@@ -1,92 +1,103 @@
 # Strength Log
 
-A minimal, production-leaning, mobile-first workout tracker focused on fast set logging, clean data, and local-first reliability.
+Strength Log is a mobile-first workout tracker for logging training sessions quickly, reviewing history, and understanding progress over time.
 
-## What the app does
+## What the app intends to do
 
-- Manages reusable exercise library with custom muscle targeting
-- Logs workouts by date with rapid set entry (reps, weight, notes)
-- Browses workout history in a weekly calendar view
-- Computes weekly analytics:
-  - total volume
-  - volume by muscle group
-  - volume by exercise
-- Tracks per-exercise progress over time (max weight + estimated 1RM)
-- Exports all data:
-  - JSON (single file)
-  - CSV (one table per core entity)
-- Optional JSON import to restore/replace local data
+The product is meant to cover the full workout logging loop:
 
-## Stack choice
+- Manage a reusable exercise library and muscle groups
+- Start a workout session for a chosen date
+- Add exercises and log sets quickly during the session
+- Review completed sessions in history
+- See weekly analytics and progress trends
+- Export data in structured formats
 
-- `Next.js` App Router + `React` + `TypeScript`
-- `Tailwind CSS` for a restrained, mobile-first UI
-- Lightweight local primitives (shadcn-style component structure, custom implementation)
-- `Dexie` + IndexedDB for local-first persistence
-- `Zustand` for tiny UI state (active workout date)
-- `React Hook Form` + `Zod` for form validation
-- `Recharts` for practical analytics charts
+The long-term goal is a stable web app where workout data is stored safely on the server in SQL tables, and every new session appends cleanly to the same persistent dataset.
 
-### Why this architecture
+## Current development status
 
-- **Fast to scaffold and maintain**: all core logic in a typed `lib/` layer
-- **Local-first reliability**: no auth/backend dependency for MVP
-- **Easy backend migration later**: domain model and repository/service boundaries are explicit
-- **Good mobile logging UX**: large touch targets, quick-add patterns, sticky navigation
+The app is currently at a functional MVP stage:
 
-## Architecture overview
+- The web app UI works
+- The main workout flow works locally
+- History, analytics, export, and import are present
+- The app builds and current automated checks pass
 
-### Layers
+The important limitation is that persistence is still primarily local-first:
 
-- `src/types/domain.ts`: canonical domain types
-- `src/lib/db.ts`: Dexie schema + first-run seed
-- `src/lib/repository.ts`: write-side workflows (create workout, add set, reorder, etc.)
-- `src/lib/analytics.ts`: weekly aggregates + progress points
-- `src/lib/volume.ts`: configurable attribution model in one place
-- `src/lib/export.ts`: JSON/CSV serialization
-- `src/components/**`: UI split by feature and reusable primitives
-- `src/app/**`: App Router pages per screen
+- The main source of truth is browser IndexedDB via Dexie
+- There is a server route for workout persistence, but it currently appends SQL text to a file instead of writing to a real SQL database
+- New browser sessions or devices do not yet bootstrap from a true server-side database
 
-### Routes
+That means the app is usable for prototyping, but it is not yet stable as a server-backed multi-session system.
 
-- `/` Dashboard
-- `/workouts` Workout Logger
-- `/exercises` Exercise + Muscle Management
-- `/history` Weekly Calendar + Daily Inspection
-- `/analytics` Weekly Analytics + Progress Charts
-- `/settings` Export/Import
+## Broad technical implementation
 
-## Data model
+### Frontend
 
-Defined in `src/types/domain.ts`.
+- `Next.js` App Router
+- `React` + `TypeScript`
+- `Tailwind CSS`
+- Feature components under `src/components/**`
 
-Core entities:
+### Client-side data and state
 
-- `MuscleGroup`
-- `Exercise`
-- `Workout`
-- `WorkoutExercise`
-- `SetEntry`
-- `AppSettings`
+- `Dexie` + IndexedDB for current local persistence
+- `dexie-react-hooks` for reactive reads
+- `Zustand` for small UI state
+- `React Hook Form` + `Zod` for validated forms
 
-Notable design choices:
+### Domain and repository layer
 
-- `Workout.date` uses local date string `YYYY-MM-DD`
-- many-to-many muscles on exercises via `primaryMuscleIds` + `secondaryMuscleIds`
-- `WorkoutExercise` separates exercise library from a specific workout instance
-- `SetEntry` is normalized and ordered via `setNumber`
-- `AppSettings` stores volume multipliers (single editable place)
+- Canonical domain types in `src/types/domain.ts`
+- Local data schema and bootstrap in `src/lib/db.ts`
+- Workout and entity workflows in `src/lib/repository.ts`
+- Analytics and derived metrics in `src/lib/analytics.ts`
 
-## Volume logic (explicit + configurable)
+### Current server-side implementation
 
-In `src/lib/volume.ts`:
+- A single API route at `src/app/api/workouts/route.ts`
+- That route currently writes raw SQL statements into `data/workouts.sql`
+- It is not yet connected to a real SQL engine, migration system, or server-side source of truth
 
-- set volume = `reps × weight`
-- primary muscles receive `100%` credit
-- secondary muscles receive `50%` credit
-- multipliers are stored in `AppSettings` (`volumePrimaryMultiplier`, `volumeSecondaryMultiplier`)
+## Key files
 
-This makes attribution transparent and easy to adjust later.
+- `src/app/workouts/page.tsx`: workout logging route
+- `src/components/workout/workout-logger.tsx`: main workout session UI
+- `src/lib/db.ts`: Dexie schema and bootstrapping
+- `src/lib/repository.ts`: workout mutations and session persistence hooks
+- `src/app/api/workouts/route.ts`: current server persistence stub
+- `src/components/settings/export-panel.tsx`: export, import, and integrity checks
+
+## Stabilization roadmap
+
+These are the next five high-priority steps to make the app stable as a server-backed product:
+
+### 1. Add a real SQL backend with migrations and relational constraints
+
+Move from the append-only SQL file to a real database with actual tables, primary keys, foreign keys, and a repeatable migration flow.
+
+### 2. Replace file-appended SQL with transactional inserts and upserts
+
+The server should write directly to SQL tables using idempotent create/update logic instead of appending duplicate raw `INSERT` statements to a text file.
+
+### 3. Add a server bootstrap/read path
+
+The app must be able to load persisted workouts, exercises, and sets from the server so refreshes and new sessions start from server data rather than only local IndexedDB.
+
+### 4. Route all important mutations through the server
+
+Creating workouts, adding exercises, adding sets, editing sets, deleting sets, reordering sets, and finishing sessions all need server-backed persistence.
+
+### 5. Add tests for persistence and repeated sessions
+
+Expand automated coverage to prove that:
+
+- a refresh keeps the same data
+- a new session appends data instead of overwriting
+- an edited session updates existing rows correctly
+- server and client stay in sync
 
 ## Local setup
 
@@ -96,78 +107,29 @@ This makes attribution transparent and easy to adjust later.
 npm install
 ```
 
-2. Run dev server:
+2. Start the app:
 
 ```bash
 npm run dev
 ```
 
-3. Open:
-
-- [http://localhost:3000](http://localhost:3000)
-
-Optional checks:
+3. Run checks:
 
 ```bash
 npm run typecheck
 npm run lint
+npm run test:e2e
+npm run build
 ```
 
-## End-to-end sample flow
+## Short-term product direction
 
-1. Open `/exercises`, add/edit muscle groups
-2. Create an exercise with primary/secondary muscles
-3. Open `/workouts`, choose date, create workout
-4. Add an exercise to workout
-5. Add sets quickly (Add Set / Repeat Last)
-6. Open `/history` and inspect the workout day
-7. Open `/analytics` for weekly and progress charts
-8. Open `/settings` and export JSON/CSV
+The immediate engineering priority is not adding more user-facing features. It is making persistence reliable and making the server-side database the real source of truth.
 
-## Export format
+Once that is stable, the app will be in a much better position for:
 
-### JSON
-
-Single file with:
-
-- `exportedAt`
-- `version`
-- `settings`
-- `muscleGroups[]`
-- `exercises[]`
-- `workouts[]`
-- `workoutExercises[]`
-- `setEntries[]`
-
-### CSV
-
-Separate files per entity table:
-
-- `muscle_groups.csv`
-- `exercises.csv`
-- `workouts.csv`
-- `workout_exercises.csv`
-- `set_entries.csv`
-
-`primaryMuscleIds` and `secondaryMuscleIds` are pipe-delimited (`|`) for easy parsing in pandas.
-
-## MVP vs future improvements
-
-### MVP included
-
-- local-first persistence
-- exercise + muscle management
-- workout logging + set editing/deleting/reordering
-- weekly history/calendar
-- weekly analytics and basic progress charting
-- JSON + CSV export (and optional JSON import)
-
-### Future improvements
-
-- month calendar and richer history filters
-- explicit backup/sync (Supabase/Postgres)
-- configurable units (kg/lb)
-- workout templates/routines
-- keyboard shortcuts + haptics for faster in-workout logging
-- automated migration layer for future hosted backend
-
+- multi-device continuity
+- reliable backups
+- hosted deployment
+- future auth and user accounts
+- higher confidence analytics and history
