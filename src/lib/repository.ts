@@ -11,11 +11,46 @@ function inferWorkoutStatus(workout: Pick<Workout, "sessionStartedAt" | "session
 }
 
 export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
-  return db.workouts.where("date").equals(date).sortBy("updatedAt");
+  const localWorkouts = await db.workouts.where("date").equals(date).sortBy("updatedAt");
+
+  try {
+    const response = await fetch(`${WORKOUT_API_PATH}?date=${encodeURIComponent(date)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load workouts for ${date}`);
+    }
+
+    const payload = (await response.json()) as { workouts?: Workout[] };
+    const serverWorkouts = payload.workouts ?? [];
+    await reconcileWorkouts(serverWorkouts);
+    return db.workouts.where("date").equals(date).sortBy("updatedAt");
+  } catch (error) {
+    console.warn("Unable to load workouts from server", error);
+    return localWorkouts;
+  }
 }
 
 export async function getWorkoutById(workoutId: string): Promise<Workout | null> {
-  return (await db.workouts.get(workoutId)) ?? null;
+  const localWorkout = (await db.workouts.get(workoutId)) ?? null;
+
+  try {
+    const response = await fetch(`${WORKOUT_API_PATH}/${encodeURIComponent(workoutId)}`);
+    if (response.status === 404) {
+      return localWorkout;
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to load workout ${workoutId}`);
+    }
+
+    const payload = (await response.json()) as { workout?: Workout };
+    if (payload.workout) {
+      return reconcileWorkout(payload.workout);
+    }
+
+    return localWorkout;
+  } catch (error) {
+    console.warn("Unable to load workout from server", error);
+    return localWorkout;
+  }
 }
 
 export async function createWorkoutForDate(date: string, options?: Pick<Workout, "notes" | "sessionStartedAt" | "sessionEndedAt">): Promise<Workout> {
@@ -203,13 +238,39 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
 
 const WORKOUT_API_PATH = "/api/workouts";
 
+function isIncomingWorkoutNewer(current: Workout | null | undefined, incoming: Workout): boolean {
+  if (!current) return true;
+  return incoming.updatedAt > current.updatedAt;
+}
+
+async function reconcileWorkout(incoming: Workout): Promise<Workout> {
+  const current = (await db.workouts.get(incoming.id)) ?? null;
+  if (isIncomingWorkoutNewer(current, incoming)) {
+    await db.workouts.put({
+      ...incoming,
+      userId: incoming.userId ?? DEFAULT_USER_ID
+    });
+    return {
+      ...incoming,
+      userId: incoming.userId ?? DEFAULT_USER_ID
+    };
+  }
+
+  return current ?? incoming;
+}
+
+async function reconcileWorkouts(incomingWorkouts: Workout[]): Promise<void> {
+  for (const incoming of incomingWorkouts) {
+    await reconcileWorkout(incoming);
+  }
+}
+
 async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {
   const bundle = await getWorkoutBundle(workoutId);
   if (!bundle) return;
 
   const payload = {
     action,
-    userId: bundle.workout.userId ?? DEFAULT_USER_ID,
     bundle
   };
 

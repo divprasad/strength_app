@@ -81,7 +81,12 @@ export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
 }
 
 export async function getWorkoutById(workoutId: string): Promise<Workout | null> {
-  const row = getDb().select().from(workouts).where(eq(workouts.id, workoutId)).get();
+  const user = getCurrentUser();
+  const row = getDb()
+    .select()
+    .from(workouts)
+    .where(and(eq(workouts.id, workoutId), eq(workouts.userId, user.id)))
+    .get();
   return row ? toWorkout(row) : null;
 }
 

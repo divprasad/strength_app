@@ -2,15 +2,15 @@
 
 ## Context
 
-This branch is the start of a hard cutover from local-first Dexie/IndexedDB runtime persistence to a server-first SQLite runtime using Drizzle.
+This branch is using an incremental bridge from local-first Dexie/IndexedDB runtime persistence toward a server-first SQLite runtime using Drizzle.
 
 The target architecture for this branch is:
 
-- SQLite as the only runtime source of truth
+- SQLite as the long-term runtime source of truth
 - server-backed JSON endpoints for every read and write
-- no Dexie runtime dependency in the shipped application
+- Dexie retained temporarily as cache/fallback during the migration
 - auth-ready user scoping on the server, without adding auth UI yet
-- manual import/export migration from old local-first builds instead of dual-write
+- incremental replacement of local runtime paths instead of a one-step cutover
 
 This document is a checkpoint summary for the current state of the branch. It describes:
 
@@ -22,7 +22,7 @@ This document is a checkpoint summary for the current state of the branch. It de
 
 ## High-Level Migration Plan
 
-The branch is following a hard-cutover plan instead of a gradual dual-write strategy.
+The branch is following an incremental bridge plan.
 
 ### Planned end state
 
@@ -35,21 +35,21 @@ The branch is following a hard-cutover plan instead of a gradual dual-write stra
   - workout status transitions
   - set numbering and reorder integrity
   - transactional writes
-- client pages remain client-rendered for now, but they fetch from JSON endpoints rather than Dexie
+- client pages remain client-rendered for now, and Dexie stays in place until each read/write path is migrated safely
 - export/import stays compatible with the existing `ExportPayload` shape so older local-first builds can migrate manually
 
 ### Intended rollout order
 
 1. Add SQL foundation, bootstrap, schema, and initial server repositories
-2. Move Settings export/import/integrity to SQL
-3. Move muscle and exercise management to SQL
-4. Move workout logger reads and mutations to SQL
-5. Move history, analytics, and dashboard to SQL
-6. Remove Dexie and clean up dead runtime paths
+2. Persist workout rows on the server with transactional upsert
+3. Add server read/bootstrap for workout rows
+4. Move workout exercise mutations to the server
+5. Move set entry mutations to the server
+6. Flip workout reads to server-first, then widen the migration to the rest of the app
 
 ### Constraints for this branch
 
-- no dual-write
+- no broad cutover in one pass
 - no replay of `data/workouts.sql`
 - no new auth UI
 - no React Query in this step
@@ -57,7 +57,7 @@ The branch is following a hard-cutover plan instead of a gradual dual-write stra
 
 ## What Has Been Achieved
 
-The current branch has completed the first foundation slice only.
+The current branch has completed the SQL foundation slice and the first narrow workout-row write slice.
 
 ### 1. SQL dependencies added
 
@@ -160,7 +160,7 @@ A first repository module now exists at:
 
 - `src/server/repositories/workout-repository.ts`
 
-This currently provides early server-side equivalents for:
+This currently provides server-side equivalents for:
 
 - listing workouts by date
 - loading a workout by ID
@@ -168,10 +168,22 @@ This currently provides early server-side equivalents for:
 - starting a workout session
 - finishing a workout session
 - listing workout exercises
+- upserting a workout row from the current client bundle
 
 This is not the full repository layer yet, but it establishes the server-owned pattern that later endpoints will use.
 
-### 8. Initial migration SQL file added
+### 8. Workout-row server writes now use SQLite
+
+The old append-only SQL text generation path has been replaced for workout rows only.
+
+Current behavior:
+
+- `POST /api/workouts` upserts the `workouts` row into SQLite
+- user ownership is derived on the server
+- repeated `start`, `finish`, and `sync` operations update the same workout row by `workout.id`
+- `workout_exercises` and `set_entries` are intentionally still not persisted server-side in this slice
+
+### 9. Initial migration SQL file added
 
 An initial SQL file exists at:
 
@@ -189,18 +201,18 @@ The following checks were run successfully after the current foundation changes:
 
 - `npm run typecheck`
 - `npm run lint`
+- `npm run build`
 
 ### What has not been reworked or verified yet
 
 The following are still pending for the SQL cutover:
 
-- `npm run build` against a fully migrated runtime path
-- `npm run test:e2e` against a SQLite-backed server-owned runtime
-- runtime validation of the new SQLite bootstrap under actual screen/API usage
+- `npm run test:e2e` against a SQLite-backed workout bootstrap path
+- runtime validation of workout-row recovery on refresh/new session flows
 
 ## Current Runtime Reality
 
-Even though the SQL foundation exists, the app has not been cut over yet.
+Even though SQLite workout persistence now exists, the app has not been cut over yet.
 
 ### What still uses Dexie today
 
@@ -220,8 +232,9 @@ The existing app still reads from and writes to Dexie at runtime.
 
 Right now this branch is:
 
-- valid as infrastructure groundwork
-- not yet a complete server-first migration
+- using Dexie as the effective runtime source of truth
+- using SQLite as the durable store for workout rows only
+- not yet bootstrapping workout rows from SQLite on refresh or new browser sessions
 - not yet ready to claim that Dexie has been removed at runtime
 
 This is an expected intermediate state, but it is not yet a complete or review-ready cutover.
@@ -241,9 +254,9 @@ The current foundation contains the schema in two places:
 
 This is acceptable only as a short-lived checkpoint. It should be collapsed into a single migration/bootstrap strategy in the next steps, otherwise drift risk increases.
 
-### 3. Old persistence still exists
+### 3. The next real step is server read/bootstrap for workout rows
 
-The old append-only `/api/workouts` path still exists in the application codebase. It has not been retired yet.
+The write path for workout rows is in place, but the read/bootstrap path is still missing. Until that exists, SQLite cannot be treated as authoritative for workout rows.
 
 ### 4. Old tests still assume local-first defaults
 
@@ -256,6 +269,32 @@ The existing Playwright config and tests still reflect the current local-first a
 This must change before the SQL migration is complete.
 
 ## Risks and Gaps
+
+## Source of Truth Transition
+
+Before the next slice:
+
+- Dexie is the UI/runtime source of truth
+- SQLite is the durable store for workout rows only
+- Existing local exercise and set data is protected because those tables are still local-only
+
+After the next slice:
+
+- SQLite becomes authoritative for workout rows
+- Dexie remains as cache/fallback while exercises and sets are still migrating
+- local workout rows are never deleted automatically during reconciliation
+
+## Next Slice
+
+Implement server read/bootstrap for workout rows only.
+
+Scope:
+
+- keep `POST /api/workouts` for workout-row upsert
+- add list-by-date and get-by-id workout read paths
+- hydrate Dexie with the newer of local/server workout rows by `updatedAt`
+- fall back to Dexie when server fetch fails
+- do not move `workout_exercises` or `set_entries` yet
 
 The current main risks are architectural rather than syntactic.
 

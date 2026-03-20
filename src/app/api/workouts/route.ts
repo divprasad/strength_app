@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertWorkoutSession } from "@/server/repositories/workout-repository";
+import { listWorkoutsByDate, upsertWorkoutSession } from "@/server/repositories/workout-repository";
 import type { WorkoutBundle } from "@/types/domain";
 
 type Payload = {
   action: "start" | "finish" | "sync";
   bundle: WorkoutBundle;
 };
+
+export async function GET(request: NextRequest) {
+  const date = request.nextUrl.searchParams.get("date");
+  if (!date) {
+    return NextResponse.json({ error: "Missing date" }, { status: 400 });
+  }
+
+  const workouts = await listWorkoutsByDate(date);
+  return NextResponse.json({ workouts });
+}
 
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as Payload;

@@ -13,7 +13,7 @@ The product is meant to cover the full workout logging loop:
 - See weekly analytics and progress trends
 - Export data in structured formats
 
-The long-term goal is a stable web app where workout data is stored safely on the server in SQL tables, and every new session appends cleanly to the same persistent dataset.
+The long-term goal is a stable web app where workout data is stored safely on the server in SQL tables and the runtime can move to a server-first model without data loss.
 
 ## Current development status
 
@@ -24,13 +24,14 @@ The app is currently at a functional MVP stage:
 - History, analytics, export, and import are present
 - The app builds and current automated checks pass
 
-The important limitation is that persistence is still primarily local-first:
+The app is currently in an incremental bridge phase between local-first runtime behavior and a server-first SQLite backend:
 
-- The main source of truth is browser IndexedDB via Dexie
-- There is a server route for workout persistence, but it currently appends SQL text to a file instead of writing to a real SQL database
-- New browser sessions or devices do not yet bootstrap from a true server-side database
+- Dexie/IndexedDB is still the effective runtime source of truth for reads and most mutations
+- SQLite now stores `workouts` rows durably through transactional upsert on the server
+- `workout_exercises` and `set_entries` still remain local-only
+- New browser sessions or refreshes do not yet bootstrap workout rows from the server
 
-That means the app is usable for prototyping, but it is not yet stable as a server-backed multi-session system.
+That means the app is still usable as a prototype, but the migration is only partially complete.
 
 ## Broad technical implementation
 
@@ -58,8 +59,9 @@ That means the app is usable for prototyping, but it is not yet stable as a serv
 ### Current server-side implementation
 
 - A single API route at `src/app/api/workouts/route.ts`
-- That route currently writes raw SQL statements into `data/workouts.sql`
-- It is not yet connected to a real SQL engine, migration system, or server-side source of truth
+- `POST /api/workouts` now persists the `workouts` row into SQLite using transactional insert-or-update semantics
+- The server derives user ownership instead of trusting a client-provided `userId`
+- There is not yet a server bootstrap/read path for workout rows
 
 ## Key files
 
@@ -67,28 +69,29 @@ That means the app is usable for prototyping, but it is not yet stable as a serv
 - `src/components/workout/workout-logger.tsx`: main workout session UI
 - `src/lib/db.ts`: Dexie schema and bootstrapping
 - `src/lib/repository.ts`: workout mutations and session persistence hooks
-- `src/app/api/workouts/route.ts`: current server persistence stub
+- `src/app/api/workouts/route.ts`: workout-row server persistence endpoint
+- `src/server/repositories/workout-repository.ts`: server-side workout row reads and writes
 - `src/components/settings/export-panel.tsx`: export, import, and integrity checks
 
 ## Stabilization roadmap
 
-These are the next five high-priority steps to make the app stable as a server-backed product:
+The branch is following an incremental bridge strategy. Near term, Dexie remains in place while workout persistence moves to SQLite one slice at a time. Long term, the destination is still a server-first SQLite app.
 
-### 1. Add a real SQL backend with migrations and relational constraints
+### 1. Add server bootstrap/read for workout rows
 
-Move from the append-only SQL file to a real database with actual tables, primary keys, foreign keys, and a repeatable migration flow.
+Add narrow read endpoints so the app can hydrate Dexie with persisted workout rows on refresh and in new browser sessions.
 
-### 2. Replace file-appended SQL with transactional inserts and upserts
+### 2. Move workout exercise mutations to the server
 
-The server should write directly to SQL tables using idempotent create/update logic instead of appending duplicate raw `INSERT` statements to a text file.
+Persist `workout_exercises` transactionally behind existing flows, one mutation at a time, while keeping the blast radius small.
 
-### 3. Add a server bootstrap/read path
+### 3. Move set entry mutations to the server
 
-The app must be able to load persisted workouts, exercises, and sets from the server so refreshes and new sessions start from server data rather than only local IndexedDB.
+Persist `set_entries` server-side with ordering and uniqueness guarantees once workout exercises are server-backed.
 
-### 4. Route all important mutations through the server
+### 4. Flip workout reads to server-first with Dexie as cache/fallback
 
-Creating workouts, adding exercises, adding sets, editing sets, deleting sets, reordering sets, and finishing sessions all need server-backed persistence.
+After workouts, workout exercises, and sets are all persisted, make SQLite authoritative for those reads while retaining Dexie as a temporary cache/offline layer.
 
 ### 5. Add tests for persistence and repeated sessions
 
@@ -122,11 +125,25 @@ npm run test:e2e
 npm run build
 ```
 
+## Source of Truth Today
+
+Before the next slice:
+
+- Dexie is the UI/runtime source of truth
+- SQLite is the durable store for workout rows only
+- Existing local exercise and set data is still protected because those records are not deleted or migrated yet
+
+After the next slice:
+
+- SQLite will become authoritative for workout rows
+- Dexie will remain as cache/fallback during the migration
+- Exercise and set details will still remain local until later slices move them server-side
+
 ## Short-term product direction
 
-The immediate engineering priority is not adding more user-facing features. It is making persistence reliable and making the server-side database the real source of truth.
+The immediate engineering priority is not adding more user-facing features. It is making workout persistence reliable, then adding server bootstrap for persisted workout rows without broadening the cutover.
 
-Once that is stable, the app will be in a much better position for:
+Once that bridge is stable, the app will be in a much better position for:
 
 - multi-device continuity
 - reliable backups
