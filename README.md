@@ -26,9 +26,10 @@ The app is currently at a functional MVP stage:
 
 The important limitation is that persistence is still primarily local-first:
 
-- The main source of truth is browser IndexedDB via Dexie
-- There is a server route for workout persistence, but it currently appends SQL text to a file instead of writing to a real SQL database
-- New browser sessions or devices do not yet bootstrap from a true server-side database
+- The main source of truth is currently browser IndexedDB via Dexie.
+- **SQL Transition Underway**: We are moving towards a server-backed SQL model. The database schema has been prepared to support workout statuses (`draft`, `active`, `completed`) and user ownership.
+- A server route exists that records workout mutations as a SQL journal in `data/workouts.sql`.
+- **Infrastructure Ready**: CI/CD and E2E automation are fully integrated into the stable `main` branch.
 
 That means the app is usable for prototyping, but it is not yet stable as a server-backed multi-session system.
 

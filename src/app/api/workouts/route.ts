@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
 import type { WorkoutBundle } from "@/types/domain";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const SQL_FILE = path.join(DATA_DIR, "workouts.sql");
 
 type Payload = {
   action: "start" | "finish" | "sync";
@@ -12,66 +8,118 @@ type Payload = {
   bundle: WorkoutBundle;
 };
 
-async function ensureDataDir() {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch {
-    /* ignore */
-  }
-}
-
-function escapeSql(value: string | number | boolean | null | undefined) {
-  if (value === null || typeof value === "undefined") {
-    return "NULL";
-  }
-  const normalized = String(value).replace(/'/g, "''");
-  return `'${normalized}'`;
-}
-
-function buildStatements(payload: Payload) {
-  const { action, userId, bundle } = payload;
-  const lines: string[] = [];
-  lines.push(`-- ${action} @ ${new Date().toISOString()} user=${userId}`);
-
-  const workout = bundle.workout;
-  lines.push(
-    `INSERT INTO workouts (id, date, notes, created_at, updated_at, user_id, session_started_at, session_ended_at) VALUES (${escapeSql(
-      workout.id
-    )}, ${escapeSql(workout.date)}, ${escapeSql(workout.notes ?? null)}, ${escapeSql(workout.createdAt)}, ${escapeSql(
-      workout.updatedAt
-    )}, ${escapeSql(userId)}, ${escapeSql(workout.sessionStartedAt ?? null)}, ${escapeSql(workout.sessionEndedAt ?? null)});`
-  );
-
-  for (const item of bundle.items) {
-    const exercise = item.workoutExercise;
-    lines.push(
-      `INSERT INTO workout_exercises (id, workout_id, exercise_id, order_index, created_at, started_at, completed_at) VALUES (${escapeSql(
-        exercise.id
-      )}, ${escapeSql(exercise.workoutId)}, ${escapeSql(exercise.exerciseId)}, ${escapeSql(exercise.orderIndex)}, ${escapeSql(
-        exercise.createdAt
-      )}, ${escapeSql(exercise.startedAt ?? null)}, ${escapeSql(exercise.completedAt ?? null)});`
-    );
-    for (const setEntry of item.sets) {
-      lines.push(
-        `INSERT INTO set_entries (id, workout_exercise_id, set_number, reps, weight, notes, created_at, updated_at) VALUES (${escapeSql(
-          setEntry.id
-        )}, ${escapeSql(setEntry.workoutExerciseId)}, ${escapeSql(setEntry.setNumber)}, ${escapeSql(setEntry.reps)}, ${escapeSql(
-          setEntry.weight
-        )}, ${escapeSql(setEntry.notes ?? null)}, ${escapeSql(setEntry.createdAt)}, ${escapeSql(setEntry.updatedAt)});`
-      );
-    }
-  }
-
-  return lines.join("\n") + "\n";
-}
-
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as Payload;
-  if (!payload?.bundle) {
+  const { bundle, userId } = payload;
+
+  if (!bundle) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
   }
-  await ensureDataDir();
-  const statements = buildStatements(payload);
-  await fs.appendFile(SQL_FILE, statements);
-  return NextResponse.json({ status: "ok", action: payload.action });
+
+  try {
+    // We use a transaction to ensure atomicity
+    await prisma.$transaction(async (tx: any) => {
+      // 1. Upsert Workout
+      await tx.workout.upsert({
+        where: { id: bundle.workout.id },
+        update: {
+          name: bundle.workout.name || `Workout ${bundle.workout.date}`,
+          date: bundle.workout.date,
+          notes: bundle.workout.notes,
+          status: bundle.workout.status,
+          userId: userId,
+          sessionStartedAt: bundle.workout.sessionStartedAt ? new Date(bundle.workout.sessionStartedAt) : null,
+          sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
+          updatedAt: new Date(),
+        },
+        create: {
+          id: bundle.workout.id,
+          name: bundle.workout.name || `Workout ${bundle.workout.date}`,
+          date: bundle.workout.date,
+          notes: bundle.workout.notes,
+          status: bundle.workout.status,
+          userId: userId,
+          sessionStartedAt: bundle.workout.sessionStartedAt ? new Date(bundle.workout.sessionStartedAt) : null,
+          sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
+        },
+      });
+
+      // 2. Upsert WorkoutExercises and their Sets
+      for (const item of bundle.items) {
+        await tx.workoutExercise.upsert({
+          where: { id: item.workoutExercise.id },
+          update: {
+            orderIndex: item.workoutExercise.orderIndex,
+            exerciseId: item.workoutExercise.exerciseId,
+            startedAt: item.workoutExercise.startedAt ? new Date(item.workoutExercise.startedAt) : null,
+            completedAt: item.workoutExercise.completedAt ? new Date(item.workoutExercise.completedAt) : null,
+            updatedAt: new Date(),
+          },
+          create: {
+            id: item.workoutExercise.id,
+            workoutId: bundle.workout.id,
+            exerciseId: item.workoutExercise.exerciseId,
+            orderIndex: item.workoutExercise.orderIndex,
+            startedAt: item.workoutExercise.startedAt ? new Date(item.workoutExercise.startedAt) : null,
+            completedAt: item.workoutExercise.completedAt ? new Date(item.workoutExercise.completedAt) : null,
+          },
+        });
+
+        for (const setEntry of item.sets) {
+          await tx.setEntry.upsert({
+            where: { id: setEntry.id },
+            update: {
+              setNumber: setEntry.setNumber,
+              weight: setEntry.weight,
+              reps: setEntry.reps,
+              type: (setEntry as any).type || "normal",
+              notes: setEntry.notes,
+              completedAt: setEntry.completedAt ? new Date(setEntry.completedAt) : null,
+              updatedAt: new Date(),
+            },
+            create: {
+              id: setEntry.id,
+              workoutExerciseId: item.workoutExercise.id,
+              setNumber: setEntry.setNumber,
+              weight: setEntry.weight,
+              reps: setEntry.reps,
+              type: (setEntry as any).type || "normal",
+              notes: setEntry.notes,
+              completedAt: setEntry.completedAt ? new Date(setEntry.completedAt) : null,
+            },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ status: "ok", action: payload.action });
+  } catch (error) {
+    console.error("Failed to persist workout:", error);
+    return NextResponse.json({ error: "Persistence failed" }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const workouts = await prisma.workout.findMany({
+      include: {
+        exercises: {
+          include: {
+            sets: true,
+          },
+          orderBy: {
+            orderIndex: "asc",
+          },
+        },
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
+
+    return NextResponse.json({ workouts });
+  } catch (error) {
+    console.error("Failed to fetch workouts:", error);
+    return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
+  }
 }

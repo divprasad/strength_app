@@ -48,18 +48,25 @@ class StrengthDatabase extends Dexie {
         });
       });
 
-    this.version(3)
+    this.version(4)
       .stores({
         muscles: "id, name, updatedAt",
         exercises: "id, name, updatedAt",
-        workouts: "id, date, status, updatedAt, userId",
+        workouts: "id, date, name, status, updatedAt, userId",
         workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
         setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
         settings: "id"
       })
       .upgrade(async (tx) => {
-        await tx.table("workouts").toCollection().modify((workout: Partial<Workout>) => {
-          workout.status = inferWorkoutStatus(workout);
+        await tx.table("workouts").toCollection().modify((workout: any) => {
+          if (!workout.name) {
+            workout.name = `Workout ${workout.date}`;
+          }
+        });
+        await tx.table("setEntries").toCollection().modify((set: any) => {
+          if (!set.type) {
+            set.type = "normal";
+          }
         });
       });
 
@@ -152,6 +159,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
 
   await database.workouts.put({
     id: workoutId,
+    name: "Sample Workout",
     date: today,
     status: "draft",
     notes: "Sample workout",
@@ -175,6 +183,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
       setNumber: 1,
       reps: 5,
       weight: 60,
+      type: "warmup",
       notes: "Warm-up",
       createdAt: now,
       updatedAt: now
@@ -185,6 +194,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
       setNumber: 2,
       reps: 5,
       weight: 70,
+      type: "normal",
       createdAt: now,
       updatedAt: now
     }

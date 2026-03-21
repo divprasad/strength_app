@@ -22,6 +22,7 @@ export interface Exercise extends Timestamps {
 
 export interface Workout extends Timestamps {
   id: Id;
+  name: string; // Added to match journal
   date: string; // YYYY-MM-DD local date
   status: WorkoutStatus;
   notes?: string;
@@ -46,7 +47,9 @@ export interface SetEntry extends Timestamps {
   setNumber: number;
   reps: number;
   weight: number;
+  type: string; // normal, warmup, dropset, fail
   notes?: string;
+  completedAt?: string; // Added to match journal
 }
 
 export interface AppSettings {

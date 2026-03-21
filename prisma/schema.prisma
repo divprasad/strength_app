@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model MuscleGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Exercise {
+  id                 String            @id @default(uuid())
+  name               String            @unique
+  category           String?
+  equipment          String?
+  primaryMuscleIds   String            // Serialized JSON for now as SQLite doesn't have native arrays
+  secondaryMuscleIds String            // Serialized JSON for now
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  workoutExercises   WorkoutExercise[]
+}
+
+model Workout {
+  id               String            @id @default(uuid())
+  name             String
+  date             String            // Added to match journal
+  notes            String?           // Added to match journal
+  status           String            @default("completed") // default for migration
+  userId           String            @default("default_user")
+  sessionStartedAt DateTime?
+  sessionEndedAt   DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  exercises        WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id          String     @id @default(uuid())
+  workout     Workout    @relation(fields: [workoutId], references: [id])
+  workoutId   String
+  exercise    Exercise   @relation(fields: [exerciseId], references: [id])
+  exerciseId  String
+  orderIndex  Int        // Renamed to match journal
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime?  @updatedAt // Optional for migration
+  sets        SetEntry[]
+}
+
+model SetEntry {
+  id                String          @id @default(uuid())
+  workoutExercise   WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+  workoutExerciseId String
+  setNumber         Int             // Added to match journal
+  weight            Float?
+  reps              Int?
+  type              String          @default("normal") // default for migration
+  notes             String?         // Added to match journal
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime?       @updatedAt // Added to match journal
+}

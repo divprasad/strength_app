@@ -27,3 +27,9 @@ pnpm-debug.log*
 # test artifacts
 /playwright-report/
 /test-results/
+
+/src/generated/prisma
+/dev.db
+/dev.db-journal
+/prisma/dev.db
+/prisma/dev.db-journal

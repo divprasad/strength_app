@@ -22,6 +22,7 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
   const now = nowIso();
   const workout: Workout = {
     id: createId("workout"),
+    name: `Workout ${date}`, // Default name
     date,
     status: inferWorkoutStatus(options ?? {}),
     notes: options?.notes,
@@ -95,6 +96,7 @@ export async function addSetToWorkoutExercise(
     setNumber: nextSetNumber,
     reps: setData.reps,
     weight: setData.weight,
+    type: "normal", // Default type
     notes: setData.notes,
     createdAt: now,
     updatedAt: now
