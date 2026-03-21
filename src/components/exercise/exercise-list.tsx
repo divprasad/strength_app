@@ -7,7 +7,7 @@ import { createExercise, deleteExercise } from "@/lib/repository";
 import type { Exercise } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExerciseForm } from "@/components/exercise/exercise-form";
 
@@ -16,6 +16,7 @@ export function ExerciseList() {
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const exerciseCount = exercises?.length ?? 0;
 
   async function handleCreate(payload: Omit<Exercise, "id" | "createdAt" | "updatedAt">) {
     try {
@@ -55,10 +56,13 @@ export function ExerciseList() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
+    <div className="space-y-5">
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">
           <CardTitle>{editing ? `Edit ${editing.name}` : "Create Exercise"}</CardTitle>
+          <CardDescription>
+            Define how movements are grouped and tracked so logging and analytics stay consistent across every session.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {muscles ? (
@@ -73,26 +77,30 @@ export function ExerciseList() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-4">
           <CardTitle>Exercise Library</CardTitle>
+          <CardDescription>{exerciseCount} exercise{exerciseCount === 1 ? "" : "s"} currently available for logging.</CardDescription>
         </CardHeader>
         <CardContent>
           {exercises && exercises.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {exercises.map((exercise) => (
-                <li key={exercise.id} className="rounded-lg border p-3">
+                <li
+                  key={exercise.id}
+                  className="rounded-[1.3rem] border border-border/70 bg-background/58 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.4)]"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
                       <p className="font-medium">{exercise.name}</p>
-                      <div className="flex flex-wrap gap-1">
-                        {exercise.category ? <Badge>{exercise.category}</Badge> : null}
+                      <div className="flex flex-wrap gap-2">
+                        {exercise.category ? <Badge className="bg-accent text-accent-foreground">{exercise.category}</Badge> : null}
                         {exercise.equipment ? <Badge>{exercise.equipment}</Badge> : null}
                       </div>
-                      {exercise.notes ? <p className="text-sm text-muted-foreground">{exercise.notes}</p> : null}
+                      {exercise.notes ? <p className="max-w-xl text-sm text-muted-foreground">{exercise.notes}</p> : null}
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(exercise)}>
+                      <Button size="sm" variant="secondary" onClick={() => setEditing(exercise)}>
                         Edit
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => handleDelete(exercise.id)}>
