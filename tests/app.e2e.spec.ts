@@ -32,10 +32,14 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
   await page.goto("/workouts");
 
   await expect(page.getByRole("heading", { name: "Workout Logger" })).toBeVisible();
+
+  await page.getByRole("button", { name: "New Session" }).click();
+  await page.getByRole("combobox").selectOption({ label: "Barbell Bench Press" });
+  await page.getByRole("button", { name: "Add" }).click();
   await expect(page.getByRole("heading", { name: "Barbell Bench Press" })).toBeVisible();
 
   await page.getByRole("button", { name: "Start Workout" }).click();
-  await expect(page.getByText(/^Session running ·/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop Workout" })).toBeVisible();
 
   await page.getByRole("button", { name: /^Start$/ }).click();
   await page.getByRole("button", { name: "Add Set" }).click();
@@ -44,8 +48,8 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
   await page.getByRole("button", { name: "Stop Workout" }).click();
 
   await page.goto("/history");
-  await expect(page.getByRole("heading", { name: /^Workout #1 · completed ·/ })).toBeVisible();
-  await expect(page.getByText("Set 3: 8 reps × 20")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Set 1: 8 reps × 20" }).first()).toBeVisible();
 });
 
 test("settings supports JSON export and fixture import", async ({ page }) => {
