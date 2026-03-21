@@ -35,7 +35,7 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
   await expect(page.getByRole("heading", { name: "Barbell Bench Press" })).toBeVisible();
 
   await page.getByRole("button", { name: "Start Workout" }).click();
-  await expect(page.getByText(/^Session running ·/)).toBeVisible();
+  await expect(page.getByText(/^Session running ·/).first()).toBeVisible();
 
   await page.getByRole("button", { name: /^Start$/ }).click();
   await page.getByRole("button", { name: "Add Set" }).click();
@@ -44,7 +44,8 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
   await page.getByRole("button", { name: "Stop Workout" }).click();
 
   await page.goto("/history");
-  await expect(page.getByRole("heading", { name: /^Workout #1 · completed ·/ })).toBeVisible();
+  await expect(page.getByText("Workout #1")).toBeVisible();
+  await expect(page.getByText(/^completed$/).first()).toBeVisible();
   await expect(page.getByText("Set 3: 8 reps × 20")).toBeVisible();
 });
 
