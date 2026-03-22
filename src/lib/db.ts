@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@/lib/constants";
-import { createId, localDateIso, nowIso } from "@/lib/utils";
+import { createId, createStableId, localDateIso, nowIso } from "@/lib/utils";
 import type { AppSettings, Exercise, MuscleGroup, SetEntry, Workout, WorkoutExercise } from "@/types/domain";
 
 function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
@@ -58,12 +58,12 @@ class StrengthDatabase extends Dexie {
         settings: "id"
       })
       .upgrade(async (tx) => {
-        await tx.table("workouts").toCollection().modify((workout: any) => {
+        await tx.table("workouts").toCollection().modify((workout) => {
           if (!workout.name) {
             workout.name = `Workout ${workout.date}`;
           }
         });
-        await tx.table("setEntries").toCollection().modify((set: any) => {
+        await tx.table("setEntries").toCollection().modify((set) => {
           if (!set.type) {
             set.type = "normal";
           }
@@ -89,7 +89,12 @@ export function ensureBootstrapped(): Promise<void> {
 
 async function bootstrapIfNeeded(): Promise<void> {
   const settings = await db.settings.get("default");
-  if (!settings) {
+  // Force re-seed if it doesn't look like we have the new stable IDs
+  const firstExercise = await db.exercises.orderBy("name").first();
+  const needsReseed = !firstExercise || !firstExercise.id.includes("_static_");
+
+  if (!settings || needsReseed) {
+    console.log("Forcing client-side re-seed with stable IDs...");
     await seedDatabase(db);
   }
 }
@@ -97,8 +102,18 @@ async function bootstrapIfNeeded(): Promise<void> {
 async function seedDatabase(database: StrengthDatabase): Promise<void> {
   const now = nowIso();
 
+  // Clear existing data to ensure stable IDs take effect
+  await database.transaction("rw", [database.muscles, database.exercises, database.workouts, database.workoutExercises, database.setEntries, database.settings], async () => {
+    await database.setEntries.clear();
+    await database.workoutExercises.clear();
+    await database.workouts.clear();
+    await database.exercises.clear();
+    await database.muscles.clear();
+    await database.settings.clear();
+  });
+
   const muscles: MuscleGroup[] = DEFAULT_MUSCLE_GROUPS.map((name) => ({
-    id: createId("muscle"),
+    id: createStableId("muscle", name),
     name,
     createdAt: now,
     updatedAt: now
@@ -117,7 +132,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
 
   const exercises: Exercise[] = [
     {
-      id: createId("exercise"),
+      id: createStableId("exercise", "Barbell Bench Press"),
       name: "Barbell Bench Press",
       category: "Push",
       equipment: "Barbell",
@@ -128,7 +143,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
       updatedAt: now
     },
     {
-      id: createId("exercise"),
+      id: createStableId("exercise", "Pull-Up"),
       name: "Pull-Up",
       category: "Pull",
       equipment: "Bodyweight",
@@ -139,7 +154,7 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
       updatedAt: now
     },
     {
-      id: createId("exercise"),
+      id: createStableId("exercise", "Back Squat"),
       name: "Back Squat",
       category: "Legs",
       equipment: "Barbell",

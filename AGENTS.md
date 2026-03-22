@@ -8,10 +8,10 @@ Strength Log is moving from a local-first MVP into a stable server-backed web ap
 
 ## Current project state
 
-- The UI and basic product flows work
-- The app currently uses Dexie/IndexedDB as the effective source of truth
-- A server route exists, but it currently appends SQL text to a file instead of writing to a real SQL database
-- The repository should be treated as a prototype being stabilized, not as a finished backend architecture
+- The UI and basic product flows work.
+- The app uses a hybrid model: Dexie/IndexedDB for the local UI, and Prisma/SQL for server-side persistence.
+- A real SQL backend (SQLite via Prisma) is fully functional for workout persistence and bootstrapping.
+- Stable IDs are used for the exercise library to ensure cross-stack consistency.
 
 ## Stable working rules
 
@@ -33,9 +33,9 @@ Strength Log is moving from a local-first MVP into a stable server-backed web ap
 
 ## Execution guidance for future agents
 
-- Treat server-side persistence as the main stabilization track.
-- Do not add unrelated product features ahead of persistence work unless the user explicitly asks.
-- Keep changes narrow and reviewable.
+- **Stable IDs**: Use `createStableId` in `src/lib/utils.ts` for any lookup or seed data (Exercises, MuscleGroups). Never use random UUIDs for data that must match across the client-server boundary.
+- **Prisma Alignment**: Ensure the database location is consistent. The standard is `prisma/dev.db`.
+- **Persistence Track**: The server-side persistence is the main track. Ensure all UI mutations have corresponding API persistence calls.
 - Prefer updating existing docs when plans change instead of scattering planning notes across new files.
 - When changing persistence logic, explain:
   - what the source of truth is before the change

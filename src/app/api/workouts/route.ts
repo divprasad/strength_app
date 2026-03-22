@@ -11,6 +11,8 @@ type Payload = {
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as Payload;
   const { bundle, userId } = payload;
+  console.log("[API DEBUG] CWD:", process.cwd());
+  console.log("[API DEBUG] DATABASE_URL:", process.env.DATABASE_URL);
 
   if (!bundle) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // We use a transaction to ensure atomicity
-    await prisma.$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx) => {
       // 1. Upsert Workout
       await tx.workout.upsert({
         where: { id: bundle.workout.id },
@@ -30,7 +32,6 @@ export async function POST(request: NextRequest) {
           userId: userId,
           sessionStartedAt: bundle.workout.sessionStartedAt ? new Date(bundle.workout.sessionStartedAt) : null,
           sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
-          updatedAt: new Date(),
         },
         create: {
           id: bundle.workout.id,
@@ -53,7 +54,6 @@ export async function POST(request: NextRequest) {
             exerciseId: item.workoutExercise.exerciseId,
             startedAt: item.workoutExercise.startedAt ? new Date(item.workoutExercise.startedAt) : null,
             completedAt: item.workoutExercise.completedAt ? new Date(item.workoutExercise.completedAt) : null,
-            updatedAt: new Date(),
           },
           create: {
             id: item.workoutExercise.id,
@@ -72,10 +72,9 @@ export async function POST(request: NextRequest) {
               setNumber: setEntry.setNumber,
               weight: setEntry.weight,
               reps: setEntry.reps,
-              type: (setEntry as any).type || "normal",
+              type: (setEntry as unknown as Record<string, unknown>).type as string || "normal",
               notes: setEntry.notes,
               completedAt: setEntry.completedAt ? new Date(setEntry.completedAt) : null,
-              updatedAt: new Date(),
             },
             create: {
               id: setEntry.id,
@@ -83,7 +82,7 @@ export async function POST(request: NextRequest) {
               setNumber: setEntry.setNumber,
               weight: setEntry.weight,
               reps: setEntry.reps,
-              type: (setEntry as any).type || "normal",
+              type: (setEntry as unknown as Record<string, unknown>).type as string || "normal",
               notes: setEntry.notes,
               completedAt: setEntry.completedAt ? new Date(setEntry.completedAt) : null,
             },
@@ -99,7 +98,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  console.log("[API DEBUG GET] CWD:", process.cwd());
+  console.log("[API DEBUG GET] DATABASE_URL:", process.env.DATABASE_URL);
   try {
     const workouts = await prisma.workout.findMany({
       include: {

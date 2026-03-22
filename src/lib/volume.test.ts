@@ -24,6 +24,7 @@ const setEntries: SetEntry[] = [
     setNumber: 1,
     reps: 5,
     weight: 100,
+    type: "normal",
     createdAt: "2026-03-20T09:10:00.000Z",
     updatedAt: "2026-03-20T09:10:00.000Z"
   },
@@ -33,6 +34,7 @@ const setEntries: SetEntry[] = [
     setNumber: 2,
     reps: 8,
     weight: 80,
+    type: "normal",
     createdAt: "2026-03-20T09:12:00.000Z",
     updatedAt: "2026-03-20T09:12:00.000Z"
   }

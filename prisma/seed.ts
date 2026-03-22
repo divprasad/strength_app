@@ -1,7 +1,15 @@
 import { prisma } from "../src/lib/prisma";
+import { createStableId } from "../src/lib/utils";
 
 async function main() {
   console.log("Seeding defaults...");
+
+  // Clear existing data to ensure stable IDs take effect
+  await prisma.setEntry.deleteMany();
+  await prisma.workoutExercise.deleteMany();
+  await prisma.workout.deleteMany();
+  await prisma.exercise.deleteMany();
+  await prisma.muscleGroup.deleteMany();
 
   const muscles = [
     "Chest", "Back", "Shoulders", "Biceps", "Triceps",
@@ -12,7 +20,10 @@ async function main() {
     await prisma.muscleGroup.upsert({
       where: { name },
       update: {},
-      create: { name }
+      create: { 
+        id: createStableId("muscle", name),
+        name 
+      }
     });
   }
 
@@ -48,7 +59,10 @@ async function main() {
     await prisma.exercise.upsert({
       where: { name: ex.name },
       update: ex,
-      create: ex
+      create: {
+        id: createStableId("exercise", ex.name),
+        ...ex
+      }
     });
   }
 

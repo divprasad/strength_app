@@ -22,6 +22,18 @@ export function createId(prefix: string): string {
   return `${prefix}_${fallback}`;
 }
 
+export function createStableId(prefix: string, seed: string): string {
+  // Simple deterministic "hash" for stable IDs (e.g. for exercises in seed)
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  const hex = Math.abs(hash).toString(16).padStart(8, "0");
+  return `${prefix}_static_${hex}`;
+}
+
 export function nowIso(): string {
   return new Date().toISOString();
 }

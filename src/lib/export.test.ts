@@ -34,6 +34,7 @@ const payload: ExportPayload = {
   workouts: [
     {
       id: "workout_1",
+      name: "Test Workout",
       date: "2026-03-20",
       status: "completed",
       notes: 'Felt "strong"',
@@ -57,6 +58,7 @@ const payload: ExportPayload = {
       setNumber: 1,
       reps: 8,
       weight: 80,
+      type: "normal",
       notes: "Paused, controlled",
       createdAt: "2026-03-20T09:15:00.000Z",
       updatedAt: "2026-03-20T09:15:00.000Z"

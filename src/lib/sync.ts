@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { WorkoutBundle } from "@/types/domain";
+
 
 const WORKOUT_API_PATH = "/api/workouts";
 
