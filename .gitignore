@@ -33,3 +33,7 @@ pnpm-debug.log*
 /dev.db-journal
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# reports
+/DEVTEST.md
+/PRODTEST.md
