@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { db } from "@/lib/db";
+import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
 import { runIntegrityAudit } from "@/lib/integrity-audit";
+import { normalizeWorkoutExerciseOrder, syncEverythingToServer } from "@/lib/repository";
 import { nowIso, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
 import { PageIntro } from "@/components/layout/page-intro";
@@ -36,6 +38,7 @@ async function buildPayload(): Promise<ExportPayload> {
 
 export function ExportPanel() {
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false); // Added loading state
   const [auditReport, setAuditReport] = useState<IntegrityAuditReport | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
@@ -58,29 +61,76 @@ export function ExportPanel() {
   }
 
   async function importJson(file: File) {
-    const text = await file.text();
-    const payload = JSON.parse(text) as ExportPayload;
+    setLoading(true); // Set loading true
+    setStatus("Importing data...");
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as ExportPayload;
 
-    await db.muscles.clear();
-    await db.exercises.clear();
-    await db.workouts.clear();
-    await db.workoutExercises.clear();
-    await db.setEntries.clear();
-    await db.settings.clear();
+      // 1. Safety Backup: Export current state before replacing it
+      setStatus("Creating safety backup...");
+      await exportJson();
 
-    await db.muscles.bulkPut(payload.muscleGroups);
-    await db.exercises.bulkPut(payload.exercises);
-    await db.workouts.bulkPut(
-      payload.workouts.map((workout) => ({
-        ...workout,
-        status: workout.status ?? (workout.sessionStartedAt ? (workout.sessionEndedAt ? "completed" : "active") : "draft")
-      }))
+      // 2. Clear and replace
+      setStatus("Replacing local data...");
+      await db.muscles.clear();
+      await db.exercises.clear();
+      await db.workouts.clear();
+      await db.workoutExercises.clear();
+      await db.setEntries.clear();
+      await db.settings.clear();
+
+      await db.muscles.bulkPut(payload.muscleGroups);
+      await db.exercises.bulkPut(payload.exercises);
+      await db.workouts.bulkPut(
+        payload.workouts.map((workout) => {
+          const hasStarted = Boolean(workout.sessionStartedAt);
+          const hasEnded = Boolean(workout.sessionEndedAt);
+          const autoStatus = hasStarted ? (hasEnded ? "completed" : "active") : "draft";
+
+          return {
+            ...workout,
+            name: workout.name ?? `Workout ${workout.date}`,
+            userId: workout.userId ?? DEFAULT_USER_ID,
+            status: workout.status ?? autoStatus
+          };
+        })
+      );
+      await db.workoutExercises.bulkPut(payload.workoutExercises);
+      await db.setEntries.bulkPut(payload.setEntries);
+      await db.settings.put(payload.settings);
+
+      // Normalize exercise order for all imported workouts to fix any existing corruption
+      for (const workout of payload.workouts) {
+        await normalizeWorkoutExerciseOrder(workout.id);
+      }
+
+      setStatus("Import complete. Safety backup downloaded. You may want to sync all data to the server.");
+    } catch (error) {
+      console.error("Import failed:", error);
+      setStatus("Import failed. Check console for details.");
+    } finally {
+      setLoading(false); // Set loading false
+    }
+  }
+
+  async function handleSyncToServer() {
+    const confirmed = window.confirm(
+      "Are you sure you want to sync all local data to the server? This will push all muscle groups, exercises, and workouts to the SQL database."
     );
-    await db.workoutExercises.bulkPut(payload.workoutExercises);
-    await db.setEntries.bulkPut(payload.setEntries);
-    await db.settings.put(payload.settings);
+    if (!confirmed) return;
 
-    setStatus("Import complete.");
+    setLoading(true);
+    setStatus("Syncing everything to server...");
+    try {
+      await syncEverythingToServer();
+      setStatus("Global sync complete.");
+    } catch (error) {
+      console.error("Sync failed:", error);
+      setStatus("Sync failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function runAudit() {
@@ -144,23 +194,20 @@ export function ExportPanel() {
 
         <Card className="overflow-hidden">
           <CardHeader className="pb-4">
-          <CardTitle>Import JSON (Optional)</CardTitle>
-          <CardDescription>Import replaces local data fully. Use the fixture or a recent export when validating flows.</CardDescription>
+          <CardTitle>Import & Sync</CardTitle>
+          <CardDescription>Upload a JSON export to replace your entire local database state.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/55 p-4">
-            <Input
-              type="file"
-              accept="application/json"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  void importJson(file);
-                }
-              }}
-            />
-            <p className="mt-3 text-xs text-muted-foreground">Import replaces local data fully.</p>
-          </div>
+        <CardContent className="space-y-4">
+          <Input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
+          <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
+            Sync All to Server
+          </Button>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+              {status}
+            </div>
+          )}
         </CardContent>
         </Card>
       </div>

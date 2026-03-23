@@ -89,12 +89,13 @@ export function ensureBootstrapped(): Promise<void> {
 
 async function bootstrapIfNeeded(): Promise<void> {
   const settings = await db.settings.get("default");
-  // Force re-seed if it doesn't look like we have the new stable IDs
+  // Only re-seed if the database is completely empty (no exercises)
+  // This ensures that user imports and existing data are not wiped by the stable ID check
   const firstExercise = await db.exercises.orderBy("name").first();
-  const needsReseed = !firstExercise || !firstExercise.id.includes("_static_");
+  const needsReseed = !firstExercise;
 
   if (!settings || needsReseed) {
-    console.log("Forcing client-side re-seed with stable IDs...");
+    console.log("Initializing database...");
     await seedDatabase(db);
   }
 }
