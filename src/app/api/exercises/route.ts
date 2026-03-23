@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Exercise } from "@/types/domain";
 
+export async function GET() {
+  try {
+    const exercises = await prisma.exercise.findMany();
+    return NextResponse.json({ exercises });
+  } catch (error) {
+    console.error("Failed to fetch exercises:", error);
+    return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const { exercises }: { exercises: Exercise[] } = await request.json();
 

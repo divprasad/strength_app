@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
 import { runIntegrityAudit } from "@/lib/integrity-audit";
-import { normalizeWorkoutExerciseOrder, syncEverythingToServer } from "@/lib/repository";
+import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
 import { nowIso, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
 import { PageIntro } from "@/components/layout/page-intro";
@@ -127,14 +127,22 @@ export function ExportPanel() {
   }
 
   async function handleSyncToServer() {
-    const confirmed = window.confirm(
-      "Are you sure you want to sync all local data to the server? This will push all muscle groups, exercises, and workouts to the SQL database."
-    );
-    if (!confirmed) return;
-
     setLoading(true);
-    setStatus("Syncing everything to server...");
+    setStatus("Checking for changes...");
     try {
+      const hasChanges = await checkServerSyncStatus();
+      
+      if (!hasChanges) {
+        setStatus("Nothing to sync ^_^");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "Changes detected! Are you sure you want to sync all local data to the server? This will push all muscle groups, exercises, and workouts to the SQL database."
+      );
+      if (!confirmed) return;
+
+      setStatus("Syncing everything to server...");
       await syncEverythingToServer();
       setStatus("Global sync complete.");
     } catch (error) {

@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { MuscleGroup } from "@/types/domain";
 
+export async function GET() {
+  try {
+    const muscles = await prisma.muscleGroup.findMany();
+    return NextResponse.json({ muscles });
+  } catch (error) {
+    console.error("Failed to fetch muscles:", error);
+    return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const { muscleGroups }: { muscleGroups: MuscleGroup[] } = await request.json();
 

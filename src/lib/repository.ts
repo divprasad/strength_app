@@ -360,6 +360,60 @@ export async function syncAllWorkouts(): Promise<void> {
   }
 }
 
+export async function checkServerSyncStatus(): Promise<boolean> {
+  const [localMuscles, localExercises, localWorkouts] = await Promise.all([
+    db.muscles.toArray(),
+    db.exercises.toArray(),
+    db.workouts.toArray()
+  ]);
+
+  const [resMuscles, resExercises, resWorkouts] = await Promise.all([
+    fetch("/api/muscles"),
+    fetch("/api/exercises"),
+    fetch("/api/workouts")
+  ]);
+
+  if (!resMuscles.ok || !resExercises.ok || !resWorkouts.ok) {
+    throw new Error("Failed to fetch current server state for comparison.");
+  }
+
+  const [serverMuscles, serverExercises, serverWorkouts] = await Promise.all([
+    resMuscles.json().then((d) => d.muscles),
+    resExercises.json().then((d) => d.exercises),
+    resWorkouts.json().then((d) => d.workouts)
+  ]);
+
+  // 1. Simple count check
+  if (
+    localMuscles.length !== serverMuscles.length ||
+    localExercises.length !== serverExercises.length ||
+    localWorkouts.length !== serverWorkouts.length
+  ) {
+    return true; // Counts differ, sync needed
+  }
+
+  // 2. Newest updatedAt check
+  const getLatestUpdate = (items: any[]) =>
+    items.reduce((max, item) => {
+      const time = new Date(item.updatedAt).getTime();
+      return time > max ? time : max;
+    }, 0);
+
+  const localMax = Math.max(
+    getLatestUpdate(localMuscles),
+    getLatestUpdate(localExercises),
+    getLatestUpdate(localWorkouts)
+  );
+
+  const serverMax = Math.max(
+    getLatestUpdate(serverMuscles),
+    getLatestUpdate(serverExercises),
+    getLatestUpdate(serverWorkouts)
+  );
+
+  return localMax > serverMax; // Sync if local has newer data
+}
+
 export async function syncEverythingToServer(): Promise<void> {
   await syncAllMuscles();
   await syncAllExercises();
