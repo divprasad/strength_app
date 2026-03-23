@@ -17,7 +17,7 @@ export async function bootstrapExercises(): Promise<void> {
   if (!response.ok) throw new Error("Failed to fetch exercises");
   const { exercises } = await response.json();
   await db.exercises.bulkPut(
-    exercises.map((e: any) => ({
+    exercises.map((e: { primaryMuscleIds: string | string[]; secondaryMuscleIds: string | string[] }) => ({
       ...e,
       primaryMuscleIds: typeof e.primaryMuscleIds === "string" ? JSON.parse(e.primaryMuscleIds) : e.primaryMuscleIds,
       secondaryMuscleIds: typeof e.secondaryMuscleIds === "string" ? JSON.parse(e.secondaryMuscleIds) : e.secondaryMuscleIds

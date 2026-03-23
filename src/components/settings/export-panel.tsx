@@ -244,7 +244,7 @@ export function ExportPanel() {
           <CardDescription>Upload a JSON export to replace your entire local database state.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
+          <Input type="file" accept=".json,application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
             Push to Database Server
           </Button>

@@ -393,7 +393,7 @@ export async function checkServerSyncStatus(): Promise<boolean> {
   }
 
   // 2. Newest updatedAt check
-  const getLatestUpdate = (items: any[]) =>
+  const getLatestUpdate = (items: { updatedAt: string }[]) =>
     items.reduce((max, item) => {
       const time = new Date(item.updatedAt).getTime();
       return time > max ? time : max;
