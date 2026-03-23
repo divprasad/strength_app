@@ -67,9 +67,21 @@ export function ExportPanel() {
       const text = await file.text();
       const payload = JSON.parse(text) as ExportPayload;
 
+      const clearServer = window.confirm(
+        "Do you also want to clear all workouts from the SERVER? (Recommended for a clean import state)"
+      );
+
       // 1. Safety Backup: Export current state before replacing it
       setStatus("Creating safety backup...");
       await exportJson();
+
+      if (clearServer) {
+        setStatus("Clearing server data...");
+        const res = await fetch("/api/workouts", { method: "DELETE" });
+        if (!res.ok) {
+          alert("Failed to clear server data. Continuing with local replacement only.");
+        }
+      }
 
       // 2. Clear and replace
       setStatus("Replacing local data...");

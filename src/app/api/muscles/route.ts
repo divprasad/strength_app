@@ -11,18 +11,33 @@ export async function POST(request: NextRequest) {
 
   try {
     await prisma.$transaction(
-      muscleGroups.map((m) =>
-        prisma.muscleGroup.upsert({
+      muscleGroups.map((m) => {
+        const now = new Date();
+        const createdAt = m.createdAt ? new Date(m.createdAt) : now;
+        const updatedAt = m.updatedAt ? new Date(m.updatedAt) : now;
+
+        return prisma.muscleGroup.upsert({
           where: { id: m.id },
-          update: { name: m.name, updatedAt: new Date(m.updatedAt) },
-          create: { id: m.id, name: m.name, createdAt: new Date(m.createdAt), updatedAt: new Date(m.updatedAt) }
-        })
-      )
+          update: {
+            name: m.name,
+            updatedAt: isNaN(updatedAt.getTime()) ? now : updatedAt
+          },
+          create: {
+            id: m.id,
+            name: m.name,
+            createdAt: isNaN(createdAt.getTime()) ? now : createdAt,
+            updatedAt: isNaN(updatedAt.getTime()) ? now : updatedAt
+          }
+        });
+      })
     );
 
     return NextResponse.json({ status: "ok", count: muscleGroups.length });
   } catch (error) {
     console.error("Failed to sync muscles:", error);
+    if (error instanceof Error) {
+      console.error("Prisma error detail:", error.message);
+    }
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }

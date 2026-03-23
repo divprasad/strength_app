@@ -124,3 +124,16 @@ export async function GET() {
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
+export async function DELETE() {
+  try {
+    await prisma.$transaction([
+      prisma.setEntry.deleteMany(),
+      prisma.workoutExercise.deleteMany(),
+      prisma.workout.deleteMany()
+    ]);
+    return NextResponse.json({ status: "ok", message: "All workouts cleared" });
+  } catch (error) {
+    console.error("Failed to clear workouts:", error);
+    return NextResponse.json({ error: "Clear failed" }, { status: 500 });
+  }
+}

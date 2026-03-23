@@ -330,7 +330,10 @@ export async function syncAllMuscles(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ muscleGroups: muscles })
   });
-  if (!response.ok) throw new Error("Failed to sync muscles to server");
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to sync muscles to server (Status: ${response.status}): ${errText}`);
+  }
 }
 
 export async function syncAllExercises(): Promise<void> {
@@ -340,7 +343,10 @@ export async function syncAllExercises(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ exercises })
   });
-  if (!response.ok) throw new Error("Failed to sync exercises to server");
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to sync exercises to server (Status: ${response.status}): ${errText}`);
+  }
 }
 
 /**
