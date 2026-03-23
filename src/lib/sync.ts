@@ -2,9 +2,34 @@ import { db } from "@/lib/db";
 
 
 const WORKOUT_API_PATH = "/api/workouts";
+const MUSCLE_API_PATH = "/api/muscles";
+const EXERCISE_API_PATH = "/api/exercises";
+
+export async function bootstrapMuscles(): Promise<void> {
+  const response = await fetch(MUSCLE_API_PATH);
+  if (!response.ok) throw new Error("Failed to fetch muscles");
+  const { muscles } = await response.json();
+  await db.muscles.bulkPut(muscles);
+}
+
+export async function bootstrapExercises(): Promise<void> {
+  const response = await fetch(EXERCISE_API_PATH);
+  if (!response.ok) throw new Error("Failed to fetch exercises");
+  const { exercises } = await response.json();
+  await db.exercises.bulkPut(
+    exercises.map((e: any) => ({
+      ...e,
+      primaryMuscleIds: typeof e.primaryMuscleIds === "string" ? JSON.parse(e.primaryMuscleIds) : e.primaryMuscleIds,
+      secondaryMuscleIds: typeof e.secondaryMuscleIds === "string" ? JSON.parse(e.secondaryMuscleIds) : e.secondaryMuscleIds
+    }))
+  );
+}
 
 export async function bootstrapFromServer(): Promise<void> {
   try {
+    await bootstrapMuscles();
+    await bootstrapExercises();
+
     const response = await fetch(WORKOUT_API_PATH);
     if (!response.ok) throw new Error("Failed to fetch from server");
 

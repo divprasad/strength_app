@@ -6,6 +6,7 @@ import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
 import { runIntegrityAudit } from "@/lib/integrity-audit";
 import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
+import { bootstrapFromServer } from "@/lib/sync";
 import { nowIso, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
 import { PageIntro } from "@/components/layout/page-intro";
@@ -153,6 +154,31 @@ export function ExportPanel() {
     }
   }
 
+  async function handleResetFromServer() {
+    const confirmed = window.confirm(
+      "This will WIPE all your local data on THIS device and replace it with data from the server. Are you sure? ^_^"
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    setStatus("Resetting and pulling from server...");
+    try {
+      await db.muscles.clear();
+      await db.exercises.clear();
+      await db.workouts.clear();
+      await db.workoutExercises.clear();
+      await db.setEntries.clear();
+
+      await bootstrapFromServer();
+      setStatus("Reset successfully pulled from server! ^_^");
+    } catch (error) {
+      console.error("Reset failed:", error);
+      setStatus("Reset failed. Check console.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function runAudit() {
     setAuditLoading(true);
     setAuditError(null);
@@ -221,6 +247,9 @@ export function ExportPanel() {
           <Input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
             Sync All to Server
+          </Button>
+          <Button onClick={handleResetFromServer} disabled={loading} variant="ghost" className="w-full">
+            Reset from Server
           </Button>
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
