@@ -39,3 +39,4 @@ pnpm-debug.log*
 /PRODTEST.md
 
 strength-export*.json
+AFTER_LOGGING.json
