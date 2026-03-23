@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  console.log(`[SYNC] Attempting to sync ${muscleGroups.length} muscles. IDs:`, muscleGroups.map(m => m.id));
+
   try {
     await prisma.$transaction(
       muscleGroups.map((m) => {
@@ -27,9 +29,8 @@ export async function POST(request: NextRequest) {
         const updatedAt = m.updatedAt ? new Date(m.updatedAt) : now;
 
         return prisma.muscleGroup.upsert({
-          where: { id: m.id },
+          where: { name: m.name },
           update: {
-            name: m.name,
             updatedAt: isNaN(updatedAt.getTime()) ? now : updatedAt
           },
           create: {

@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  console.log(`[SYNC] Attempting to sync ${exercises.length} exercises. IDs:`, exercises.map(e => e.id));
+
   try {
     await prisma.$transaction(
       exercises.map((e) => {
@@ -30,9 +32,8 @@ export async function POST(request: NextRequest) {
         const secondaryMuscleIds = Array.isArray(e.secondaryMuscleIds) ? e.secondaryMuscleIds : [];
 
         return prisma.exercise.upsert({
-          where: { id: e.id },
+          where: { name: e.name },
           update: {
-            name: e.name,
             category: e.category,
             equipment: e.equipment,
             primaryMuscleIds: JSON.stringify(primaryMuscleIds),
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ok", count: exercises.length });
   } catch (error) {
     console.error("Failed to sync exercises:", error);
+    if (error instanceof Error) {
+      console.error("Prisma error detail:", error.message);
+    }
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
