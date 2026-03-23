@@ -246,10 +246,10 @@ export function ExportPanel() {
         <CardContent className="space-y-4">
           <Input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
-            Sync All to Server
+            Push to Database Server
           </Button>
           <Button onClick={handleResetFromServer} disabled={loading} variant="ghost" className="w-full">
-            Reset from Server
+            Pull from Database Server
           </Button>
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
