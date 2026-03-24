@@ -415,6 +415,14 @@ export async function checkServerSyncStatus(): Promise<boolean> {
 }
 
 export async function syncEverythingToServer(): Promise<void> {
+  // 1. Clear server state to ensure a clean overwrite (prevents zombie data)
+  await Promise.all([
+    fetch("/api/muscles", { method: "DELETE" }),
+    fetch("/api/exercises", { method: "DELETE" }),
+    fetch("/api/workouts", { method: "DELETE" })
+  ]);
+
+  // 2. Push current local state
   await syncAllMuscles();
   await syncAllExercises();
   await syncAllWorkouts();
