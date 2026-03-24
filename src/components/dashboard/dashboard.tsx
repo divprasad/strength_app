@@ -21,10 +21,16 @@ export function Dashboard() {
   const muscles = useLiveQuery(() => db.muscles.toArray(), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
-    .map(([muscleId, volume]) => ({
-      muscleName: muscles?.find((m) => m.id === muscleId)?.name ?? "Unknown",
-      volume
-    }))
+    .map(([muscleId, volume]) => {
+      const muscle = muscles?.find((m) => m.id === muscleId);
+      return {
+        id: muscleId,
+        muscleName: muscle?.name ?? "Unknown",
+        volume,
+        exists: !!muscle
+      };
+    })
+    .filter((m) => m.exists)
     .sort((a, b) => b.volume - a.volume)
     .slice(0, 3);
 
@@ -85,7 +91,7 @@ export function Dashboard() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {topMuscles.map((item) => (
                     <Badge
-                      key={item.muscleName}
+                      key={item.id}
                       className="bg-white/12 px-3 py-1 text-primary-foreground ring-1 ring-white/12"
                     >
                       {item.muscleName}
@@ -134,7 +140,7 @@ export function Dashboard() {
             {topMuscles.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {topMuscles.map((item) => (
-                  <Badge key={item.muscleName} className="bg-accent px-3 py-1 text-accent-foreground">
+                  <Badge key={item.id} className="bg-accent px-3 py-1 text-accent-foreground">
                     {item.muscleName}
                   </Badge>
                 ))}
