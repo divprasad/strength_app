@@ -23,7 +23,7 @@ export function WeeklyHistory() {
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const workouts = useLiveQuery(
-    () => db.workouts.where("date").between(format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"), true, true).toArray(),
+    () => db.workouts.where("date").between(format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"), true, true).toArray().then(arr => arr.filter(w => w.status !== "archived")),
     [anchorDate]
   );
 

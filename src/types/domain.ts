@@ -56,6 +56,8 @@ export interface AppSettings {
   id: "default";
   volumePrimaryMultiplier: number;
   volumeSecondaryMultiplier: number;
+  themePref?: "light" | "dark";
+  paletteIdx?: number;
 }
 
 export interface WorkoutBundle {
@@ -100,4 +102,4 @@ export interface IntegrityAuditReport {
   issues: IntegrityIssue[];
 }
 
-export type WorkoutStatus = "draft" | "active" | "completed";
+export type WorkoutStatus = "draft" | "active" | "completed" | "archived";

@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { getWeeklyMetrics } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
-import { ArrowRight, Flame, Sparkles } from "lucide-react";
+import { archiveWorkout } from "@/lib/repository";
+import { Archive, ArrowRight, Flame, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +18,7 @@ export function Dashboard() {
   const todayIso = localDateIso(new Date());
 
   const metrics = useLiveQuery(() => getWeeklyMetrics(todayIso), [todayIso]);
-  const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().limit(5).toArray(), []);
+  const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().filter(w => w.status !== "archived").limit(5).toArray(), []);
   const muscles = useLiveQuery(() => db.muscles.toArray(), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
@@ -65,9 +66,11 @@ export function Dashboard() {
               </Button>
               <div className="flex items-center gap-3 rounded-full border border-white/16 bg-white/10 px-4 py-3 text-sm text-primary-foreground/78">
                 <Sparkles className="h-4 w-4" />
-                {recentWorkout
-                  ? `Last session ${formatDistanceToNowStrict(parseISO(recentWorkout.updatedAt), { addSuffix: true })}`
-                  : "No recent session yet. Your next workout sets the baseline."}
+                {recentWorkout ? (
+                  `Last session ${formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}`
+                ) : (
+                  "No recent session yet. Your next workout sets the baseline."
+                )}
               </div>
             </div>
           </div>
@@ -173,16 +176,31 @@ export function Dashboard() {
                   <div className="min-w-0">
                     <p className="font-medium">{workout.date}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {workout.status} · Updated {formatDistanceToNowStrict(parseISO(workout.updatedAt), { addSuffix: true })}
+                      {workout.status} · Logged {formatDistanceToNowStrict(parseISO(workout.sessionEndedAt ?? workout.sessionStartedAt ?? workout.updatedAt), { addSuffix: true })}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    className="rounded-full border border-border/70 bg-card px-4 hover:bg-accent"
-                    onClick={() => router.push("/workouts")}
-                  >
-                    Open
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      className="rounded-full border border-border/70 bg-card px-4 hover:bg-accent"
+                      onClick={() => router.push("/workouts")}
+                    >
+                      Open
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      title="Archive Workout"
+                      onClick={async () => {
+                        if (window.confirm("Archive this workout? It will be hidden from history and analytics.")) {
+                          await archiveWorkout(workout.id);
+                        }
+                      }}
+                    >
+                      <Archive className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

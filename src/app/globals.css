@@ -2,39 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Base Definitions */
 :root {
-  --background: 38 38% 97%;
-  --foreground: 210 26% 13%;
-  --card: 0 0% 100%;
-  --card-foreground: 210 26% 13%;
-  --border: 28 18% 84%;
-  --muted: 36 30% 92%;
-  --muted-foreground: 212 14% 34%;
-  --primary: 198 70% 24%;
-  --primary-foreground: 40 45% 97%;
-  --accent: 29 57% 88%;
-  --accent-foreground: 210 26% 13%;
-  --destructive: 2 72% 42%;
-  --destructive-foreground: 40 30% 97%;
   --radius: 1.2rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 210 28% 8%;
-    --foreground: 38 28% 94%;
-    --card: 212 24% 11%;
-    --card-foreground: 38 28% 94%;
-    --border: 210 15% 22%;
-    --muted: 210 16% 17%;
-    --muted-foreground: 33 12% 71%;
-    --primary: 190 55% 58%;
-    --primary-foreground: 210 28% 12%;
-    --accent: 28 24% 20%;
-    --accent-foreground: 38 28% 94%;
-    --destructive: 2 70% 54%;
-    --destructive-foreground: 0 0% 100%;
-  }
+/* Light Mode Palettes */
+html.light {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --primary: 222 47% 11%;
+  --primary-foreground: 210 40% 98%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+}
+
+html.light[data-palette="1"] { /* Warm Sand / Soft Earth */
+  --background: 30 30% 98%;
+  --foreground: 30 20% 20%;
+  --card: 30 30% 100%;
+  --card-foreground: 30 20% 20%;
+  --border: 30 15% 90%;
+  --muted: 30 50% 94%;
+  --muted-foreground: 30 10% 45%;
+  --primary: 25 30% 35%;
+  --primary-foreground: 30 30% 98%;
+  --accent: 30 50% 90%;
+  --accent-foreground: 30 20% 20%;
+}
+
+html.light[data-palette="2"] { /* Nordic / Airy Blue */
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 210 40% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 210 30% 90%;
+  --muted: 210 30% 94%;
+  --muted-foreground: 215 16% 47%;
+  --primary: 212 90% 40%;
+  --primary-foreground: 210 40% 98%;
+  --accent: 210 30% 90%;
+  --accent-foreground: 210 40% 20%;
+}
+
+/* Dark Mode Palettes */
+html.dark {
+  --background: 222 47% 6%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 8%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 32% 14%;
+  --muted: 217 32% 14%;
+  --muted-foreground: 215 20% 65%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 222 47% 6%;
+  --accent: 217 32% 14%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 210 40% 98%;
+}
+
+html.dark[data-palette="1"] { /* Midnight Gold / Premium Black */
+  --background: 0 0% 4%;
+  --foreground: 0 0% 94%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 94%;
+  --border: 0 0% 15%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 65%;
+  --primary: 45 93% 47%;
+  --primary-foreground: 0 0% 4%;
+  --accent: 0 0% 12%;
+  --accent-foreground: 0 0% 94%;
+}
+
+html.dark[data-palette="2"] { /* Forest / Deep Emerald */
+  --background: 160 30% 6%;
+  --foreground: 160 20% 94%;
+  --card: 160 30% 8%;
+  --card-foreground: 160 20% 94%;
+  --border: 160 20% 15%;
+  --muted: 160 20% 15%;
+  --muted-foreground: 160 10% 65%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 160 30% 6%;
+  --accent: 160 20% 12%;
+  --accent-foreground: 160 20% 94%;
 }
 
 * {
@@ -42,7 +102,7 @@
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-background text-foreground antialiased transition-colors duration-500;
   background-image:
     radial-gradient(circle at top left, hsl(var(--accent) / 0.35), transparent 24%),
     radial-gradient(circle at top right, hsl(var(--primary) / 0.14), transparent 22%),

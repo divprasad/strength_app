@@ -426,3 +426,33 @@ export function summarizeSets(sets: SetEntry[]) {
     totalVolume: sets.reduce((sum, setEntry) => sum + setEntry.reps * setEntry.weight, 0)
   };
 }
+
+export async function archiveWorkout(workoutId: string): Promise<void> {
+  await db.workouts.update(workoutId, {
+    status: "archived",
+    updatedAt: nowIso()
+  });
+}
+
+export async function restoreWorkout(workoutId: string): Promise<void> {
+  await db.workouts.update(workoutId, {
+    status: "completed",
+    updatedAt: nowIso()
+  });
+}
+
+export async function deleteWorkout(workoutId: string): Promise<void> {
+  const workoutExercises = await db.workoutExercises.where("workoutId").equals(workoutId).toArray();
+  const setEntriesKeys = await Promise.all(
+    workoutExercises.map(async (we) => {
+      const sets = await db.setEntries.where("workoutExerciseId").equals(we.id).toArray();
+      return sets.map((s) => s.id);
+    })
+  ).then(nested => nested.flat());
+
+  await db.transaction("rw", [db.setEntries, db.workoutExercises, db.workouts], async () => {
+    await db.setEntries.bulkDelete(setEntriesKeys);
+    await db.workoutExercises.bulkDelete(workoutExercises.map((we) => we.id));
+    await db.workouts.delete(workoutId);
+  });
+}

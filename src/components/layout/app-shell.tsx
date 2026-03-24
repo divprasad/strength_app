@@ -6,6 +6,7 @@ import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
 
 const desktopLinks = [
   { href: "/", label: "Dashboard" },
@@ -29,7 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-xl font-semibold tracking-[-0.04em] md:text-2xl">{APP_NAME}</p>
               <p className="truncate text-xs text-muted-foreground md:text-sm">Fast local workout logging for repeatable sessions</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
+              <ThemeToggle />
+              <PaletteToggle />
               <div className="shrink-0">
                 <CommandPalette />
               </div>
