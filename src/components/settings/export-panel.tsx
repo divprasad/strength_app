@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { db } from "@/lib/db";
+import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
-import { runIntegrityAudit } from "@/lib/integrity-audit";
+import { runIntegrityAudit, healMuscleLinks } from "@/lib/integrity-audit";
+import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
+import { bootstrapFromServer } from "@/lib/sync";
 import { nowIso, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
 import { PageIntro } from "@/components/layout/page-intro";
@@ -36,6 +39,7 @@ async function buildPayload(): Promise<ExportPayload> {
 
 export function ExportPanel() {
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false); // Added loading state
   const [auditReport, setAuditReport] = useState<IntegrityAuditReport | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
@@ -58,29 +62,124 @@ export function ExportPanel() {
   }
 
   async function importJson(file: File) {
-    const text = await file.text();
-    const payload = JSON.parse(text) as ExportPayload;
+    setLoading(true); // Set loading true
+    setStatus("Importing data...");
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as ExportPayload;
 
-    await db.muscles.clear();
-    await db.exercises.clear();
-    await db.workouts.clear();
-    await db.workoutExercises.clear();
-    await db.setEntries.clear();
-    await db.settings.clear();
+      const clearServer = window.confirm(
+        "Do you also want to clear all workouts from the SERVER? (Recommended for a clean import state)"
+      );
 
-    await db.muscles.bulkPut(payload.muscleGroups);
-    await db.exercises.bulkPut(payload.exercises);
-    await db.workouts.bulkPut(
-      payload.workouts.map((workout) => ({
-        ...workout,
-        status: workout.status ?? (workout.sessionStartedAt ? (workout.sessionEndedAt ? "completed" : "active") : "draft")
-      }))
+      // 1. Safety Backup: Export current state before replacing it
+      setStatus("Creating safety backup...");
+      await exportJson();
+
+      if (clearServer) {
+        setStatus("Clearing server data...");
+        const res = await fetch("/api/workouts", { method: "DELETE" });
+        if (!res.ok) {
+          alert("Failed to clear server data. Continuing with local replacement only.");
+        }
+      }
+
+      // 2. Clear and replace
+      setStatus("Replacing local data...");
+      await db.muscles.clear();
+      await db.exercises.clear();
+      await db.workouts.clear();
+      await db.workoutExercises.clear();
+      await db.setEntries.clear();
+      await db.settings.clear();
+
+      await db.muscles.bulkPut(payload.muscleGroups);
+      await db.exercises.bulkPut(payload.exercises);
+      await db.workouts.bulkPut(
+        payload.workouts.map((workout) => {
+          const hasStarted = Boolean(workout.sessionStartedAt);
+          const hasEnded = Boolean(workout.sessionEndedAt);
+          const autoStatus = hasStarted ? (hasEnded ? "completed" : "active") : "draft";
+
+          return {
+            ...workout,
+            name: workout.name ?? `Workout ${workout.date}`,
+            userId: workout.userId ?? DEFAULT_USER_ID,
+            status: workout.status ?? autoStatus
+          };
+        })
+      );
+      await db.workoutExercises.bulkPut(payload.workoutExercises);
+      await db.setEntries.bulkPut(payload.setEntries);
+      await db.settings.put(payload.settings);
+
+      // Normalize exercise order for all imported workouts to fix any existing corruption
+      for (const workout of payload.workouts) {
+        await normalizeWorkoutExerciseOrder(workout.id);
+      }
+      
+      // Auto-heal muscle links in case the export had broken references or was from an older version
+      await healMuscleLinks();
+
+      setStatus("Import complete. Safety backup downloaded. You may want to sync all data to the server.");
+    } catch (error) {
+      console.error("Import failed:", error);
+      setStatus("Import failed. Check console for details.");
+    } finally {
+      setLoading(false); // Set loading false
+    }
+  }
+
+  async function handleSyncToServer() {
+    setLoading(true);
+    setStatus("Checking for changes...");
+    try {
+      const hasChanges = await checkServerSyncStatus();
+      
+      if (!hasChanges) {
+        setStatus("Nothing to sync ^_^");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "Changes detected! Are you sure you want to sync all local data to the server? This will push all muscle groups, exercises, and workouts to the SQL database."
+      );
+      if (!confirmed) return;
+
+      setStatus("Syncing everything to server...");
+      await syncEverythingToServer();
+      setStatus("Global sync complete.");
+    } catch (error) {
+      console.error("Sync failed:", error);
+      setStatus("Sync failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResetFromServer() {
+    const confirmed = window.confirm(
+      "This will WIPE all your local data on THIS device and replace it with data from the server. Are you sure? ^_^"
     );
-    await db.workoutExercises.bulkPut(payload.workoutExercises);
-    await db.setEntries.bulkPut(payload.setEntries);
-    await db.settings.put(payload.settings);
+    if (!confirmed) return;
 
-    setStatus("Import complete.");
+    setLoading(true);
+    setStatus("Resetting and pulling from server...");
+    try {
+      await db.muscles.clear();
+      await db.exercises.clear();
+      await db.workouts.clear();
+      await db.workoutExercises.clear();
+      await db.setEntries.clear();
+
+      await bootstrapFromServer();
+      setStatus("Reset successfully pulled from server! ^_^");
+    } catch (error) {
+      console.error("Reset failed:", error);
+      setStatus("Reset failed. Check console.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function runAudit() {
@@ -93,6 +192,21 @@ export function ExportPanel() {
       setAuditError(error instanceof Error ? error.message : "Unable to run integrity audit.");
     } finally {
       setAuditLoading(false);
+    }
+  }
+
+  async function runRepair() {
+    setLoading(true);
+    setStatus("Repairing data integrity...");
+    try {
+      const { healedCount } = await healMuscleLinks();
+      setStatus(`Repaired ${healedCount} exercises. Running audit...`);
+      await runAudit();
+    } catch (error) {
+      console.error("Repair failed:", error);
+      setStatus("Repair failed. Check console.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -144,23 +258,23 @@ export function ExportPanel() {
 
         <Card className="overflow-hidden">
           <CardHeader className="pb-4">
-          <CardTitle>Import JSON (Optional)</CardTitle>
-          <CardDescription>Import replaces local data fully. Use the fixture or a recent export when validating flows.</CardDescription>
+          <CardTitle>Import & Sync</CardTitle>
+          <CardDescription>Upload a JSON export to replace your entire local database state.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/55 p-4">
-            <Input
-              type="file"
-              accept="application/json"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  void importJson(file);
-                }
-              }}
-            />
-            <p className="mt-3 text-xs text-muted-foreground">Import replaces local data fully.</p>
-          </div>
+        <CardContent className="space-y-4">
+          <Input type="file" accept=".json,application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
+          <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
+            Push to Database Server
+          </Button>
+          <Button onClick={handleResetFromServer} disabled={loading} variant="ghost" className="w-full">
+            Pull from Database Server
+          </Button>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+              {status}
+            </div>
+          )}
         </CardContent>
         </Card>
       </div>
@@ -175,11 +289,20 @@ export function ExportPanel() {
           {auditReport ? (
             <div className="space-y-3">
               <div className="rounded-[1.2rem] border border-border/70 bg-background/55 p-4">
-                <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {auditReport.summary.total} issue{auditReport.summary.total === 1 ? "" : "s"} total · {auditReport.summary.errors} errors ·{" "}
-                  {auditReport.summary.warnings} warnings
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {auditReport.summary.total} issue{auditReport.summary.total === 1 ? "" : "s"} total · {auditReport.summary.errors} errors ·{" "}
+                      {auditReport.summary.warnings} warnings
+                    </p>
+                  </div>
+                  {!auditReport.ok && (
+                    <Button size="sm" onClick={runRepair} disabled={loading}>
+                      Repair Issues
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {auditReport.issues.length > 0 ? (

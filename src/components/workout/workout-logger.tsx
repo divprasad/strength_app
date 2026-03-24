@@ -12,6 +12,7 @@ import {
   finishWorkoutSession,
   getWorkoutById,
   listWorkoutsByDate,
+  removeExerciseFromWorkout,
   renumberSets,
   reorderSet,
   startWorkoutSessionForWorkout,
@@ -124,12 +125,29 @@ export function WorkoutLogger() {
       : workout.status === "completed"
         ? "Session complete"
         : "Session stopped";
+  const handleFinishWorkout = async () => {
+    if (!activeWorkoutId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to finish this workout? This will save the session to the server."
+    );
+    if (!confirmed) return;
+
+    try {
+      await finishWorkoutSession(activeWorkoutId);
+      setActiveWorkoutId(null);
+    } catch (error) {
+      console.error("Failed to finish workout:", error);
+      alert("Failed to save workout to server. It is still saved locally.");
+    }
+  };
+
   const primaryAction = !workout ? (
     <Button onClick={handleCreateWorkout} disabled={sessionBusy}>
       Create Workout
     </Button>
   ) : sessionActive ? (
-    <Button variant="destructive" onClick={handleStopWorkout} disabled={sessionBusy}>
+    <Button variant="destructive" onClick={handleFinishWorkout} disabled={sessionBusy}>
       Stop Workout
     </Button>
   ) : (
@@ -148,15 +166,6 @@ export function WorkoutLogger() {
     }
   }
 
-  async function handleStopWorkout() {
-    if (!workout?.id) return;
-    setSessionBusy(true);
-    try {
-      await finishWorkoutSession(workout.id);
-    } finally {
-      setSessionBusy(false);
-    }
-  }
 
   async function handleStartWorkout() {
     if (!workout?.id) return;
@@ -366,11 +375,12 @@ export function WorkoutLogger() {
   );
 
   async function handleDeleteWorkoutExercise(workoutExerciseId: string) {
-    const sets = await db.setEntries.where("workoutExerciseId").equals(workoutExerciseId).toArray();
-    await db.transaction("rw", db.setEntries, db.workoutExercises, async () => {
-      await db.setEntries.bulkDelete(sets.map((setEntry) => setEntry.id));
-      await db.workoutExercises.delete(workoutExerciseId);
-    });
+    setSessionBusy(true);
+    try {
+      await removeExerciseFromWorkout(workoutExerciseId);
+    } finally {
+      setSessionBusy(false);
+    }
   }
 }
 

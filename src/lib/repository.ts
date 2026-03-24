@@ -70,7 +70,8 @@ export async function getWorkoutBundle(workoutId: string): Promise<WorkoutBundle
 
 export async function addExerciseToWorkout(workoutId: string, exerciseId: string): Promise<WorkoutExercise> {
   const existingItems = await db.workoutExercises.where("workoutId").equals(workoutId).toArray();
-  const nextIndex = existingItems.length;
+  const maxIndex = existingItems.reduce((max, item) => Math.max(max, item.orderIndex), -1);
+  const nextIndex = maxIndex + 1;
   const item: WorkoutExercise = {
     id: createId("workoutExercise"),
     workoutId,
@@ -81,6 +82,33 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
   await db.workoutExercises.put(item);
   await db.workouts.update(workoutId, { updatedAt: nowIso() });
   return item;
+}
+
+export async function normalizeWorkoutExerciseOrder(workoutId: string): Promise<void> {
+  const items = await db.workoutExercises.where("workoutId").equals(workoutId).sortBy("orderIndex");
+  await db.transaction("rw", db.workoutExercises, async () => {
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].orderIndex !== i) {
+        await db.workoutExercises.update(items[i].id, { orderIndex: i });
+      }
+    }
+  });
+}
+
+export async function removeExerciseFromWorkout(workoutExerciseId: string): Promise<void> {
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (!workoutExercise) return;
+
+  const workoutId = workoutExercise.workoutId;
+  const sets = await db.setEntries.where("workoutExerciseId").equals(workoutExerciseId).toArray();
+
+  await db.transaction("rw", [db.setEntries, db.workoutExercises, db.workouts], async () => {
+    await db.setEntries.bulkDelete(sets.map((s) => s.id));
+    await db.workoutExercises.delete(workoutExerciseId);
+    await db.workouts.update(workoutId, { updatedAt: nowIso() });
+  });
+
+  await normalizeWorkoutExerciseOrder(workoutId);
 }
 
 export async function addSetToWorkoutExercise(
@@ -293,6 +321,103 @@ export async function finishActiveWorkoutExercise(workoutId: string): Promise<vo
   if (activeExercise) {
     await finishWorkoutExercise(activeExercise.id);
   }
+}
+
+export async function syncAllMuscles(): Promise<void> {
+  const muscles = await db.muscles.toArray();
+  const response = await fetch("/api/muscles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ muscleGroups: muscles })
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to sync muscles to server (Status: ${response.status}): ${errText}`);
+  }
+}
+
+export async function syncAllExercises(): Promise<void> {
+  const exercises = await db.exercises.toArray();
+  const response = await fetch("/api/exercises", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ exercises })
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to sync exercises to server (Status: ${response.status}): ${errText}`);
+  }
+}
+
+/**
+ * Pushes all local workouts to the server.
+ * Note: This can be slow for large histories, but is useful for initial imports.
+ */
+export async function syncAllWorkouts(): Promise<void> {
+  const workouts = await db.workouts.toArray();
+  for (const workout of workouts) {
+    await persistWorkoutSession("sync", workout.id);
+  }
+}
+
+export async function checkServerSyncStatus(): Promise<boolean> {
+  const [localMuscles, localExercises, localWorkouts] = await Promise.all([
+    db.muscles.toArray(),
+    db.exercises.toArray(),
+    db.workouts.toArray()
+  ]);
+
+  const [resMuscles, resExercises, resWorkouts] = await Promise.all([
+    fetch("/api/muscles"),
+    fetch("/api/exercises"),
+    fetch("/api/workouts")
+  ]);
+
+  if (!resMuscles.ok || !resExercises.ok || !resWorkouts.ok) {
+    throw new Error("Failed to fetch current server state for comparison.");
+  }
+
+  const [serverMuscles, serverExercises, serverWorkouts] = await Promise.all([
+    resMuscles.json().then((d) => d.muscles),
+    resExercises.json().then((d) => d.exercises),
+    resWorkouts.json().then((d) => d.workouts)
+  ]);
+
+  // 1. Simple count check
+  if (
+    localMuscles.length !== serverMuscles.length ||
+    localExercises.length !== serverExercises.length ||
+    localWorkouts.length !== serverWorkouts.length
+  ) {
+    return true; // Counts differ, sync needed
+  }
+
+  // 2. Newest updatedAt check
+  const getLatestUpdate = (items: { updatedAt: string }[]) =>
+    items.reduce((max, item) => {
+      const time = new Date(item.updatedAt).getTime();
+      return time > max ? time : max;
+    }, 0);
+
+  const localMax = Math.max(
+    getLatestUpdate(localMuscles),
+    getLatestUpdate(localExercises),
+    getLatestUpdate(localWorkouts)
+  );
+
+  const serverMax = Math.max(
+    getLatestUpdate(serverMuscles),
+    getLatestUpdate(serverExercises),
+    getLatestUpdate(serverWorkouts)
+  );
+
+  return localMax > serverMax; // Sync if local has newer data
+}
+
+export async function syncEverythingToServer(): Promise<void> {
+  await syncAllMuscles();
+  await syncAllExercises();
+  await syncAllWorkouts();
 }
 
 export function summarizeSets(sets: SetEntry[]) {

@@ -37,3 +37,6 @@ pnpm-debug.log*
 # reports
 /DEVTEST.md
 /PRODTEST.md
+
+strength-export*.json
+AFTER_LOGGING.json

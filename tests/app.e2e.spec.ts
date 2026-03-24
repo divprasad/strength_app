@@ -29,6 +29,7 @@ test("command palette can be opened on a mobile viewport", async ({ page }) => {
 });
 
 test("workout lifecycle can be completed from logger to history", async ({ page }) => {
+  page.on("dialog", dialog => dialog.accept());
   await page.goto("/workouts");
 
   await expect(page.getByRole("heading", { name: "Workout Logger" })).toBeVisible();
@@ -45,7 +46,7 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
 
   await page.goto("/history");
   await expect(page.getByText("Workout #1")).toBeVisible();
-  await expect(page.getByText(/^completed$/).first()).toBeVisible();
+  await expect(page.getByText(/^Completed/i).first()).toBeVisible();
   await expect(page.getByText("Set 3: 8 reps × 20")).toBeVisible();
 });
 
@@ -57,7 +58,7 @@ test("settings supports JSON export and fixture import", async ({ page }) => {
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^strength-export-.*\.json$/);
 
-  await page.locator('input[type="file"][accept="application/json"]').setInputFiles(importFixturePath);
+  await page.locator('input[type="file"][accept=".json,application/json"]').setInputFiles(importFixturePath);
   await expect(page.getByText("Import complete.")).toBeVisible();
 
   await page.goto("/exercises");
