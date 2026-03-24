@@ -4,7 +4,7 @@ import { useState } from "react";
 import { db } from "@/lib/db";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
-import { runIntegrityAudit } from "@/lib/integrity-audit";
+import { runIntegrityAudit, healMuscleLinks } from "@/lib/integrity-audit";
 import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
 import { bootstrapFromServer } from "@/lib/sync";
 import { nowIso, triggerDownload } from "@/lib/utils";
@@ -117,6 +117,9 @@ export function ExportPanel() {
       for (const workout of payload.workouts) {
         await normalizeWorkoutExerciseOrder(workout.id);
       }
+      
+      // Auto-heal muscle links in case the export had broken references or was from an older version
+      await healMuscleLinks();
 
       setStatus("Import complete. Safety backup downloaded. You may want to sync all data to the server.");
     } catch (error) {
@@ -189,6 +192,21 @@ export function ExportPanel() {
       setAuditError(error instanceof Error ? error.message : "Unable to run integrity audit.");
     } finally {
       setAuditLoading(false);
+    }
+  }
+
+  async function runRepair() {
+    setLoading(true);
+    setStatus("Repairing data integrity...");
+    try {
+      const { healedCount } = await healMuscleLinks();
+      setStatus(`Repaired ${healedCount} exercises. Running audit...`);
+      await runAudit();
+    } catch (error) {
+      console.error("Repair failed:", error);
+      setStatus("Repair failed. Check console.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -271,11 +289,20 @@ export function ExportPanel() {
           {auditReport ? (
             <div className="space-y-3">
               <div className="rounded-[1.2rem] border border-border/70 bg-background/55 p-4">
-                <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {auditReport.summary.total} issue{auditReport.summary.total === 1 ? "" : "s"} total · {auditReport.summary.errors} errors ·{" "}
-                  {auditReport.summary.warnings} warnings
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {auditReport.summary.total} issue{auditReport.summary.total === 1 ? "" : "s"} total · {auditReport.summary.errors} errors ·{" "}
+                      {auditReport.summary.warnings} warnings
+                    </p>
+                  </div>
+                  {!auditReport.ok && (
+                    <Button size="sm" onClick={runRepair} disabled={loading}>
+                      Repair Issues
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {auditReport.issues.length > 0 ? (
