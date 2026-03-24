@@ -216,18 +216,6 @@ export async function healMuscleLinks(): Promise<{ healedCount: number }> {
     // matches one of our defaults and re-seed those links.
 
     const isHealed = await db.transaction("rw", db.exercises, async () => {
-      const updatedExercise = { ...exercise };
-      let changed = false;
-
-      const healList = (ids: string[]) => {
-        return ids.map((id) => {
-          if (muscleIdSet.has(id)) return id;
-          // If ID is missing, we can't really "heal" it by name here because we don't know the name.
-          // BUT, if this is a known static exercise, we can restore its defaults.
-          return null;
-        }).filter(Boolean) as string[];
-      };
-
       // Since we don't have the missing names, let's just strip the bad links
       // to satisfy the integrity audit, and the user can re-assign them if needed.
       // IN A FUTURE STEP: We will improve the import to map by name.
