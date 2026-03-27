@@ -1,4 +1,4 @@
-import { eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subWeeks } from "date-fns";
+import { eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subDays, subWeeks } from "date-fns";
 import { db } from "@/lib/db";
 import { attributedVolumeForExercise, e1rm } from "@/lib/volume";
 import type { AppSettings } from "@/types/domain";
@@ -21,7 +21,8 @@ export async function getWeeklyMetrics(anchorDateIso: string): Promise<WeeklyMet
   const start = startOfWeek(parseISO(anchorDateIso), { weekStartsOn: 1 });
   const end = endOfWeek(parseISO(anchorDateIso), { weekStartsOn: 1 });
 
-  const workouts = await db.workouts.where("date").between(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"), true, true).toArray();
+  const allWorkouts = await db.workouts.where("date").between(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"), true, true).toArray();
+  const workouts = allWorkouts.filter(w => w.status !== "archived");
   const settings =
     (await db.settings.get("default")) ??
     ({ id: "default", volumePrimaryMultiplier: 1, volumeSecondaryMultiplier: 0.5 } as AppSettings);
@@ -64,7 +65,8 @@ export async function getExerciseProgress(exerciseId: string, weeksBack = 12): P
   const today = new Date();
   const start = startOfWeek(subWeeks(today, weeksBack), { weekStartsOn: 1 });
 
-  const workouts = await db.workouts.where("date").aboveOrEqual(format(start, "yyyy-MM-dd")).toArray();
+  const allWorkouts = await db.workouts.where("date").aboveOrEqual(format(start, "yyyy-MM-dd")).toArray();
+  const workouts = allWorkouts.filter(w => w.status !== "archived");
   const points: ExerciseProgressPoint[] = [];
 
   for (const workout of workouts) {
@@ -93,4 +95,34 @@ export async function getExerciseProgress(exerciseId: string, weeksBack = 12): P
   }
 
   return points.sort((a, b) => a.date.localeCompare(b.date));
+}
+export async function get30DaySummary(): Promise<{ completedCount: number; totalVolume: number }> {
+  const thirtyDaysAgo = subDays(new Date(), 30);
+  const startStr = format(thirtyDaysAgo, "yyyy-MM-dd");
+  const endStr = format(new Date(), "yyyy-MM-dd");
+
+  const allWorkouts = await db.workouts
+    .where("date")
+    .between(startStr, endStr, true, true)
+    .toArray();
+  
+  const workouts = allWorkouts.filter(w => w.status !== "archived");
+  const settings = (await db.settings.get("default")) ?? { volumePrimaryMultiplier: 1, volumeSecondaryMultiplier: 0.5 };
+
+  let totalVolume = 0;
+  for (const workout of workouts) {
+    const workoutExercises = await db.workoutExercises.where("workoutId").equals(workout.id).toArray();
+    for (const item of workoutExercises) {
+      const exercise = await db.exercises.get(item.exerciseId);
+      if (!exercise) continue;
+      const sets = await db.setEntries.where("workoutExerciseId").equals(item.id).toArray();
+      const attribution = attributedVolumeForExercise(exercise, sets, settings as AppSettings);
+      totalVolume += attribution.total;
+    }
+  }
+
+  return {
+    completedCount: workouts.length,
+    totalVolume: Math.round(totalVolume)
+  };
 }

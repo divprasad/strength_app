@@ -36,6 +36,11 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
   return workout;
 }
 
+export async function updateWorkout(workoutId: string, patch: Partial<Workout>): Promise<void> {
+  const now = nowIso();
+  await db.workouts.update(workoutId, { ...patch, updatedAt: now });
+}
+
 export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
   // Deprecated compatibility helper. New session flows should create/select by workoutId.
   const existing = await db.workouts.where("date").equals(date).first();
@@ -233,6 +238,10 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
 
 const WORKOUT_API_PATH = "/api/workouts";
 
+export async function syncWorkoutToServer(workoutId: string): Promise<void> {
+  await persistWorkoutSession("sync", workoutId);
+}
+
 async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {
   const bundle = await getWorkoutBundle(workoutId);
   if (!bundle) return;
@@ -415,6 +424,14 @@ export async function checkServerSyncStatus(): Promise<boolean> {
 }
 
 export async function syncEverythingToServer(): Promise<void> {
+  // 1. Clear server state to ensure a clean overwrite (prevents zombie data)
+  await Promise.all([
+    fetch("/api/muscles", { method: "DELETE" }),
+    fetch("/api/exercises", { method: "DELETE" }),
+    fetch("/api/workouts", { method: "DELETE" })
+  ]);
+
+  // 2. Push current local state
   await syncAllMuscles();
   await syncAllExercises();
   await syncAllWorkouts();
@@ -425,4 +442,34 @@ export function summarizeSets(sets: SetEntry[]) {
     totalReps: sets.reduce((sum, setEntry) => sum + setEntry.reps, 0),
     totalVolume: sets.reduce((sum, setEntry) => sum + setEntry.reps * setEntry.weight, 0)
   };
+}
+
+export async function archiveWorkout(workoutId: string): Promise<void> {
+  await db.workouts.update(workoutId, {
+    status: "archived",
+    updatedAt: nowIso()
+  });
+}
+
+export async function restoreWorkout(workoutId: string): Promise<void> {
+  await db.workouts.update(workoutId, {
+    status: "completed",
+    updatedAt: nowIso()
+  });
+}
+
+export async function deleteWorkout(workoutId: string): Promise<void> {
+  const workoutExercises = await db.workoutExercises.where("workoutId").equals(workoutId).toArray();
+  const setEntriesKeys = await Promise.all(
+    workoutExercises.map(async (we) => {
+      const sets = await db.setEntries.where("workoutExerciseId").equals(we.id).toArray();
+      return sets.map((s) => s.id);
+    })
+  ).then(nested => nested.flat());
+
+  await db.transaction("rw", [db.setEntries, db.workoutExercises, db.workouts], async () => {
+    await db.setEntries.bulkDelete(setEntriesKeys);
+    await db.workoutExercises.bulkDelete(workoutExercises.map((we) => we.id));
+    await db.workouts.delete(workoutId);
+  });
 }

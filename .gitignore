@@ -40,3 +40,6 @@ pnpm-debug.log*
 
 strength-export*.json
 AFTER_LOGGING.json
+
+# editor
+*.code-workspace

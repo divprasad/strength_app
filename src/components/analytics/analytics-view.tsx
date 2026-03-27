@@ -147,7 +147,7 @@ export function AnalyticsView() {
                     <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridColor} />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} interval={0} angle={-20} textAnchor="end" height={70} stroke={axisColor} />
                     <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                    <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
+                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
                     <Bar dataKey="volume" fill={primaryBar} radius={[8, 8, 4, 4]} stroke={primaryBar} strokeWidth={1.2} />
                   </BarChart>
                 )}
@@ -171,7 +171,7 @@ export function AnalyticsView() {
                     <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridColor} />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} interval={0} angle={-20} textAnchor="end" height={70} stroke={axisColor} />
                     <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                    <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
+                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
                     <Bar dataKey="volume" fill={accentBar} radius={[8, 8, 4, 4]} stroke={accentBar} strokeWidth={1.2} />
                   </BarChart>
                 )}
@@ -212,7 +212,7 @@ export function AnalyticsView() {
                         <CartesianGrid strokeDasharray="4 4" stroke={gridColor} />
                         <XAxis dataKey="date" tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
                         <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                        <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
+                        <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
                         <Line type="monotone" dataKey="maxWeight" stroke={primaryLine} strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
                       </LineChart>
                     )}

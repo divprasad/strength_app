@@ -65,3 +65,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
+export async function DELETE() {
+  try {
+    await prisma.exercise.deleteMany();
+    return NextResponse.json({ status: "ok", message: "All exercises cleared" });
+  } catch (error) {
+    console.error("Failed to clear exercises:", error);
+    return NextResponse.json({ error: "Clear failed" }, { status: 500 });
+  }
+}

@@ -183,59 +183,93 @@ export async function runIntegrityAudit(): Promise<IntegrityAuditReport> {
   };
 }
 
-export async function healMuscleLinks(): Promise<{ healedCount: number }> {
-  const [exercises, muscles] = await Promise.all([
+export async function healDatabase(): Promise<{ healedCount: number }> {
+  const [exercises, muscles, workoutExercises, setEntries] = await Promise.all([
     db.exercises.toArray(),
-    db.muscles.toArray()
+    db.muscles.toArray(),
+    db.workoutExercises.toArray(),
+    db.setEntries.toArray()
   ]);
-
-  const muscleMap = new Map<string, string>(); // name -> id
-  muscles.forEach((m) => muscleMap.set(m.name.toLowerCase(), m.id));
 
   const muscleIdSet = new Set(muscles.map((m) => m.id));
   let healedCount = 0;
 
+  // 1. Heal Muscle Links (Exercises)
   for (const exercise of exercises) {
     const missingPrimary = exercise.primaryMuscleIds.filter((id) => !muscleIdSet.has(id));
     const missingSecondary = exercise.secondaryMuscleIds.filter((id) => !muscleIdSet.has(id));
 
-    if (missingPrimary.length === 0 && missingSecondary.length === 0) continue;
-
-    // This is the tricky part: how do we know the "name" of the missing muscle?
-    // If the exercise is from our DEFAULT_EXERCISES, we can look it up.
-    // For others, we might be out of luck unless we have a mapping.
-    // However, if the "missing" IDs actually belong to muscles that DO exist but with different IDs,
-    // we can't know which is which without a name map.
-
-    // Better approach: Since we don't have the old muscle names for the random IDs,
-    // we can only heal the STATIC exercises using our known defaults.
-    // But for imported exercises, we might have to just clear the bad links if we can't find them.
-
-    // Let's at least fix the STATIC ones using a hardcoded name-to-muscle lookup for now,
-    // OR we can assume that if a muscle ID is missing, we check if the exercise name
-    // matches one of our defaults and re-seed those links.
-
-    const isHealed = await db.transaction("rw", db.exercises, async () => {
-      // Since we don't have the missing names, let's just strip the bad links
-      // to satisfy the integrity audit, and the user can re-assign them if needed.
-      // IN A FUTURE STEP: We will improve the import to map by name.
-      
+    if (missingPrimary.length > 0 || missingSecondary.length > 0) {
       const newPrimary = exercise.primaryMuscleIds.filter(id => muscleIdSet.has(id));
       const newSecondary = exercise.secondaryMuscleIds.filter(id => muscleIdSet.has(id));
 
-      if (newPrimary.length !== exercise.primaryMuscleIds.length || 
-          newSecondary.length !== exercise.secondaryMuscleIds.length) {
-        await db.exercises.update(exercise.id, {
-          primaryMuscleIds: newPrimary,
-          secondaryMuscleIds: newSecondary,
-          updatedAt: new Date().toISOString()
-        });
-        return true;
-      }
-      return false;
-    });
+      await db.exercises.update(exercise.id, {
+        primaryMuscleIds: newPrimary,
+        secondaryMuscleIds: newSecondary,
+        updatedAt: new Date().toISOString()
+      });
+      healedCount++;
+    }
+  }
 
-    if (isHealed) healedCount++;
+  // 2. Heal Duplicate WorkoutExercise Order
+  const workoutGroups = new Map<string, typeof workoutExercises>();
+  workoutExercises.forEach(we => {
+    const list = workoutGroups.get(we.workoutId) || [];
+    list.push(we);
+    workoutGroups.set(we.workoutId, list);
+  });
+
+  for (const [workoutId, items] of workoutGroups) {
+    const sorted = [...items].sort((a, b) => a.orderIndex - b.orderIndex);
+    let needsReorder = false;
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].orderIndex !== i) {
+        needsReorder = true;
+        break;
+      }
+    }
+
+    if (needsReorder) {
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i].orderIndex !== i) {
+          await db.workoutExercises.update(sorted[i].id, { orderIndex: i });
+          healedCount++;
+        }
+      }
+    }
+  }
+
+  // 3. Heal Duplicate Set Numbers
+  const workoutExerciseGroups = new Map<string, typeof setEntries>();
+  setEntries.forEach(se => {
+    const list = workoutExerciseGroups.get(se.workoutExerciseId) || [];
+    list.push(se);
+    workoutExerciseGroups.set(se.workoutExerciseId, list);
+  });
+
+  for (const [weId, items] of workoutExerciseGroups) {
+    const sorted = [...items].sort((a, b) => a.setNumber - b.setNumber);
+    let needsResequence = false;
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].setNumber !== i + 1) {
+        needsResequence = true;
+        break;
+      }
+    }
+
+    if (needsResequence) {
+      for (let i = 0; i < sorted.length; i++) {
+        const newNumber = i + 1;
+        if (sorted[i].setNumber !== newNumber) {
+          await db.setEntries.update(sorted[i].id, { 
+            setNumber: newNumber,
+            updatedAt: new Date().toISOString()
+          });
+          healedCount++;
+        }
+      }
+    }
   }
 
   return { healedCount };

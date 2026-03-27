@@ -4,7 +4,7 @@ import { useState } from "react";
 import { db } from "@/lib/db";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
-import { runIntegrityAudit, healMuscleLinks } from "@/lib/integrity-audit";
+import { runIntegrityAudit, healDatabase } from "@/lib/integrity-audit";
 import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
 import { bootstrapFromServer } from "@/lib/sync";
 import { nowIso, triggerDownload } from "@/lib/utils";
@@ -118,8 +118,8 @@ export function ExportPanel() {
         await normalizeWorkoutExerciseOrder(workout.id);
       }
       
-      // Auto-heal muscle links in case the export had broken references or was from an older version
-      await healMuscleLinks();
+      // Auto-heal data in case the export had broken references, duplicate set numbers, or re-ordering issues
+      await healDatabase();
 
       setStatus("Import complete. Safety backup downloaded. You may want to sync all data to the server.");
     } catch (error) {
@@ -199,8 +199,8 @@ export function ExportPanel() {
     setLoading(true);
     setStatus("Repairing data integrity...");
     try {
-      const { healedCount } = await healMuscleLinks();
-      setStatus(`Repaired ${healedCount} exercises. Running audit...`);
+      const { healedCount } = await healDatabase();
+      setStatus(`Repaired ${healedCount} entries. Running audit...`);
       await runAudit();
     } catch (error) {
       console.error("Repair failed:", error);
