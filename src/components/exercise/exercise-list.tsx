@@ -91,13 +91,31 @@ export function ExerciseList() {
                   className="rounded-[1.3rem] border border-border/70 bg-background/58 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.4)]"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <p className="font-medium">{exercise.name}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {exercise.category ? <Badge className="bg-accent text-accent-foreground">{exercise.category}</Badge> : null}
-                        {exercise.equipment ? <Badge>{exercise.equipment}</Badge> : null}
+                    <div className="space-y-1.5">
+                      <p className="font-semibold tracking-tight">{exercise.name}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {exercise.category && (
+                          <Badge className="bg-accent/80 text-accent-foreground border-accent/20 px-2 py-0 text-[10px] uppercase tracking-wider">{exercise.category}</Badge>
+                        )}
+                        {exercise.primaryMuscleIds?.map(id => {
+                          const muscle = muscles?.find(m => m.id === id);
+                          return muscle ? (
+                            <Badge key={id} variant="secondary" className="bg-primary/5 text-primary/80 border-primary/10 px-2 py-0 text-[10px] font-medium">
+                              {muscle.name}
+                            </Badge>
+                          ) : null;
+                        })}
+                        {exercise.equipment && exercise.equipment.trim() !== "" && (
+                          <Badge variant="outline" className="border-border/40 text-muted-foreground px-2 py-0 text-[10px] font-normal italic">
+                            {exercise.equipment}
+                          </Badge>
+                        )}
                       </div>
-                      {exercise.notes ? <p className="max-w-xl text-sm text-muted-foreground">{exercise.notes}</p> : null}
+                      {exercise.notes && exercise.notes.trim() !== "" && (
+                        <p className="max-w-xl text-[11px] leading-relaxed text-muted-foreground/85 italic">
+                          {exercise.notes}
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="secondary" onClick={() => setEditing(exercise)}>

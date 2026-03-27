@@ -1,17 +1,18 @@
 "use client";
 
-import { formatDistanceToNowStrict, parseISO } from "date-fns";
+import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useRouter } from "next/navigation";
-import { getWeeklyMetrics } from "@/lib/analytics";
+import { getWeeklyMetrics, get30DaySummary } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
-import { archiveWorkout } from "@/lib/repository";
-import { Archive, ArrowRight, Flame, Sparkles } from "lucide-react";
+import { archiveWorkout, getWorkoutBundle } from "@/lib/repository";
+import { Archive, ArrowRight, Edit2, Flame, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { Workout, MuscleGroup } from "@/types/domain";
 
 export function Dashboard() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function Dashboard() {
   const metrics = useLiveQuery(() => getWeeklyMetrics(todayIso), [todayIso]);
   const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().filter(w => w.status !== "archived").limit(5).toArray(), []);
   const muscles = useLiveQuery(() => db.muscles.toArray(), []);
+  const summary30 = useLiveQuery(() => get30DaySummary(), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
     .map(([muscleId, volume]) => {
@@ -159,9 +161,11 @@ export function Dashboard() {
         <CardHeader className="flex flex-col gap-2 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardDescription className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
-              Recent activity
+              Workout overview
             </CardDescription>
-            <CardTitle className="mt-2 text-2xl">Recent Workouts</CardTitle>
+            <CardTitle className="mt-2 text-2xl">
+              {summary30?.completedCount ?? 0} completed : total {summary30?.totalVolume ?? 0} kg lifted in the past 30 days
+            </CardTitle>
           </div>
           <p className="max-w-md text-sm text-muted-foreground">Review your latest logged sessions and jump back into the logger without leaving the dashboard.</p>
         </CardHeader>
@@ -169,39 +173,7 @@ export function Dashboard() {
           {recent && recent.length > 0 ? (
             <ul className="space-y-3">
               {recent.map((workout) => (
-                <li
-                  key={workout.id}
-                  className="flex items-center justify-between gap-3 rounded-[1.3rem] border border-border/70 bg-background/72 p-4 shadow-[0_18px_40px_-36px_hsl(var(--foreground)/0.65)]"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium">{workout.date}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {workout.status} · Logged {formatDistanceToNowStrict(parseISO(workout.sessionEndedAt ?? workout.sessionStartedAt ?? workout.updatedAt), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      className="rounded-full border border-border/70 bg-card px-4 hover:bg-accent"
-                      onClick={() => router.push("/workouts")}
-                    >
-                      Open
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      title="Archive Workout"
-                      onClick={async () => {
-                        if (window.confirm("Archive this workout? It will be hidden from history and analytics.")) {
-                          await archiveWorkout(workout.id);
-                        }
-                      }}
-                    >
-                      <Archive className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </li>
+                <RecentWorkoutRow key={workout.id} workout={workout} muscles={muscles ?? []} />
               ))}
             </ul>
           ) : (
@@ -218,5 +190,90 @@ export function Dashboard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function RecentWorkoutRow({ workout, muscles }: { workout: Workout; muscles: MuscleGroup[] }) {
+  const router = useRouter();
+  const bundle = useLiveQuery(() => getWorkoutBundle(workout.id), [workout.id]);
+
+  if (!bundle) {
+    return (
+      <li className="h-24 animate-pulse rounded-[1.3rem] border border-border/70 bg-background/40" />
+    );
+  }
+
+  const durationMs = bundle.workout.sessionEndedAt && bundle.workout.sessionStartedAt
+    ? new Date(bundle.workout.sessionEndedAt).getTime() - new Date(bundle.workout.sessionStartedAt).getTime()
+    : 0;
+  const durationMin = Math.round(durationMs / 60000);
+
+  const totalReps = bundle.items.reduce((sum, item) => sum + item.sets.reduce((s, set) => s + set.reps, 0), 0);
+  const totalVolume = bundle.items.reduce((sum, item) => sum + item.sets.reduce((s, set) => s + (set.reps * set.weight), 0), 0);
+
+  const muscleMap: Record<string, number> = {};
+  bundle.items.forEach(item => {
+    const vol = item.sets.reduce((s, set) => s + (set.reps * set.weight), 0);
+    const primaryIds = (item.exercise.primaryMuscleIds as unknown as string[]) || [];
+    const secondaryIds = (item.exercise.secondaryMuscleIds as unknown as string[]) || [];
+    
+    [...primaryIds, ...secondaryIds].forEach(id => {
+      muscleMap[id] = (muscleMap[id] ?? 0) + vol;
+    });
+  });
+
+  const topMusclesStr = Object.entries(muscleMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id]) => muscles.find(m => m.id === id)?.name)
+    .filter(Boolean)
+    .join(", ");
+
+  const dateStr = bundle.workout.date;
+  const timeStr = bundle.workout.sessionStartedAt 
+    ? format(parseISO(bundle.workout.sessionStartedAt), "HH:mm")
+    : "--:--";
+
+  return (
+    <li className="flex flex-col gap-3 rounded-[1.3rem] border border-border/70 bg-background/72 p-4 shadow-[0_18px_40px_-36px_hsl(var(--foreground)/0.65)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="font-medium">
+          {durationMin} min | {dateStr} | {timeStr}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {topMusclesStr || "No muscles tracked"} | {totalReps} total reps | {Math.round(totalVolume)} total kg
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          className="h-10 rounded-full border border-border/70 bg-card px-4 text-sm hover:bg-accent"
+          onClick={() => router.push("/workouts")}
+        >
+          Open
+        </Button>
+        <Button
+          variant="ghost"
+          className="h-10 rounded-full border border-border/70 bg-card px-4 text-sm hover:bg-accent"
+          onClick={() => router.push(`/workouts?id=${workout.id}`)}
+        >
+          <Edit2 className="mr-2 h-3.5 w-3.5" />
+          Edit
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          title="Archive Workout"
+          onClick={async () => {
+            if (window.confirm("Archive this workout? It will be hidden from history and analytics.")) {
+              await archiveWorkout(workout.id);
+            }
+          }}
+        >
+          <Archive className="h-4 w-4" />
+        </Button>
+      </div>
+    </li>
   );
 }

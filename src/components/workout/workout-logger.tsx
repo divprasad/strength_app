@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Trash2 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import {
   addExerciseToWorkout,
@@ -17,12 +18,14 @@ import {
   reorderSet,
   startWorkoutSessionForWorkout,
   startWorkoutExercise,
-  summarizeSets
+  summarizeSets,
+  updateWorkout,
+  syncWorkoutToServer
 } from "@/lib/repository";
 import { useUiStore } from "@/lib/store";
 import { formatLocalDate, localDateIso, nowIso } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import type { Exercise, MuscleGroup, SetEntry } from "@/types/domain";
+import type { Exercise, MuscleGroup, SetEntry, Workout } from "@/types/domain";
 import { formatDurationLong, formatTimeOfDay, computeDurationSeconds, muscleTimeSummary } from "@/lib/time";
 import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +35,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Modal } from "@/components/ui/modal";
 
 function formatTimer(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -72,10 +76,14 @@ export function WorkoutLogger() {
     return map;
   }, [muscleGroups]);
 
-  const sessionActive = workout?.status === "active";
+  const [sessionActive, setSessionActive] = useState(false); // Initialize sessionActive state
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [newExerciseId, setNewExerciseId] = useState("");
+
+  useEffect(() => {
+    setSessionActive(workout?.status === "active");
+  }, [workout?.status]);
 
   useEffect(() => {
     if (!workouts) return;
@@ -125,6 +133,32 @@ export function WorkoutLogger() {
       : workout.status === "completed"
         ? "Session complete"
         : "Session stopped";
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const editId = searchParams.get("id");
+  const [pendingEditWorkout, setPendingEditWorkout] = useState<Workout | null>(null);
+
+  useEffect(() => {
+    if (editId && activeWorkoutId !== editId) {
+      getWorkoutById(editId).then((w) => {
+        if (w) setPendingEditWorkout(w);
+      });
+    }
+  }, [editId, activeWorkoutId]);
+
+  const handleConfirmEdit = () => {
+    if (pendingEditWorkout) {
+      setActiveWorkoutId(pendingEditWorkout.id);
+      setSelectedDate(pendingEditWorkout.date);
+      setPendingEditWorkout(null);
+      // Remove id from URL without refresh
+      const url = new URL(window.location.href);
+      url.searchParams.delete("id");
+      router.replace(url.pathname + url.search);
+    }
+  };
+
   const handleFinishWorkout = async () => {
     if (!activeWorkoutId) return;
 
@@ -140,6 +174,28 @@ export function WorkoutLogger() {
       console.error("Failed to finish workout:", error);
       alert("Failed to save workout to server. It is still saved locally.");
     }
+  };
+
+  const handleSaveAndPush = async () => {
+    if (!activeWorkoutId) return;
+    setSessionBusy(true);
+    try {
+      await syncWorkoutToServer(activeWorkoutId);
+      alert("Changes saved and pushed to server successfully.");
+    } catch (error) {
+      console.error("Failed to push changes:", error);
+      alert("Failed to push changes to server. Changes are saved locally.");
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
+  const handleUpdateTime = async (time: string) => {
+    if (!workout || !time) return;
+    const [hours, minutes] = time.split(":").map(Number);
+    const date = new Date(workout.sessionStartedAt || nowIso());
+    date.setHours(hours, minutes, 0, 0);
+    await updateWorkout(workout.id, { sessionStartedAt: date.toISOString() });
   };
 
   const primaryAction = !workout ? (
@@ -203,20 +259,61 @@ export function WorkoutLogger() {
         title="Workout Logger"
         description="Choose the active day, pick the right session, and move from start to finished sets without losing context."
         action={
-          <>
+          <div className="flex flex-wrap gap-2">
             {primaryAction}
             <Button size="sm" variant="secondary" onClick={handleCreateWorkout} disabled={sessionBusy}>
               New Session
             </Button>
-          </>
+            {workout?.status === "completed" && (
+              <Button size="sm" onClick={handleSaveAndPush} disabled={sessionBusy} className="bg-primary/90 hover:bg-primary">
+                Confirm Edit and Save
+              </Button>
+            )}
+          </div>
         }
         meta={
           <>
             <Badge className="bg-accent px-3 py-1 text-accent-foreground">{formatLocalDate(selectedDate, "EEEE, MMMM d")}</Badge>
-            <Badge>{sessionSummary}</Badge>
+            <Badge className={cn(workout?.status === "completed" ? "bg-primary/10 text-primary border-primary/20" : "")}>
+              {sessionSummary}
+            </Badge>
           </>
         }
       />
+
+      <Modal
+        isOpen={!!pendingEditWorkout}
+        onClose={() => {
+          setPendingEditWorkout(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("id");
+          router.replace(url.pathname + url.search);
+        }}
+        title="Edit Workout Session?"
+        description="Are you sure you want to jump back into this session? Any changes will need to be re-confirmed for server sync."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => {
+              setPendingEditWorkout(null);
+              const url = new URL(window.location.href);
+              url.searchParams.delete("id");
+              router.replace(url.pathname + url.search);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmEdit}>
+              Edit Session
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-[1.5rem] border border-border/70 bg-muted/30 p-4">
+            <p className="font-medium">{pendingEditWorkout?.name}</p>
+            <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
+          </div>
+        </div>
+      </Modal>
 
       <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
         <Card className="overflow-hidden">
@@ -244,12 +341,26 @@ export function WorkoutLogger() {
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary/70">Session Status</p>
               <p className="mt-2 text-lg font-semibold tracking-[-0.03em]">{sessionSummary}</p>
               {workout?.sessionStartedAt ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Started at {formatTimeOfDay(workout.sessionStartedAt)}
-                  {!sessionActive && workout.sessionEndedAt
-                    ? ` · Duration ${formatDurationLong(computeDurationSeconds(workout.sessionStartedAt, workout.sessionEndedAt))}`
-                    : ""}
-                </p>
+                <div className="mt-2 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Started at {formatTimeOfDay(workout.sessionStartedAt)}
+                    {!sessionActive && workout.sessionEndedAt
+                      ? ` · Duration ${formatDurationLong(computeDurationSeconds(workout.sessionStartedAt, workout.sessionEndedAt))}`
+                      : ""}
+                  </p>
+                  {workout.status === "completed" && (
+                    <div className="pt-2">
+                      <Label htmlFor="start-time" className="text-[10px] uppercase text-muted-foreground">Update Start Time</Label>
+                      <Input
+                        id="start-time"
+                        type="time"
+                        defaultValue={formatTimeOfDay(workout.sessionStartedAt).split(" ")[0]} // Basic format check
+                        onBlur={(e) => handleUpdateTime(e.target.value)}
+                        className="mt-1 h-8 max-w-[120px] text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="mt-2 text-sm text-muted-foreground">Create or select a session to begin logging sets for this day.</p>
               )}
@@ -353,6 +464,7 @@ export function WorkoutLogger() {
                   completedAt={item.completedAt}
                   isActive={activeExerciseId === item.id}
                   isSessionActive={sessionActive}
+                  allowEdit={workout?.status === "completed" || sessionActive}
                 />
               );
             })}
@@ -395,7 +507,8 @@ function WorkoutExerciseCard({
   startedAt,
   completedAt,
   isActive,
-  isSessionActive
+  isSessionActive,
+  allowEdit
 }: {
   workoutExerciseId: string;
   title: string;
@@ -408,6 +521,7 @@ function WorkoutExerciseCard({
   completedAt?: string;
   isActive: boolean;
   isSessionActive: boolean;
+  allowEdit?: boolean;
 }) {
   const sets = useLiveQuery(
     () => db.setEntries.where("workoutExerciseId").equals(workoutExerciseId).sortBy("setNumber"),
@@ -467,7 +581,7 @@ function WorkoutExerciseCard({
     await renumberSets(workoutExerciseId);
   }
 
-  if (isFinished) {
+  if (isFinished && !allowEdit) {
     const summary = summarizeSets(sets ?? []);
     return (
       <Card className="overflow-hidden border-white/50 bg-card/92">
@@ -523,6 +637,8 @@ function WorkoutExerciseCard({
             <Button size="sm" variant="secondary" onClick={onFinish}>
               Finish
             </Button>
+          ) : isFinished && allowEdit ? (
+            <Badge variant="outline">Completed</Badge>
           ) : (
             onStart &&
             isSessionActive && (

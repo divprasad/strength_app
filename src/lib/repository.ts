@@ -36,6 +36,11 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
   return workout;
 }
 
+export async function updateWorkout(workoutId: string, patch: Partial<Workout>): Promise<void> {
+  const now = nowIso();
+  await db.workouts.update(workoutId, { ...patch, updatedAt: now });
+}
+
 export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
   // Deprecated compatibility helper. New session flows should create/select by workoutId.
   const existing = await db.workouts.where("date").equals(date).first();
@@ -232,6 +237,10 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
 }
 
 const WORKOUT_API_PATH = "/api/workouts";
+
+export async function syncWorkoutToServer(workoutId: string): Promise<void> {
+  await persistWorkoutSession("sync", workoutId);
+}
 
 async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {
   const bundle = await getWorkoutBundle(workoutId);

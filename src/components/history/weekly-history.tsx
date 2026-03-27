@@ -1,7 +1,7 @@
 "use client";
 
 import { addWeeks, eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subWeeks } from "date-fns";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/lib/db";
@@ -11,8 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { MuscleGroup } from "@/types/domain";
-import { computeDurationSeconds, formatDurationLong, formatTimeOfDay, muscleTimeSummary } from "@/lib/time";
+import { computeDurationSeconds, formatDurationLong, formatTimeOfDay } from "@/lib/time";
 
 export function WeeklyHistory() {
   const [anchorDate, setAnchorDate] = useState(localDateIso(new Date()));
@@ -27,12 +26,7 @@ export function WeeklyHistory() {
     [anchorDate]
   );
 
-  const muscleGroups = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
-  const muscleMap = useMemo(() => {
-    const map = new Map<string, MuscleGroup>();
-    (muscleGroups ?? []).forEach((muscle) => map.set(muscle.id, muscle));
-    return map;
-  }, [muscleGroups]);
+
 
   const workoutsForDate = useLiveQuery(async () => {
     const dateWorkouts = await db.workouts.where("date").equals(selectedDate).toArray();
@@ -117,67 +111,43 @@ export function WeeklyHistory() {
         </CardHeader>
         <CardContent>
           {workoutsForDate && workoutsForDate.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {workoutsForDate.map((entry, index) => {
                 const durationSeconds = computeDurationSeconds(entry.workout.sessionStartedAt, entry.workout.sessionEndedAt);
                 return (
-                  <Card key={entry.workout.id} className="overflow-hidden border-white/50 bg-card/92">
-                    <CardHeader className="border-b border-border/70 pb-4">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className="bg-accent px-3 py-1 text-accent-foreground">Workout #{index + 1}</Badge>
-                          <Badge>{entry.workout.status}</Badge>
-                        </div>
-                        <CardTitle className="text-2xl">
+                  <div key={entry.workout.id} className="overflow-hidden rounded-[1.4rem] border border-border/60 bg-background/55 p-4 shadow-[0_12px_36px_-32px_hsl(var(--foreground)/0.5)]">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-primary/70">Session {index + 1}</span>
+                        <div className="h-4 w-px bg-border/50" />
+                        <span className="text-sm font-semibold tracking-tight">
                           {formatTimeOfDay(entry.workout.sessionStartedAt)} · {formatDurationLong(durationSeconds)}
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.workout.status === "completed"
-                            ? `Completed · ${formatDurationLong(durationSeconds)}`
-                            : entry.workout.status === "active"
-                              ? "In progress"
-                              : "Draft"}
-                        </p>
+                        </span>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pt-5">
+                    </div>
+                    
+                    <div className="mt-4 space-y-4">
                       {entry.items.length > 0 ? (
                         entry.items.map((exerciseEntry) => {
                           const exerciseDuration = computeDurationSeconds(
                             exerciseEntry.item.startedAt,
                             exerciseEntry.item.completedAt ?? entry.workout.sessionEndedAt
                           );
-                          const muscleTimes = exerciseEntry.exercise
-                            ? muscleTimeSummary(exerciseEntry.exercise, exerciseDuration, muscleMap)
-                            : [];
                           return (
-                            <div
-                              key={exerciseEntry.item.id}
-                              className="rounded-[1.3rem] border border-border/70 bg-background/60 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.42)]"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="font-medium">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
-                                <span className="text-xs text-muted-foreground">{formatDurationLong(exerciseDuration)}</span>
+                            <div key={exerciseEntry.item.id} className="space-y-2">
+                              <div className="flex items-center justify-between gap-4">
+                                <p className="text-sm font-medium tracking-tight text-foreground">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
+                                <span className="text-[10px] tabular-nums text-muted-foreground">{formatDurationLong(exerciseDuration)}</span>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {exerciseEntry.sets.length} set{exerciseEntry.sets.length === 1 ? "" : "s"}
-                              </p>
-                              {muscleTimes.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                                  {muscleTimes.map((muscle) => (
-                                    <span key={muscle.muscleId} className="rounded-full border border-border/70 px-2.5 py-1">
-                                      {muscle.name} · {formatDurationLong(muscle.seconds)} ({muscle.tags.join(", ")})
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              <ul className="mt-3 space-y-2 text-sm">
+                              
+                              <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                                 {exerciseEntry.sets.map((setEntry) => (
                                   <li
                                     key={setEntry.id}
-                                    className="rounded-[1rem] border border-border/65 bg-card/85 px-3 py-2 shadow-[0_12px_30px_-28px_hsl(var(--foreground)/0.4)]"
+                                    className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-1.5 text-xs text-muted-foreground"
                                   >
-                                    Set {setEntry.setNumber}: {setEntry.reps} reps × {setEntry.weight}
+                                    <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+                                    <span>{setEntry.reps} reps × {setEntry.weight}kg</span>
                                   </li>
                                 ))}
                               </ul>
@@ -185,10 +155,10 @@ export function WeeklyHistory() {
                           );
                         })
                       ) : (
-                        <p className="text-sm text-muted-foreground">Workout exists but has no exercises.</p>
+                        <p className="text-xs text-muted-foreground italic">No exercises recorded.</p>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 );
               })}
             </div>

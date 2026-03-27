@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { CommandPalette } from "@/components/layout/command-palette";
+
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
 
@@ -33,9 +33,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2 md:gap-3">
               <ThemeToggle />
               <PaletteToggle />
-              <div className="shrink-0">
-                <CommandPalette />
-              </div>
               <nav className="hidden gap-2 md:flex md:flex-wrap md:justify-end">
                 {desktopLinks.map((item) => (
                   <Link
