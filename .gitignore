@@ -43,3 +43,4 @@ AFTER_LOGGING.json
 
 # editor
 *.code-workspace
+prisma/*.backup-*
