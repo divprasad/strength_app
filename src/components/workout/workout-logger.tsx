@@ -579,15 +579,12 @@ function InlineExercisePicker({
 function WorkoutExerciseCard({
   workoutExerciseId,
   title,
-  exercise: _exercise,
-  muscleMap: _muscleMap,
   onDelete,
   onStart,
   onFinish,
   startedAt,
   completedAt,
   isActive,
-  isSessionActive: _isSessionActive,
   allowEdit
 }: {
   workoutExerciseId: string;

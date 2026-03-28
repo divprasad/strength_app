@@ -103,3 +103,12 @@ export interface IntegrityAuditReport {
 }
 
 export type WorkoutStatus = "draft" | "active" | "completed" | "archived";
+
+export interface SyncJob {
+  id: string;
+  action: "upsert";
+  status: "pending" | "failed";
+  retryCount: number;
+  lastAttemptAt?: string;
+  createdAt: string;
+}

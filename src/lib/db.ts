@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from "dexie";
 import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@/lib/constants";
 import { createId, createStableId, localDateIso, nowIso } from "@/lib/utils";
-import type { AppSettings, Exercise, MuscleGroup, SetEntry, Workout, WorkoutExercise } from "@/types/domain";
+import type { AppSettings, Exercise, MuscleGroup, SetEntry, SyncJob, Workout, WorkoutExercise } from "@/types/domain";
 
 function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
   if (!workout.sessionStartedAt) return "draft";
@@ -16,6 +16,7 @@ class StrengthDatabase extends Dexie {
   workoutExercises!: EntityTable<WorkoutExercise, "id">;
   setEntries!: EntityTable<SetEntry, "id">;
   settings!: EntityTable<AppSettings, "id">;
+  syncQueue!: EntityTable<SyncJob, "id">;
 
   constructor() {
     super("strength-app-db");
@@ -68,6 +69,17 @@ class StrengthDatabase extends Dexie {
             set.type = "normal";
           }
         });
+      });
+
+    this.version(5)
+      .stores({
+        muscles: "id, name, updatedAt",
+        exercises: "id, name, updatedAt",
+        workouts: "id, date, name, status, updatedAt, userId",
+        workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+        setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+        settings: "id",
+        syncQueue: "id, status, createdAt"
       });
 
     this.on("populate", async () => {

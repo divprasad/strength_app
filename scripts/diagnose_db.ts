@@ -28,7 +28,7 @@ async function main() {
     setMap.set(key, (setMap.get(key) || 0) + 1)
   })
   
-  const duplicateSets = Array.from(setMap.entries()).filter(([_, count]) => count > 1)
+  const duplicateSets = Array.from(setMap.entries()).filter(([, count]) => count > 1)
   console.log(`Duplicate Set Numbers: ${duplicateSets.length}`)
   if (duplicateSets.length > 0) {
     console.log('Sample duplicates:', duplicateSets.slice(0, 5))

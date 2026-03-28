@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Processes - Strength Log Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 leading-relaxed min-h-screen p-6 md:p-12">
+    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200">
+        <header class="mb-12 border-b border-slate-100 pb-8">
+            <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 mb-3">App Data Flow & Processes</h1>
+            <p class="text-lg text-slate-500">How data moves through the application, focusing on the Local-First Sync Architecture.</p>
+            <nav class="mt-6 flex gap-4 text-sm font-medium">
+                <a href="meta_processes.html" class="text-blue-600 underline underline-offset-4">Meta Processes</a>
+                <a href="folder_structure.html" class="text-slate-500 hover:text-blue-600 transition">Folder Structure</a>
+                <a href="tech_stack.html" class="text-slate-500 hover:text-blue-600 transition">Tech Stack</a>
+                <a href="future_roadmap.html" class="text-slate-500 hover:text-blue-600 transition">Future Roadmap</a>
+            </nav>
+        </header>
+
+        <main class="space-y-12">
+            
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">The Local-First Paradigm</h2>
+                <p class="text-slate-700">Instead of traditional monolithic web apps that require a persistent internet connection to execute database writes, this application employs a <strong>Local-First Sync Architecture</strong>. The primary interface for all reads and writes is inherently local to the user's browser, enabling zero-latency UI interactions and complete offline capability.</p>
+                
+                <div class="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 mt-4">
+                    <h3 class="text-lg font-semibold text-blue-900 mb-3">The Journey of Logging a Set</h3>
+                    <ol class="list-decimal list-inside space-y-3 text-blue-800">
+                        <li><strong>User Action:</strong> User clicks "Finish Set" in the UI.</li>
+                        <li><strong>Instant Write:</strong> The component writes directly to the local <code>Dexie</code> (IndexedDB) instance. The UI updates instantaneously (0ms network latency).</li>
+                        <li><strong>Queueing:</strong> In the same local transaction, a <code>SyncJob</code> ticket containing the affected <code>workoutId</code> is dropped into the local <code>syncQueue</code> table.</li>
+                        <li><strong>Background Sync:</strong> The <code>syncEngine</code> processor wakes up, bundles the entire workout state, and attempts to POST it to the Prisma server endpoint in the background.</li>
+                        <li><strong>Resolution:</strong> If successful, the local ticket is destroyed. If offline, the queue ticket remains pending until the device regains connectivity.</li>
+                    </ol>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">Conflict Resolution Strategy</h2>
+                <p class="text-slate-700">The application utilizes a <strong>"Client Payload Wins"</strong> strategy at the workout level. This avoids the heavy engineering overhead of a true mathematical CRDT (Conflict-Free Replicated Data Type) while providing extreme reliability for a single-player application.</p>
+                <ul class="list-disc list-outside ml-5 space-y-2 text-slate-700 mt-3">
+                    <li>When the sync engine pushes a workout bundle, it completely overwrites the server's version of that specific workout.</li>
+                    <li>To prevent "Zombie Sets" (data deleted locally that regenerates when synced), the Next.js API route actively compares the incoming bundle against the SQL database and executes precision deletions for any orphaned rows before performing the primary upsert transaction.</li>
+                </ul>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">Database Backups</h2>
+                <p class="text-slate-700">Because a Local-First environment can aggressively overwrite server data, automatic structural backups are built directly into the sync pipeline.</p>
+                <p class="text-slate-700">Whenever a device successfully pushes new mutations to the Next.js API, the server executes an instantaneous filesystem copy of <code>dev.db</code> before applying the transaction. These backups are stored locally in the <code>/prisma/</code> directory with exact timestamp definitions, providing the user an easy rollback vector if local data corruption is inadvertently pushed upstream.</p>
+            </section>
+
+        </main>
+    </div>
+</body>
+</html>
