@@ -64,7 +64,7 @@ export function MuscleManager() {
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden max-w-2xl border-none shadow-none bg-transparent">
       <CardHeader className="pb-4">
         <CardTitle>Muscle Groups</CardTitle>
         <CardDescription>Maintain the muscle taxonomy used in exercise setup, timing, and analytics.</CardDescription>

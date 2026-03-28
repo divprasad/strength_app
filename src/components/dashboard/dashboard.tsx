@@ -257,7 +257,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
         onClick={() => setExpanded(true)}
         className="flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
       >
-        <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+        <Check className="h-4 w-4 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
           <p className="text-xs text-muted-foreground truncate">
@@ -275,7 +275,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
         onClick={() => setExpanded(false)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
       >
-        <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+        <Check className="h-4 w-4 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
           <p className="text-[10px] text-muted-foreground">

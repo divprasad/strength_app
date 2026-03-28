@@ -319,7 +319,7 @@ export function WorkoutLogger() {
             className={cn(
               "px-2.5 py-0.5 text-[10px] font-semibold",
               sessionActive
-                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
+                ? "bg-success/15 text-success border-success/20"
                 : workout?.status === "completed"
                   ? "bg-primary/10 text-primary border-primary/20"
                   : ""
@@ -679,7 +679,7 @@ function WorkoutExerciseCard({
           onClick={() => setExpanded(true)}
           className="flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
         >
-          <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+          <Check className="h-4 w-4 shrink-0 text-success" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium truncate">{title}</p>
             <p className="text-xs text-muted-foreground truncate">
@@ -697,7 +697,7 @@ function WorkoutExerciseCard({
           onClick={() => setExpanded(false)}
           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
         >
-          <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+          <Check className="h-4 w-4 shrink-0 text-success" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium truncate">{title}</p>
             <p className="text-[10px] text-muted-foreground">
@@ -770,7 +770,7 @@ function WorkoutExerciseCard({
         <div className="flex items-center gap-2.5 min-w-0">
           <p className="font-semibold text-sm tracking-tight truncate">{title}</p>
           {isTimerActive && (
-            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 px-2 py-0 text-[10px] font-mono animate-pulse">
+            <Badge className="bg-success/15 text-success border-success/20 px-2 py-0 text-[10px] font-mono animate-pulse">
               {formatTimer(elapsed)}
             </Badge>
           )}
@@ -892,7 +892,7 @@ function SetChip({
             onUpdate(setEntry, { reps: Number(editReps) || 0, weight: Number(editWeight) || 0 });
             setEditing(false);
           }}
-          className="text-emerald-500 hover:text-emerald-600 p-0.5"
+          className="text-success hover:text-success/80 p-0.5"
         >
           <Check className="h-3 w-3" />
         </button>
