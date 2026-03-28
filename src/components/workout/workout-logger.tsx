@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Trash2 } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import {
@@ -15,7 +15,6 @@ import {
   listWorkoutsByDate,
   removeExerciseFromWorkout,
   renumberSets,
-  reorderSet,
   startWorkoutSessionForWorkout,
   startWorkoutExercise,
   summarizeSets,
@@ -26,16 +25,15 @@ import { useUiStore } from "@/lib/store";
 import { formatLocalDate, localDateIso, nowIso } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout } from "@/types/domain";
-import { formatDurationLong, formatTimeOfDay, computeDurationSeconds, muscleTimeSummary } from "@/lib/time";
-import { PageIntro } from "@/components/layout/page-intro";
+import { formatDurationLong, formatTimeOfDay, computeDurationSeconds } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
+
+/* ─── helpers ─── */
 
 function formatTimer(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -49,6 +47,24 @@ function computeElapsed(startedAt?: string) {
   if (Number.isNaN(startedMs)) return 0;
   return Math.max(0, Math.floor((Date.now() - startedMs) / 1000));
 }
+
+function formatSetsInline(sets: SetEntry[]): string {
+  if (sets.length === 0) return "No sets";
+  const groups: { reps: number; weight: number; count: number }[] = [];
+  for (const s of sets) {
+    const last = groups[groups.length - 1];
+    if (last && last.reps === s.reps && last.weight === s.weight) {
+      last.count++;
+    } else {
+      groups.push({ reps: s.reps, weight: s.weight, count: 1 });
+    }
+  }
+  return groups.map(g => `${g.count}×${g.reps}@${g.weight}kg`).join(", ");
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════════ */
 
 export function WorkoutLogger() {
   const selectedDate = useUiStore((s) => s.selectedDate);
@@ -76,10 +92,11 @@ export function WorkoutLogger() {
     return map;
   }, [muscleGroups]);
 
-  const [sessionActive, setSessionActive] = useState(false); // Initialize sessionActive state
+  const [sessionActive, setSessionActive] = useState(false);
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
-  const [newExerciseId, setNewExerciseId] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showSessionSelector, setShowSessionSelector] = useState(false);
 
   useEffect(() => {
     setSessionActive(workout?.status === "active");
@@ -127,13 +144,14 @@ export function WorkoutLogger() {
 
   const activeExerciseId = workoutExercises?.find((item) => item.startedAt && !item.completedAt)?.id ?? null;
   const sessionSummary = !workout
-    ? "No workout selected"
+    ? "No session"
     : sessionActive
-      ? `Session running · ${formatTimer(sessionElapsed)}`
+      ? formatTimer(sessionElapsed)
       : workout.status === "completed"
-        ? "Session complete"
-        : "Session stopped";
+        ? "Complete"
+        : "Stopped";
 
+  // Edit mode via URL param
   const searchParams = useSearchParams();
   const router = useRouter();
   const editId = searchParams.get("id");
@@ -152,21 +170,49 @@ export function WorkoutLogger() {
       setActiveWorkoutId(pendingEditWorkout.id);
       setSelectedDate(pendingEditWorkout.date);
       setPendingEditWorkout(null);
-      // Remove id from URL without refresh
       const url = new URL(window.location.href);
       url.searchParams.delete("id");
       router.replace(url.pathname + url.search);
     }
   };
 
+  /* ─── actions ─── */
+
+  async function handleCreateAndStart() {
+    setSessionBusy(true);
+    try {
+      const created = await createWorkoutForDate(selectedDate);
+      setActiveWorkoutId(created.id);
+      await startWorkoutSessionForWorkout(created.id);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function handleCreateWorkout() {
+    setSessionBusy(true);
+    try {
+      const created = await createWorkoutForDate(selectedDate);
+      setActiveWorkoutId(created.id);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function handleStartWorkout() {
+    if (!workout?.id) return;
+    setSessionBusy(true);
+    try {
+      await startWorkoutSessionForWorkout(workout.id);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
   const handleFinishWorkout = async () => {
     if (!activeWorkoutId) return;
-
-    const confirmed = window.confirm(
-      "Are you sure you want to finish this workout? This will save the session to the server."
-    );
+    const confirmed = window.confirm("Finish this workout? This will save the session to the server.");
     if (!confirmed) return;
-
     try {
       await finishWorkoutSession(activeWorkoutId);
       setActiveWorkoutId(null);
@@ -198,49 +244,42 @@ export function WorkoutLogger() {
     await updateWorkout(workout.id, { sessionStartedAt: date.toISOString() });
   };
 
-  const primaryAction = !workout ? (
-    <Button onClick={handleCreateWorkout} disabled={sessionBusy}>
-      Create Workout
-    </Button>
-  ) : sessionActive ? (
-    <Button variant="destructive" onClick={handleFinishWorkout} disabled={sessionBusy}>
-      Stop Workout
-    </Button>
-  ) : (
-    <Button onClick={handleStartWorkout} disabled={sessionBusy}>
-      Start Workout
-    </Button>
-  );
-
-  async function handleCreateWorkout() {
+  // Phase 2: Quick-add exercise — auto-creates workout + starts session if needed
+  async function handleQuickAddExercise(exerciseId: string) {
+    if (!exerciseId) return;
     setSessionBusy(true);
     try {
-      const created = await createWorkoutForDate(selectedDate);
-      setActiveWorkoutId(created.id);
+      let wid = workout?.id;
+      // Auto-create workout if none exists
+      if (!wid) {
+        const created = await createWorkoutForDate(selectedDate);
+        setActiveWorkoutId(created.id);
+        wid = created.id;
+      }
+      // Auto-start session if not started
+      const current = await getWorkoutById(wid);
+      if (current && !current.sessionStartedAt) {
+        await startWorkoutSessionForWorkout(wid);
+      }
+      // Add exercise
+      const item = await addExerciseToWorkout(wid, exerciseId);
+      // Auto-start the exercise (finish current active one first)
+      if (activeExerciseId) {
+        await finishWorkoutExercise(activeExerciseId);
+      }
+      await startWorkoutExercise(item.id);
     } finally {
       setSessionBusy(false);
     }
-  }
-
-
-  async function handleStartWorkout() {
-    if (!workout?.id) return;
-    setSessionBusy(true);
-    try {
-      await startWorkoutSessionForWorkout(workout.id);
-    } finally {
-      setSessionBusy(false);
-    }
-  }
-
-  async function handleAddExercise() {
-    if (!newExerciseId || !workout?.id) return;
-    await addExerciseToWorkout(workout.id, newExerciseId);
-    setNewExerciseId("");
   }
 
   async function handleStartExercise(workoutExerciseId: string) {
-    if (!sessionActive || !workout?.id) return;
+    if (!workout?.id) return;
+    // Auto-start session if needed
+    const current = await getWorkoutById(workout.id);
+    if (current && !current.sessionStartedAt) {
+      await startWorkoutSessionForWorkout(workout.id);
+    }
     if (activeExerciseId && activeExerciseId !== workoutExerciseId) {
       await finishWorkoutExercise(activeExerciseId);
     }
@@ -251,36 +290,129 @@ export function WorkoutLogger() {
     await finishWorkoutExercise(workoutExerciseId);
   }
 
+  async function handleDeleteWorkoutExercise(workoutExerciseId: string) {
+    setSessionBusy(true);
+    try {
+      await removeExerciseFromWorkout(workoutExerciseId);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  const hasMultipleSessions = (workouts?.length ?? 0) > 1;
+
+  /* ─── render ─── */
 
   return (
-    <div className="space-y-6">
-      <PageIntro
-        eyebrow="Training Session"
-        title="Workout Logger"
-        description="Choose the active day, pick the right session, and move from start to finished sets without losing context."
-        action={
-          <div className="flex flex-wrap gap-2">
-            {primaryAction}
-            <Button size="sm" variant="secondary" onClick={handleCreateWorkout} disabled={sessionBusy}>
+    <div className="space-y-3">
+      {/* ── Phase 4: Compact Header Bar ── */}
+      <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border border-border/60 bg-card/90 px-4 py-3 shadow-[0_12px_36px_-24px_hsl(var(--foreground)/0.3)]">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className="text-sm font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+          >
+            {formatLocalDate(selectedDate, "EEE, MMM d")}
+          </button>
+          <div className="h-4 w-px bg-border/50" />
+          <Badge
+            className={cn(
+              "px-2.5 py-0.5 text-[10px] font-semibold",
+              sessionActive
+                ? "bg-success/15 text-success border-success/20"
+                : workout?.status === "completed"
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : ""
+            )}
+          >
+            {sessionActive ? `● ${sessionSummary}` : sessionSummary}
+          </Badge>
+          {hasMultipleSessions && (
+            <button
+              onClick={() => setShowSessionSelector(!showSessionSelector)}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              {workouts?.length} sessions
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {sessionActive ? (
+            <Button size="sm" variant="destructive" onClick={handleFinishWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
+              Stop
+            </Button>
+          ) : workout && workout.status !== "completed" ? (
+            <Button size="sm" onClick={handleStartWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
+              Start
+            </Button>
+          ) : workout?.status === "completed" ? (
+            <Button size="sm" onClick={handleSaveAndPush} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs bg-primary/90 hover:bg-primary">
+              Save Edit
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Collapsible Date Picker */}
+      {showDatePicker && (
+        <div className="rounded-[1.2rem] border border-border/60 bg-card/90 p-3 animate-in slide-in-from-top-1 duration-150">
+          <div className="flex items-center gap-3">
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value || localDateIso(new Date()));
+                setShowDatePicker(false);
+              }}
+              className="h-9 max-w-[180px] text-sm"
+            />
+            {workout?.status === "completed" && workout.sessionStartedAt && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">Start time:</span>
+                <Input
+                  type="time"
+                  defaultValue={formatTimeOfDay(workout.sessionStartedAt).split(" ")[0]}
+                  onBlur={(e) => handleUpdateTime(e.target.value)}
+                  className="h-9 w-[100px] text-sm"
+                />
+              </div>
+            )}
+            <Button size="sm" variant="secondary" onClick={handleCreateWorkout} disabled={sessionBusy} className="h-8 text-xs rounded-full">
               New Session
             </Button>
-            {workout?.status === "completed" && (
-              <Button size="sm" onClick={handleSaveAndPush} disabled={sessionBusy} className="bg-primary/90 hover:bg-primary">
-                Confirm Edit and Save
-              </Button>
-            )}
           </div>
-        }
-        meta={
-          <>
-            <Badge className="bg-accent px-3 py-1 text-accent-foreground">{formatLocalDate(selectedDate, "EEEE, MMMM d")}</Badge>
-            <Badge className={cn(workout?.status === "completed" ? "bg-primary/10 text-primary border-primary/20" : "")}>
-              {sessionSummary}
-            </Badge>
-          </>
-        }
-      />
+        </div>
+      )}
 
+      {/* Collapsible Session Selector */}
+      {showSessionSelector && workouts && workouts.length > 1 && (
+        <div className="rounded-[1.2rem] border border-border/60 bg-card/90 p-2 animate-in slide-in-from-top-1 duration-150">
+          <div className="space-y-1">
+            {workouts.map((item) => {
+              const isSelected = item.id === activeWorkoutId;
+              const dur = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveWorkoutId(item.id);
+                    setShowSessionSelector(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors",
+                    isSelected ? "bg-accent/75 text-foreground" : "hover:bg-card text-muted-foreground"
+                  )}
+                >
+                  <span>{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted"}</span>
+                  <span className="text-xs">{item.status === "completed" ? formatDurationLong(dur) : item.status}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Mode Modal */}
       <Modal
         isOpen={!!pendingEditWorkout}
         onClose={() => {
@@ -290,7 +422,7 @@ export function WorkoutLogger() {
           router.replace(url.pathname + url.search);
         }}
         title="Edit Workout Session?"
-        description="Are you sure you want to jump back into this session? Any changes will need to be re-confirmed for server sync."
+        description="Jump back into this session to make changes."
         footer={
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => {
@@ -307,147 +439,17 @@ export function WorkoutLogger() {
           </div>
         }
       >
-        <div className="space-y-4">
-          <div className="rounded-[1.5rem] border border-border/70 bg-muted/30 p-4">
-            <p className="font-medium">{pendingEditWorkout?.name}</p>
-            <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
-          </div>
+        <div className="rounded-[1.5rem] border border-border/70 bg-muted/30 p-4">
+          <p className="font-medium">{pendingEditWorkout?.name}</p>
+          <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
         </div>
       </Modal>
 
-      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-4">
-            <CardTitle>Session Day</CardTitle>
-            <CardDescription>Set the training date first so the logger loads the right sessions and history context.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="workout-date">Date</Label>
-              <Input
-                id="workout-date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value || localDateIso(new Date()))}
-              />
-            </div>
-            <div className="rounded-[1.2rem] border border-border/70 bg-background/58 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.42)]">
-              <p className="font-medium">{formatLocalDate(selectedDate, "EEEE, MMMM d")}</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Focus on quick logging: select the session, start the active exercise, and add sets without leaving the page.
-              </p>
-            </div>
-            <div className="rounded-[1.2rem] border border-border/70 bg-background/58 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.42)]">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary/70">Session Status</p>
-              <p className="mt-2 text-lg font-semibold tracking-[-0.03em]">{sessionSummary}</p>
-              {workout?.sessionStartedAt ? (
-                <div className="mt-2 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Started at {formatTimeOfDay(workout.sessionStartedAt)}
-                    {!sessionActive && workout.sessionEndedAt
-                      ? ` · Duration ${formatDurationLong(computeDurationSeconds(workout.sessionStartedAt, workout.sessionEndedAt))}`
-                      : ""}
-                  </p>
-                  {workout.status === "completed" && (
-                    <div className="pt-2">
-                      <Label htmlFor="start-time" className="text-[10px] uppercase text-muted-foreground">Update Start Time</Label>
-                      <Input
-                        id="start-time"
-                        type="time"
-                        defaultValue={formatTimeOfDay(workout.sessionStartedAt).split(" ")[0]} // Basic format check
-                        onBlur={(e) => handleUpdateTime(e.target.value)}
-                        className="mt-1 h-8 max-w-[120px] text-xs"
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">Create or select a session to begin logging sets for this day.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-4">
-            <CardTitle>Sessions for This Date</CardTitle>
-            <CardDescription>Move between sessions without losing the active workout selection.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {workouts && workouts.length > 0 ? (
-              <div className="space-y-3">
-                {workouts.map((item) => {
-                  const isSelected = item.id === activeWorkoutId;
-                  const durationSeconds = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setActiveWorkoutId(item.id)}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-3 rounded-[1.2rem] border px-4 py-3 text-left shadow-[inset_0_1px_0_hsl(0_0%_100%/0.35)] transition-colors",
-                        isSelected
-                          ? "border-primary/20 bg-accent/75"
-                          : "border-border/70 bg-background/58 hover:border-border hover:bg-card"
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium">{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted session"}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.status === "active"
-                            ? "Running"
-                            : item.status === "completed"
-                              ? `Completed · ${formatDurationLong(durationSeconds)}`
-                              : "Draft"}
-                        </p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{isSelected ? "Selected" : "Tap to open"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState title="No sessions yet for this date" description="Use the session actions above to create the first workout entry for this day." />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle>Add Exercise to Workout</CardTitle>
-          <CardDescription>Select a movement to add it to the active workout before you start logging sets.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {workout ? (
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <Select value={newExerciseId} onChange={(e) => setNewExerciseId(e.target.value)}>
-                <option value="">Add exercise to workout</option>
-                {(exercises ?? []).map((exercise) => (
-                  <option key={exercise.id} value={exercise.id}>
-                    {exercise.name}
-                  </option>
-                ))}
-              </Select>
-              <Button onClick={handleAddExercise} className="shrink-0">
-                Add
-              </Button>
-            </div>
-          ) : (
-            <EmptyState title="No selected workout" description="Select an existing session or create a new one before adding exercises." />
-          )}
-        </CardContent>
-      </Card>
-
+      {/* ── Exercise List ── */}
       {workout ? (
-        workoutExercises && workoutExercises.length > 0 ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-primary/70">Exercise Queue</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.04em]">Logged Exercises</h2>
-              <p className="text-sm text-muted-foreground">Keep the active movement visible, finish it cleanly, then move to the next one.</p>
-            </div>
-            {workoutExercises.map((item) => {
+        <div className="space-y-2">
+          {workoutExercises && workoutExercises.length > 0 ? (
+            workoutExercises.map((item) => {
               const exercise = exerciseMap?.get(item.exerciseId);
               if (!exercise) return null;
               return (
@@ -458,7 +460,7 @@ export function WorkoutLogger() {
                   exercise={exercise}
                   muscleMap={muscleMap}
                   onDelete={!item.completedAt ? () => handleDeleteWorkoutExercise(item.id) : undefined}
-                  onStart={sessionActive ? () => handleStartExercise(item.id) : undefined}
+                  onStart={() => handleStartExercise(item.id)}
                   onFinish={() => handleFinishExercise(item.id)}
                   startedAt={item.startedAt}
                   completedAt={item.completedAt}
@@ -467,47 +469,125 @@ export function WorkoutLogger() {
                   allowEdit={workout?.status === "completed" || sessionActive}
                 />
               );
-            })}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="pt-5">
-              <EmptyState title="No exercises in this workout" description="Add an exercise above to begin logging sets." />
-            </CardContent>
-          </Card>
-        )
+            })
+          ) : (
+            <Card className="border-dashed border-border/50">
+              <CardContent className="pt-5">
+                <EmptyState title="No exercises yet" description="Pick an exercise below to start tracking." />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Phase 2: Inline Exercise Picker (always at bottom) ── */}
+          <InlineExercisePicker
+            exercises={exercises ?? []}
+            onAdd={handleQuickAddExercise}
+            disabled={sessionBusy}
+          />
+        </div>
       ) : (
-        <Card>
-          <CardContent className="pt-5">
-            <EmptyState title="No workout yet" description="Create a workout for this date to start." />
-          </CardContent>
-        </Card>
+        /* No workout — show a single CTA */
+        <div className="flex flex-col items-center gap-4 rounded-[1.8rem] border border-dashed border-border/50 bg-card/60 px-6 py-12">
+          <p className="text-sm text-muted-foreground">No workout for {formatLocalDate(selectedDate, "EEEE, MMM d")}</p>
+          <Button onClick={handleCreateAndStart} disabled={sessionBusy} className="rounded-full px-6">
+            Start Workout
+          </Button>
+        </div>
       )}
     </div>
   );
-
-  async function handleDeleteWorkoutExercise(workoutExerciseId: string) {
-    setSessionBusy(true);
-    try {
-      await removeExerciseFromWorkout(workoutExerciseId);
-    } finally {
-      setSessionBusy(false);
-    }
-  }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   INLINE EXERCISE PICKER (Phase 2)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function InlineExercisePicker({
+  exercises,
+  onAdd,
+  disabled
+}: {
+  exercises: Exercise[];
+  onAdd: (exerciseId: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!filter) return exercises;
+    const lower = filter.toLowerCase();
+    return exercises.filter(e => e.name.toLowerCase().includes(lower));
+  }, [exercises, filter]);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        className="flex w-full items-center justify-center gap-2 rounded-[1.2rem] border border-dashed border-border/50 bg-card/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card/70 hover:text-foreground disabled:opacity-50"
+      >
+        <Plus className="h-4 w-4" />
+        Add Exercise
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-[1.2rem] border border-primary/20 bg-card/90 p-3 shadow-[0_8px_24px_-12px_hsl(var(--primary)/0.2)] animate-in zoom-in-95 duration-150">
+      <Input
+        autoFocus
+        placeholder="Search exercises..."
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        className="h-9 text-sm mb-2"
+      />
+      <div className="max-h-[200px] overflow-y-auto space-y-0.5">
+        {filtered.length > 0 ? (
+          filtered.map((exercise) => (
+            <button
+              key={exercise.id}
+              onClick={() => {
+                onAdd(exercise.id);
+                setOpen(false);
+                setFilter("");
+              }}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-left transition-colors hover:bg-accent/50"
+            >
+              <span className="font-medium">{exercise.name}</span>
+              <span className="text-[10px] text-muted-foreground">{exercise.category}</span>
+            </button>
+          ))
+        ) : (
+          <p className="px-3 py-2 text-xs text-muted-foreground">No exercises found</p>
+        )}
+      </div>
+      <button
+        onClick={() => { setOpen(false); setFilter(""); }}
+        className="mt-2 w-full rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXERCISE CARD (Phase 1 + 3 + 5)
+   ═══════════════════════════════════════════════════════════════════ */
 
 function WorkoutExerciseCard({
   workoutExerciseId,
   title,
-  exercise,
-  muscleMap,
+  exercise: _exercise,
+  muscleMap: _muscleMap,
   onDelete,
   onStart,
   onFinish,
   startedAt,
   completedAt,
   isActive,
-  isSessionActive,
+  isSessionActive: _isSessionActive,
   allowEdit
 }: {
   workoutExerciseId: string;
@@ -515,7 +595,7 @@ function WorkoutExerciseCard({
   exercise: Exercise;
   muscleMap: Map<string, MuscleGroup>;
   onDelete?: () => void;
-  onStart?: () => void;
+  onStart: () => void;
   onFinish: () => void;
   startedAt?: string;
   completedAt?: string;
@@ -527,19 +607,28 @@ function WorkoutExerciseCard({
     () => db.setEntries.where("workoutExerciseId").equals(workoutExerciseId).sortBy("setNumber"),
     [workoutExerciseId]
   );
-  const [reps, setReps] = useState("8");
-  const [weight, setWeight] = useState("20");
 
   const lastSet = useMemo(() => {
     if (!sets || sets.length === 0) return null;
     return sets[sets.length - 1];
   }, [sets]);
 
+  // Phase 3: Smart pre-fill from last set
+  const [reps, setReps] = useState("8");
+  const [weight, setWeight] = useState("20");
+
+  useEffect(() => {
+    if (lastSet) {
+      setReps(String(lastSet.reps));
+      setWeight(String(lastSet.weight));
+    }
+  }, [lastSet]);
+
   const isFinished = Boolean(completedAt);
   const isTimerActive = isActive && !isFinished && Boolean(startedAt);
   const [elapsed, setElapsed] = useState(() => computeElapsed(startedAt));
   const durationSeconds = computeDurationSeconds(startedAt, completedAt);
-  const muscleTimes = exercise ? muscleTimeSummary(exercise, durationSeconds, muscleMap) : [];
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!isTimerActive) {
@@ -581,165 +670,253 @@ function WorkoutExerciseCard({
     await renumberSets(workoutExerciseId);
   }
 
-  if (isFinished && !allowEdit) {
+  /* ── Phase 1: Collapsed finished exercise ── */
+  if (isFinished && !isActive) {
     const summary = summarizeSets(sets ?? []);
+    if (!expanded) {
+      return (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
+        >
+          <Check className="h-4 w-4 shrink-0 text-success" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{title}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {formatSetsInline(sets ?? [])} · {formatDurationLong(durationSeconds)}
+            </p>
+          </div>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </button>
+      );
+    }
+    // Expanded collapsed view
     return (
-      <Card className="overflow-hidden border-white/50 bg-card/92">
-        <CardHeader className="border-b border-border/70 pb-4">
-          <div className="space-y-2">
-            <CardTitle>{title}</CardTitle>
-            <Badge className="w-fit bg-accent px-3 py-1 text-accent-foreground">Finished</Badge>
+      <div className="rounded-[1.2rem] border border-border/50 bg-card/70 overflow-hidden">
+        <button
+          onClick={() => setExpanded(false)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
+        >
+          <Check className="h-4 w-4 shrink-0 text-success" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{title}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {formatDurationLong(durationSeconds)} · {summary.totalReps} reps · {summary.totalVolume}kg vol
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-5">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[1.1rem] border border-border/70 bg-background/58 p-3">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary/70">Duration</p>
-              <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{formatDurationLong(durationSeconds)}</p>
-            </div>
-            <div className="rounded-[1.1rem] border border-border/70 bg-background/58 p-3">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary/70">Total Reps</p>
-              <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{summary.totalReps}</p>
-            </div>
-            <div className="rounded-[1.1rem] border border-border/70 bg-background/58 p-3">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary/70">Total Volume</p>
-              <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{summary.totalVolume}</p>
-            </div>
-          </div>
-          {muscleTimes.length > 0 ? (
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              {muscleTimes.map((entry) => (
-                <span key={entry.muscleId} className="rounded-full border border-border/70 px-2.5 py-1 text-[10px]">
-                  {entry.name} · {formatDurationLong(entry.seconds)} ({entry.tags.join(", ")})
-                </span>
+          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </button>
+        <div className="px-4 pb-3 space-y-2">
+          {(sets ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(sets ?? []).map((setEntry) => (
+                allowEdit ? (
+                  <SetChip
+                    key={setEntry.id}
+                    setEntry={setEntry}
+                    onUpdate={updateSet}
+                    onDelete={deleteSet}
+                  />
+                ) : (
+                  <span key={setEntry.id} className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs">
+                    <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+                    <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+                  </span>
+                )
               ))}
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
     );
   }
 
-  return (
-    <Card className={cn("overflow-hidden", isActive && "border-primary/20 bg-card/94")}>
-      <CardHeader className="flex flex-col gap-4 border-b border-border/70 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <CardTitle>{title}</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <Badge className={cn(isTimerActive ? "bg-accent px-3 py-1 text-accent-foreground" : "")}>
-              {isTimerActive ? `Active · ${formatTimer(elapsed)}` : "Pending"}
-            </Badge>
-            {sets && sets.length > 0 ? <Badge>{sets.length} set{sets.length === 1 ? "" : "s"}</Badge> : null}
-          </div>
+  /* ── Pending (not started) exercise ── */
+  if (!startedAt && !isFinished) {
+    return (
+      <div className="flex items-center gap-3 rounded-[1.2rem] border border-border/40 bg-card/40 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-[10px] text-muted-foreground">Pending</p>
         </div>
-        <div className="flex items-center gap-2">
-          {isActive ? (
-            <Button size="sm" variant="secondary" onClick={onFinish}>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="secondary" onClick={onStart} className="h-8 rounded-full px-3 text-xs">
+            Start
+          </Button>
+          {onDelete && (
+            <Button size="icon" variant="ghost" onClick={onDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Active exercise card (full interactive view) ── */
+  return (
+    <div
+      className={cn(
+        "rounded-[1.4rem] border-2 bg-card/95 shadow-[0_16px_40px_-20px_hsl(var(--foreground)/0.4)] overflow-hidden transition-all",
+        isActive
+          ? "border-primary/30 shadow-[0_16px_40px_-16px_hsl(var(--primary)/0.25)]"
+          : isFinished && allowEdit
+            ? "border-border/50"
+            : "border-border/40"
+      )}
+    >
+      {/* Card header */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <p className="font-semibold text-sm tracking-tight truncate">{title}</p>
+          {isTimerActive && (
+            <Badge className="bg-success/15 text-success border-success/20 px-2 py-0 text-[10px] font-mono animate-pulse">
+              {formatTimer(elapsed)}
+            </Badge>
+          )}
+          {isFinished && allowEdit && (
+            <Badge variant="outline" className="px-2 py-0 text-[10px]">Completed</Badge>
+          )}
+          {sets && sets.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">{sets.length} set{sets.length === 1 ? "" : "s"}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isActive && (
+            <Button size="sm" variant="secondary" onClick={onFinish} className="h-7 rounded-full px-3 text-[11px]">
               Finish
             </Button>
-          ) : isFinished && allowEdit ? (
-            <Badge variant="outline">Completed</Badge>
-          ) : (
-            onStart &&
-            isSessionActive && (
-              <Button size="sm" variant="secondary" onClick={onStart}>
-                Start
-              </Button>
-            )
           )}
-          {onDelete ? (
-            <Button size="icon" variant="ghost" onClick={onDelete}>
-              <Trash2 className="h-4 w-4" />
+          {!isActive && !isFinished && (
+            <Button size="sm" variant="secondary" onClick={onStart} className="h-7 rounded-full px-3 text-[11px]">
+              Start
             </Button>
-          ) : null}
+          )}
+          {onDelete && (
+            <Button size="icon" variant="ghost" onClick={onDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-5">
-        <div className="hidden grid-cols-[42px_1fr_1fr_130px_42px] gap-2 text-xs text-muted-foreground sm:grid">
-          <span>#</span>
-          <span>Reps</span>
-          <span>Weight</span>
-          <span>Actions</span>
-          <span></span>
-        </div>
+      </div>
 
-        <div className="space-y-2">
-          {(sets ?? []).map((setEntry) => (
-            <div
-              key={setEntry.id}
-              className="rounded-[1.2rem] border border-border/70 bg-background/58 p-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.42)]"
-            >
-              <div className="flex items-center justify-between gap-3 sm:hidden">
-                <p className="text-sm font-medium">Set {setEntry.setNumber}</p>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => reorderSet(setEntry.id, "up")}>
-                    ↑
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => reorderSet(setEntry.id, "down")}>
-                    ↓
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => deleteSet(setEntry.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-3 grid gap-3 sm:mt-0 sm:grid-cols-[42px_1fr_1fr_130px_42px] sm:items-center">
-                <span className="hidden text-sm font-medium sm:block">{setEntry.setNumber}</span>
-                <div>
-                  <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:hidden">Reps</p>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    defaultValue={setEntry.reps}
-                    onBlur={(e) => updateSet(setEntry, { reps: Number(e.target.value) || 0 })}
-                    className="h-10"
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:hidden">Weight</p>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    defaultValue={setEntry.weight}
-                    onBlur={(e) => updateSet(setEntry, { weight: Number(e.target.value) || 0 })}
-                    className="h-10"
-                  />
-                </div>
-                <div className="hidden gap-1 sm:flex">
-                  <Button size="sm" variant="ghost" onClick={() => reorderSet(setEntry.id, "up")}>
-                    ↑
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => reorderSet(setEntry.id, "down")}>
-                    ↓
-                  </Button>
-                </div>
-                <Button size="icon" variant="ghost" className="hidden sm:inline-flex" onClick={() => deleteSet(setEntry.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* ── Phase 5: Compact set chips ── */}
+      <div className="px-4 py-3 space-y-2">
+        {(sets ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {(sets ?? []).map((setEntry) => (
+              <SetChip
+                key={setEntry.id}
+                setEntry={setEntry}
+                onUpdate={updateSet}
+                onDelete={deleteSet}
+              />
+            ))}
+          </div>
+        )}
 
-        <div className="rounded-[1.25rem] border border-border/70 bg-background/58 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.42)]">
-          <p className="mb-1 text-sm font-medium">Quick Add Set</p>
-          <p className="mb-3 text-sm text-muted-foreground">Use the current reps and weight defaults for a fast, repeatable set entry flow.</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Input type="number" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value)} placeholder="Reps" />
+        {/* ── Phase 3: Smart Quick Add ── */}
+        <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={reps}
+              onChange={(e) => setReps(e.target.value)}
+              className="h-10 w-16 text-center text-sm font-medium"
+              placeholder="Reps"
+            />
+            <span className="text-xs text-muted-foreground">×</span>
             <Input
               type="number"
               inputMode="decimal"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              placeholder="Weight"
+              className="h-10 w-20 text-center text-sm font-medium"
+              placeholder="kg"
             />
-            <Button onClick={addSet}>Add Set</Button>
-            <Button variant="secondary" onClick={quickRepeat}>
-              Repeat Last
-            </Button>
           </div>
+          <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm shrink-0">
+            Log
+          </Button>
+          {lastSet && (
+            <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm shrink-0" title="Repeat last set">
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SET CHIP (Phase 5 — compact pill instead of full card)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function SetChip({
+  setEntry,
+  onUpdate,
+  onDelete
+}: {
+  setEntry: SetEntry;
+  onUpdate: (setEntry: SetEntry, patch: Partial<SetEntry>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editReps, setEditReps] = useState(String(setEntry.reps));
+  const [editWeight, setEditWeight] = useState(String(setEntry.weight));
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/30 px-2 py-1.5 animate-in zoom-in-95 duration-100">
+        <span className="text-[10px] font-semibold text-primary/70 w-4">#{setEntry.setNumber}</span>
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={editReps}
+          onChange={(e) => setEditReps(e.target.value)}
+          className="h-7 w-12 text-center text-xs p-0"
+          autoFocus
+        />
+        <span className="text-[10px] text-muted-foreground">×</span>
+        <Input
+          type="number"
+          inputMode="decimal"
+          value={editWeight}
+          onChange={(e) => setEditWeight(e.target.value)}
+          className="h-7 w-14 text-center text-xs p-0"
+        />
+        <button
+          onClick={() => {
+            onUpdate(setEntry, { reps: Number(editReps) || 0, weight: Number(editWeight) || 0 });
+            setEditing(false);
+          }}
+          className="text-success hover:text-success/80 p-0.5"
+        >
+          <Check className="h-3 w-3" />
+        </button>
+        <button
+          onClick={() => onDelete(setEntry.id)}
+          className="text-muted-foreground hover:text-destructive p-0.5"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        setEditReps(String(setEntry.reps));
+        setEditWeight(String(setEntry.weight));
+        setEditing(true);
+      }}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs transition-colors hover:border-primary/20 hover:bg-accent/30"
+    >
+      <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+      <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+    </button>
   );
 }

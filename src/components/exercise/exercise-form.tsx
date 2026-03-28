@@ -138,37 +138,40 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
 
       <div>
         <Label>Primary Muscles</Label>
-        <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] border border-border/70 bg-background/60 p-3">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {muscles.map((muscle) => (
-            <label
-              key={muscle.id}
-              className="flex items-center gap-2 rounded-[0.95rem] border border-border/65 bg-card/78 px-3 py-2 text-sm shadow-[0_12px_28px_-28px_hsl(var(--foreground)/0.45)]"
-            >
-              <input className="h-4 w-4 accent-[hsl(var(--primary))]" type="checkbox" value={muscle.id} {...form.register("primaryMuscleIds")} />
-              {muscle.name}
+            <label key={muscle.id} className="cursor-pointer">
+              <input 
+                className="peer sr-only" 
+                type="checkbox" 
+                value={muscle.id} 
+                {...form.register("primaryMuscleIds")} 
+              />
+              <div className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all peer-checked:border-primary peer-checked:bg-primary/15 peer-checked:text-primary hover:bg-muted">
+                {muscle.name}
+              </div>
             </label>
           ))}
         </div>
         {form.formState.errors.primaryMuscleIds ? (
-          <p className="mt-1 text-sm text-destructive">{form.formState.errors.primaryMuscleIds.message}</p>
+          <p className="mt-1.5 text-sm text-destructive">{form.formState.errors.primaryMuscleIds.message}</p>
         ) : null}
       </div>
 
       <div>
         <Label>Secondary Muscles</Label>
-        <div className="grid grid-cols-2 gap-2 rounded-[1.2rem] border border-border/70 bg-background/60 p-3">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {muscles.map((muscle) => (
-            <label
-              key={`${muscle.id}-secondary`}
-              className="flex items-center gap-2 rounded-[0.95rem] border border-border/65 bg-card/78 px-3 py-2 text-sm shadow-[0_12px_28px_-28px_hsl(var(--foreground)/0.45)]"
-            >
+            <label key={`${muscle.id}-secondary`} className="cursor-pointer">
               <input
-                className="h-4 w-4 accent-[hsl(var(--primary))]"
+                className="peer sr-only"
                 type="checkbox"
                 value={muscle.id}
                 {...form.register("secondaryMuscleIds")}
               />
-              {muscle.name}
+              <div className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all peer-checked:border-primary peer-checked:bg-primary/15 peer-checked:text-primary hover:bg-muted">
+                {muscle.name}
+              </div>
             </label>
           ))}
         </div>

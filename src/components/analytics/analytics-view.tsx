@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } 
 import { getExerciseProgress, getWeeklyMetrics } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
+import { useTheme } from "@/components/layout/theme-provider";
 import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,18 +14,55 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
-const axisColor = "#6b7280";
-const gridColor = "rgba(148, 163, 184, 0.24)";
-const primaryBar = "#0f7c90";
-const accentBar = "#cb8f24";
-const primaryLine = "#0f7c90";
-const accentLine = "#cb8f24";
-const tooltipStyle = {
-  backgroundColor: "rgba(255, 255, 255, 0.97)",
-  borderColor: "rgba(148, 163, 184, 0.28)",
-  borderRadius: "18px",
-  boxShadow: "0 24px 60px -36px rgba(15, 23, 42, 0.45)"
-} as const;
+/** Resolve a CSS custom property like "--primary" to a concrete color string. */
+function resolveCssColor(varName: string): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return raw ? `hsl(${raw})` : "#888";
+}
+
+/** Derive a secondary chart color by shifting the primary hue ~140° (near-complementary). */
+function deriveSecondary(primaryHsl: string): string {
+  // primaryHsl looks like "hsl(220 72% 58%)" — parse h/s/l
+  const match = primaryHsl.match(/hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)/);
+  if (!match) return primaryHsl;
+  const h = (parseFloat(match[1]) + 140) % 360;
+  const s = Math.min(parseFloat(match[2]), 65); // cap saturation to avoid neon
+  const l = parseFloat(match[3]);
+  return `hsl(${h} ${s}% ${l}%)`;
+}
+
+/** Hook that returns concrete chart colors, re-resolved whenever theme/palette changes. */
+function useChartColors() {
+  const { theme, palette } = useTheme();
+  const [colors, setColors] = useState({
+    axis: "#888",
+    grid: "#888",
+    primary: "#888",
+    secondary: "#888",
+    cardBg: "#fff",
+    cardBorder: "#ddd",
+    cardFg: "#000",
+  });
+
+  useEffect(() => {
+    // Small delay ensures CSS vars have been applied after theme/palette change
+    const id = requestAnimationFrame(() => {
+      const primary = resolveCssColor("--primary");
+      setColors({
+        axis: resolveCssColor("--muted-foreground"),
+        grid: resolveCssColor("--border"),
+        primary,
+        secondary: deriveSecondary(primary),
+        cardBg: resolveCssColor("--card"),
+        cardBorder: resolveCssColor("--border"),
+        cardFg: resolveCssColor("--card-foreground"),
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [theme, palette]);
+
+  return colors;
+}
 
 function MeasuredChart({
   height,
@@ -55,7 +93,7 @@ function MeasuredChart({
   }, []);
 
   return (
-    <div ref={containerRef} className="min-w-0 w-full" style={{ height }}>
+    <div ref={containerRef} className="min-w-0 w-full outline-none" style={{ height }}>
       {width > 0 ? children({ width, height }) : null}
     </div>
   );
@@ -68,6 +106,15 @@ export function AnalyticsView() {
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const [exerciseId, setExerciseId] = useState("");
   const progress = useLiveQuery(() => (exerciseId ? getExerciseProgress(exerciseId) : Promise.resolve([])), [exerciseId]);
+  const cc = useChartColors();
+
+  const tooltipStyle = {
+    backgroundColor: cc.cardBg,
+    borderColor: cc.cardBorder,
+    color: cc.cardFg,
+    borderRadius: "18px",
+    boxShadow: "0 24px 60px -36px rgba(0,0,0,0.25)"
+  };
 
   const muscleRows = Object.entries(metrics?.byMuscle ?? {})
     .map(([muscleId, volume]) => ({ name: muscles?.find((m) => m.id === muscleId)?.name ?? "Unknown", volume: Math.round(volume) }))
@@ -144,11 +191,11 @@ export function AnalyticsView() {
               <MeasuredChart height={288}>
                 {({ width, height }) => (
                   <BarChart width={width} height={height} data={muscleRows}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridColor} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} interval={0} angle={-20} textAnchor="end" height={70} stroke={axisColor} />
-                    <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
-                    <Bar dataKey="volume" fill={primaryBar} radius={[8, 8, 4, 4]} stroke={primaryBar} strokeWidth={1.2} />
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={cc.grid} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: cc.axis }} interval={0} angle={-20} textAnchor="end" height={70} stroke={cc.axis} />
+                    <YAxis tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: cc.cardFg }} />
+                    <Bar dataKey="volume" fill={cc.primary} radius={[8, 8, 4, 4]} stroke={cc.primary} strokeWidth={1.2} />
                   </BarChart>
                 )}
               </MeasuredChart>
@@ -168,11 +215,11 @@ export function AnalyticsView() {
               <MeasuredChart height={288}>
                 {({ width, height }) => (
                   <BarChart width={width} height={height} data={exerciseRows}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridColor} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} interval={0} angle={-20} textAnchor="end" height={70} stroke={axisColor} />
-                    <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
-                    <Bar dataKey="volume" fill={accentBar} radius={[8, 8, 4, 4]} stroke={accentBar} strokeWidth={1.2} />
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={cc.grid} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: cc.axis }} interval={0} angle={-20} textAnchor="end" height={70} stroke={cc.axis} />
+                    <YAxis tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                    <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: cc.cardFg }} />
+                    <Bar dataKey="volume" fill={cc.secondary} radius={[8, 8, 4, 4]} stroke={cc.secondary} strokeWidth={1.2} />
                   </BarChart>
                 )}
               </MeasuredChart>
@@ -209,11 +256,11 @@ export function AnalyticsView() {
                   <MeasuredChart height={256}>
                     {({ width, height }) => (
                       <LineChart width={width} height={height} data={progress}>
-                        <CartesianGrid strokeDasharray="4 4" stroke={gridColor} />
-                        <XAxis dataKey="date" tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                        <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                        <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
-                        <Line type="monotone" dataKey="maxWeight" stroke={primaryLine} strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
+                        <CartesianGrid strokeDasharray="4 4" stroke={cc.grid} />
+                        <XAxis dataKey="date" tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                        <YAxis tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                        <Tooltip cursor={false} contentStyle={tooltipStyle} labelStyle={{ color: cc.cardFg }} />
+                        <Line type="monotone" dataKey="maxWeight" stroke={cc.primary} strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
                       </LineChart>
                     )}
                   </MeasuredChart>
@@ -223,11 +270,11 @@ export function AnalyticsView() {
                   <MeasuredChart height={256}>
                     {({ width, height }) => (
                       <LineChart width={width} height={height} data={progress}>
-                        <CartesianGrid strokeDasharray="4 4" stroke={gridColor} />
-                        <XAxis dataKey="date" tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                        <YAxis tick={{ fontSize: 12, fill: axisColor }} stroke={axisColor} />
-                        <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#111827" }} />
-                        <Line type="monotone" dataKey="bestE1rm" stroke={accentLine} strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
+                        <CartesianGrid strokeDasharray="4 4" stroke={cc.grid} />
+                        <XAxis dataKey="date" tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                        <YAxis tick={{ fontSize: 12, fill: cc.axis }} stroke={cc.axis} />
+                        <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: cc.cardFg }} />
+                        <Line type="monotone" dataKey="bestE1rm" stroke={cc.secondary} strokeWidth={2.6} dot={false} activeDot={{ r: 5 }} />
                       </LineChart>
                     )}
                   </MeasuredChart>

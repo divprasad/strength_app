@@ -1,9 +1,15 @@
+"use client";
+
+import { useState } from "react";
 import { ExerciseList } from "@/components/exercise/exercise-list";
 import { PageIntro } from "@/components/layout/page-intro";
 import { MuscleManager } from "@/components/muscle/muscle-manager";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function ExercisesPage() {
+  const [activeTab, setActiveTab] = useState<"exercises" | "muscles">("exercises");
+
   return (
     <div className="space-y-6">
       <PageIntro
@@ -17,9 +23,36 @@ export default function ExercisesPage() {
           </>
         }
       />
-      <div className="grid gap-5 lg:grid-cols-[1.75fr_1fr]">
-        <ExerciseList />
-        <MuscleManager />
+      
+      <div className="border-b border-border/60">
+        <div className="flex gap-6 -mb-[1px]">
+          <button 
+            onClick={() => setActiveTab("exercises")}
+            className={cn(
+              "pb-3 text-sm font-medium transition-colors border-b-2 outline-none",
+              activeTab === "exercises" 
+                ? "border-primary text-foreground" 
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Exercise Library
+          </button>
+          <button 
+            onClick={() => setActiveTab("muscles")}
+            className={cn(
+              "pb-3 text-sm font-medium transition-colors border-b-2 outline-none",
+              activeTab === "muscles" 
+                ? "border-primary text-foreground" 
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Muscle Taxonomy
+          </button>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        {activeTab === "exercises" ? <ExerciseList /> : <MuscleManager />}
       </div>
     </div>
   );

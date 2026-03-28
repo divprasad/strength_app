@@ -96,7 +96,7 @@ export async function getExerciseProgress(exerciseId: string, weeksBack = 12): P
 
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
-export async function get30DaySummary(): Promise<{ completedCount: number; totalVolume: number }> {
+export async function get30DaySummary(): Promise<{ completedCount: number; totalVolume: number; weeklyVolumes: number[] }> {
   const thirtyDaysAgo = subDays(new Date(), 30);
   const startStr = format(thirtyDaysAgo, "yyyy-MM-dd");
   const endStr = format(new Date(), "yyyy-MM-dd");
@@ -110,6 +110,8 @@ export async function get30DaySummary(): Promise<{ completedCount: number; total
   const settings = (await db.settings.get("default")) ?? { volumePrimaryMultiplier: 1, volumeSecondaryMultiplier: 0.5 };
 
   let totalVolume = 0;
+  const volumeByDate: Record<string, number> = {};
+
   for (const workout of workouts) {
     const workoutExercises = await db.workoutExercises.where("workoutId").equals(workout.id).toArray();
     for (const item of workoutExercises) {
@@ -118,11 +120,27 @@ export async function get30DaySummary(): Promise<{ completedCount: number; total
       const sets = await db.setEntries.where("workoutExerciseId").equals(item.id).toArray();
       const attribution = attributedVolumeForExercise(exercise, sets, settings as AppSettings);
       totalVolume += attribution.total;
+      volumeByDate[workout.date] = (volumeByDate[workout.date] ?? 0) + attribution.total;
     }
+  }
+
+  // Compute 4-week volume trend
+  const weeklyVolumes: number[] = [];
+  for (let i = 3; i >= 0; i--) {
+    const wkStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 });
+    const wkEnd = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: wkStart, end: wkEnd });
+    let wkVol = 0;
+    for (const day of days) {
+      const key = format(day, "yyyy-MM-dd");
+      wkVol += volumeByDate[key] ?? 0;
+    }
+    weeklyVolumes.push(Math.round(wkVol));
   }
 
   return {
     completedCount: workouts.length,
-    totalVolume: Math.round(totalVolume)
+    totalVolume: Math.round(totalVolume),
+    weeklyVolumes
   };
 }

@@ -8,97 +8,120 @@
 }
 
 /* Light Mode Palettes */
+
+/* Default: "Stone" — Clean, professional neutral with decisive blue */
 html.light {
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
+  --background: 0 0% 99%;
+  --foreground: 220 14% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --primary: 222 47% 11%;
-  --primary-foreground: 210 40% 98%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --card-foreground: 220 14% 10%;
+  --border: 220 9% 91%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --primary: 220 72% 50%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 220 30% 95%;
+  --accent-foreground: 220 14% 10%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 152 56% 39%;
 }
 
-html.light[data-palette="1"] { /* Warm Sand / Soft Earth */
-  --background: 30 30% 98%;
-  --foreground: 30 20% 20%;
-  --card: 30 30% 100%;
-  --card-foreground: 30 20% 20%;
-  --border: 30 15% 90%;
-  --muted: 30 50% 94%;
-  --muted-foreground: 30 10% 45%;
-  --primary: 25 30% 35%;
-  --primary-foreground: 30 30% 98%;
-  --accent: 30 50% 90%;
-  --accent-foreground: 30 20% 20%;
+/* Palette 1: "Sand" — Warm, premium amber */
+html.light[data-palette="1"] {
+  --background: 36 25% 98%;
+  --foreground: 24 10% 12%;
+  --card: 36 20% 100%;
+  --card-foreground: 24 10% 12%;
+  --border: 36 12% 89%;
+  --muted: 36 20% 94%;
+  --muted-foreground: 24 8% 45%;
+  --primary: 24 75% 47%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 36 25% 92%;
+  --accent-foreground: 24 10% 12%;
+  --success: 152 56% 39%;
 }
 
-html.light[data-palette="2"] { /* Nordic / Airy Blue */
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
-  --card: 210 40% 100%;
-  --card-foreground: 222 47% 11%;
-  --border: 210 30% 90%;
-  --muted: 210 30% 94%;
-  --muted-foreground: 215 16% 47%;
-  --primary: 212 90% 40%;
-  --primary-foreground: 210 40% 98%;
-  --accent: 210 30% 90%;
-  --accent-foreground: 210 40% 20%;
+/* Palette 2: "Rose" — Deep berry on soft blush */
+html.light[data-palette="2"] {
+  --background: 340 20% 98%;
+  --foreground: 340 12% 12%;
+  --card: 340 15% 100%;
+  --card-foreground: 340 12% 12%;
+  --border: 340 10% 89%;
+  --muted: 340 15% 94%;
+  --muted-foreground: 340 6% 45%;
+  --primary: 340 72% 47%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 340 18% 93%;
+  --accent-foreground: 340 12% 12%;
+  --success: 152 56% 39%;
 }
 
 /* Dark Mode Palettes */
+
+/* Default: "Graphite" — Eye-comfortable dark with blue accent */
 html.dark {
-  --background: 222 47% 6%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 8%;
-  --card-foreground: 210 40% 98%;
-  --border: 217 32% 14%;
-  --muted: 217 32% 14%;
-  --muted-foreground: 215 20% 65%;
-  --primary: 199 89% 48%;
-  --primary-foreground: 222 47% 6%;
-  --accent: 217 32% 14%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 210 40% 98%;
+  --background: 220 16% 8%;
+  --foreground: 220 9% 93%;
+  --card: 220 16% 10%;
+  --card-foreground: 220 9% 93%;
+  --border: 220 12% 16%;
+  --muted: 220 12% 15%;
+  --muted-foreground: 220 9% 60%;
+  --primary: 220 72% 58%;
+  --primary-foreground: 220 16% 6%;
+  --accent: 220 12% 14%;
+  --accent-foreground: 220 9% 93%;
+  --destructive: 0 62% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 152 56% 47%;
 }
 
-html.dark[data-palette="1"] { /* Midnight Gold / Premium Black */
-  --background: 0 0% 4%;
-  --foreground: 0 0% 94%;
-  --card: 0 0% 7%;
-  --card-foreground: 0 0% 94%;
-  --border: 0 0% 15%;
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 65%;
-  --primary: 45 93% 47%;
-  --primary-foreground: 0 0% 4%;
-  --accent: 0 0% 12%;
-  --accent-foreground: 0 0% 94%;
+/* Palette 1: "Onyx" — Luxe monochrome with gold accent */
+html.dark[data-palette="1"] {
+  --background: 0 0% 7%;
+  --foreground: 0 0% 90%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 90%;
+  --border: 0 0% 16%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 58%;
+  --primary: 42 80% 52%;
+  --primary-foreground: 0 0% 7%;
+  --accent: 0 0% 13%;
+  --accent-foreground: 0 0% 90%;
+  --success: 152 50% 42%;
 }
 
-html.dark[data-palette="2"] { /* Forest / Deep Emerald */
-  --background: 160 30% 6%;
-  --foreground: 160 20% 94%;
-  --card: 160 30% 8%;
-  --card-foreground: 160 20% 94%;
-  --border: 160 20% 15%;
-  --muted: 160 20% 15%;
-  --muted-foreground: 160 10% 65%;
-  --primary: 160 84% 39%;
-  --primary-foreground: 160 30% 6%;
-  --accent: 160 20% 12%;
-  --accent-foreground: 160 20% 94%;
+/* Palette 2: "Molten" — Volcanic coral on warm charcoal */
+html.dark[data-palette="2"] {
+  --background: 15 15% 7%;
+  --foreground: 15 8% 90%;
+  --card: 15 14% 10%;
+  --card-foreground: 15 8% 90%;
+  --border: 15 10% 16%;
+  --muted: 15 10% 14%;
+  --muted-foreground: 15 6% 58%;
+  --primary: 10 85% 58%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 15 10% 13%;
+  --accent-foreground: 15 8% 90%;
+  --success: 152 50% 42%;
 }
 
 * {
   @apply border-border;
+}
+
+/* Remove browser focus outline from chart SVGs */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-wrapper svg,
+.recharts-surface {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

@@ -1,9 +1,11 @@
 # dependencies
 /node_modules
+/.npm_cache/
 
 # next.js
 /.next/
 /out/
+next-env.d.ts
 
 # production
 /build
@@ -28,18 +30,28 @@ pnpm-debug.log*
 /playwright-report/
 /test-results/
 
+# database
 /src/generated/prisma
 /dev.db
 /dev.db-journal
 /prisma/dev.db
 /prisma/dev.db-journal
+prisma/*.backup-*
 
-# reports
+# data output
+/data/
+
+# reports & scratch
 /DEVTEST.md
 /PRODTEST.md
+GLOBAL_*.md
 
+# exports
 strength-export*.json
 AFTER_LOGGING.json
 
 # editor
 *.code-workspace
+
+# debugging scripts (local dev tooling)
+/debugging_scripts/
