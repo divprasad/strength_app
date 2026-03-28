@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { WorkoutBundle } from "@/types/domain";
+import fs from "fs/promises";
+import path from "path";
 
 type Payload = {
   action: "start" | "finish" | "sync";
@@ -16,6 +18,27 @@ export async function POST(request: NextRequest) {
 
   if (!bundle) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
+  }
+
+  // Auto-Backup Mechanism
+  try {
+    const lastWorkout = await prisma.workout.findFirst({
+      orderBy: { date: "desc" },
+    });
+    const lastWorkoutDate = lastWorkout ? lastWorkout.date : "none";
+    const timestamp = new Date().toISOString().split(".")[0].replace(/:/g, "-") + "-Z";
+    const backupFilename = `db_backup_${timestamp}_lastworkout_${lastWorkoutDate}.db`;
+    
+    // The workspace convention lists prisma/dev.db as the standard database location
+    const sourceDbPath = path.join(process.cwd(), "prisma", "dev.db");
+    const backupPath = path.join(process.cwd(), "prisma", backupFilename);
+
+    // Attempt the backup (fails silently so it doesn't break the sync if db is locked/missing)
+    await fs.access(sourceDbPath);
+    await fs.copyFile(sourceDbPath, backupPath);
+    console.log(`[API Backup] Created auto-backup: ${backupFilename}`);
+  } catch (backupError) {
+    console.log("[API Backup] Skipping auto-backup (ensure dev.db exists):", backupError);
   }
 
   try {
@@ -44,6 +67,40 @@ export async function POST(request: NextRequest) {
           sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
         },
       });
+
+      // Track incoming IDs to handle deletions
+      const incomingExerciseIds = bundle.items.map(item => item.workoutExercise.id);
+      const incomingSetIds = bundle.items.flatMap(item => item.sets.map(s => s.id));
+
+      // Find and delete removed WorkoutExercises
+      const existingExercises = await tx.workoutExercise.findMany({
+        where: { workoutId: bundle.workout.id },
+        select: { id: true }
+      });
+      const exercisesToDelete = existingExercises.map(e => e.id).filter(id => !incomingExerciseIds.includes(id));
+      
+      if (exercisesToDelete.length > 0) {
+        await tx.setEntry.deleteMany({
+          where: { workoutExerciseId: { in: exercisesToDelete } }
+        });
+        await tx.workoutExercise.deleteMany({
+          where: { id: { in: exercisesToDelete } }
+        });
+      }
+
+      // Find and delete removed Sets within remaining exercises
+      if (incomingExerciseIds.length > 0) {
+          const existingSets = await tx.setEntry.findMany({
+            where: { workoutExerciseId: { in: incomingExerciseIds } },
+            select: { id: true }
+          });
+          const setsToDelete = existingSets.map(s => s.id).filter(id => !incomingSetIds.includes(id));
+          if (setsToDelete.length > 0) {
+             await tx.setEntry.deleteMany({
+               where: { id: { in: setsToDelete } }
+             });
+          }
+      }
 
       // 2. Upsert WorkoutExercises and their Sets
       for (const item of bundle.items) {

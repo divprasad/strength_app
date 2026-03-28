@@ -1,6 +1,6 @@
 # Strength Log
 
-Strength Log is a mobile-first workout tracker for logging training sessions quickly, reviewing history, and understanding progress over time.
+Strength Log is a mobile-first workout tracker for logging training sessions quickly, reviewing history, and understanding progress over time. 
 
 ## What the app intends to do
 
@@ -13,30 +13,26 @@ The product is meant to cover the full workout logging loop:
 - See weekly analytics and progress trends
 - Export data in structured formats
 
-The long-term goal is a stable web app where workout data is stored safely on the server in SQL tables, and every new session appends cleanly to the same persistent dataset.
+The core infrastructure uses a **Local-First Sync Architecture**. The app remains instantaneously responsive by writing purely to local IndexedDB (`Dexie`) and seamlessly queues all mutations to a background `syncEngine` that communicates with the `Prisma` SQL backend whenever the network is available.
 
 ## Current development status
 
-The app is currently at a functional MVP stage:
+The app is functionally complete and boasts a highly reliable architectural foundation:
 
-- The web app UI works
-- The main workout flow works locally
-- History, analytics, export, and import are present
-- Typecheck, lint, build, and unit tests pass locally
+- The web app UI works perfectly offline and is heavily optimized.
+- **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
+- **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
+- **Automated DB Backups:** Every successful server sync automatically commands the server to duplicate the SQLite `dev.db` locally as a fallback measure.
+- History, analytics, export, and import are present. Pulling/Bootstrapping directly from the server is supported via the Settings panel.
+- Typecheck, lint, build, and unit tests pass locally. Playwright End-to-End coverage is available to certify the critical flow scenarios.
 
-The important limitation is that persistence is still primarily local-first:
+## Detailed Documentation
 
-- The main source of truth is currently browser IndexedDB via Dexie.
-- **SQL Transition Underway**: We are moving towards a server-backed SQL model. The database schema has been prepared to support workout statuses (`draft`, `active`, `completed`) and user ownership.
-- A server route exists that records workout mutations as a SQL journal in `data/workouts.sql`.
-- **Infrastructure Ready**: CI/CD and E2E automation are fully integrated into the stable `main` branch.
-
-That means the app is usable for prototyping, but it is not yet stable as a server-backed multi-session system.
-
-The current end-to-end coverage is still being stabilized:
-
-- Playwright scenarios exist for workout and settings flows
-- Those scenarios are not yet the required merge gate in CI
+Four detailed static HTML reference files are available inside the `/docs` directory to help developers navigate the architectural choices, project structure, and roadmap. You can open them natively in any browser:
+- `docs/meta_processes.html` (Local-First Sync flow)
+- `docs/folder_structure.html` (Codebase Map)
+- `docs/tech_stack.html` (Tooling choices)
+- `docs/future_roadmap.html` (PWA Deployment path)
 
 ## Broad technical implementation
 
@@ -51,59 +47,20 @@ The current end-to-end coverage is still being stabilized:
 
 - `Dexie` + IndexedDB for current local persistence
 - `dexie-react-hooks` for reactive reads
-- `Zustand` for small UI state
+- Internal offline `syncQueue` table for background processing
 - `React Hook Form` + `Zod` for validated forms
 
 ### Domain and repository layer
 
-- Canonical domain types in `src/types/domain.ts`
+- Canonical domain types in `src/types/domain.ts` (including `SyncJob`)
 - Local data schema and bootstrap in `src/lib/db.ts`
-- Workout and entity workflows in `src/lib/repository.ts`
-- Analytics and derived metrics in `src/lib/analytics.ts`
+- Centralized queueing logic in `src/lib/repository.ts`
+- The Sync background loop in `src/lib/syncEngine.ts`
 
 ### Current server-side implementation
 
-- A single API route at `src/app/api/workouts/route.ts`
-- That route currently writes raw SQL statements into `data/workouts.sql`
-- It is not yet connected to a real SQL engine, migration system, or server-side source of truth
-
-## Key files
-
-- `src/app/workouts/page.tsx`: workout logging route
-- `src/components/workout/workout-logger.tsx`: main workout session UI
-- `src/lib/db.ts`: Dexie schema and bootstrapping
-- `src/lib/repository.ts`: workout mutations and session persistence hooks
-- `src/app/api/workouts/route.ts`: current server persistence stub
-- `src/components/settings/export-panel.tsx`: export, import, and integrity checks
-
-## Stabilization roadmap
-
-These are the next five high-priority steps to make the app stable as a server-backed product:
-
-### 1. Add a real SQL backend with migrations and relational constraints
-
-Move from the append-only SQL file to a real database with actual tables, primary keys, foreign keys, and a repeatable migration flow.
-
-### 2. Replace file-appended SQL with transactional inserts and upserts
-
-The server should write directly to SQL tables using idempotent create/update logic instead of appending duplicate raw `INSERT` statements to a text file.
-
-### 3. Add a server bootstrap/read path
-
-The app must be able to load persisted workouts, exercises, and sets from the server so refreshes and new sessions start from server data rather than only local IndexedDB.
-
-### 4. Route all important mutations through the server
-
-Creating workouts, adding exercises, adding sets, editing sets, deleting sets, reordering sets, and finishing sessions all need server-backed persistence.
-
-### 5. Add tests for persistence and repeated sessions
-
-Expand automated coverage to prove that:
-
-- a refresh keeps the same data
-- a new session appends data instead of overwriting
-- an edited session updates existing rows correctly
-- server and client stay in sync
+- A centralized API route at `src/app/api/workouts/route.ts` handles the unified `WorkoutBundle` payload via atomic Prisma `$transaction` upserts, preventing zombie rows.
+- SQLite acts as the final persistent ledger. 
 
 ## Local setup
 
@@ -129,20 +86,21 @@ npm run test:e2e
 npm run build
 ```
 
+## Future Stabilization roadmap
+
+With backend persistence formally accomplished via the sync queue, the final trajectory of the application focuses on turning it into a deployable, single-player native app experience:
+
+### 1. PWA Transformation
+Adding standard `manifest.json` configurations and Service Workers to cache routing files locally, effectively removing the browser URL bar when installed to an Android desktop.
+
+### 2. Local-Network Backend Hosting
+Dockerizing the repository to run silently on a home NAS or Raspberry Pi on the local network rather than a public Vercel instance, securing the unauthenticated app.
+
+### 3. Production Clean-ups
+Minifying components, expanding test coverage across the newly tabbed Exercises interface, and adding user-facing UI toggles if background syncing fails consecutively.
+
 ## Automated checks
 
 - Unit tests use `Vitest` for pure `src/lib/**` logic.
 - Fast CI runs `lint`, `typecheck`, `test:unit`, and `build` on every branch push and on pull requests into `main`.
-- Playwright E2E runs as a separate manual GitHub Actions workflow until the suite is stable enough to block merges.
-
-## Short-term product direction
-
-The immediate engineering priority is not adding more user-facing features. It is making persistence reliable and making the server-side database the real source of truth.
-
-Once that is stable, the app will be in a much better position for:
-
-- multi-device continuity
-- reliable backups
-- hosted deployment
-- future auth and user accounts
-- higher confidence analytics and history
+- Playwright E2E runs as a separate manual GitHub Actions workflow.

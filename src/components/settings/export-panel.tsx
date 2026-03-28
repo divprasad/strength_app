@@ -171,6 +171,7 @@ export function ExportPanel() {
       await db.workouts.clear();
       await db.workoutExercises.clear();
       await db.setEntries.clear();
+      await db.syncQueue.clear();
 
       await bootstrapFromServer();
       setStatus("Reset successfully pulled from server! ^_^");

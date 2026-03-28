@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Future Roadmap - Strength Log Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 leading-relaxed min-h-screen p-6 md:p-12">
+    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200">
+        <header class="mb-12 border-b border-slate-100 pb-8">
+            <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 mb-3">Road to Production</h1>
+            <p class="text-lg text-slate-500">The explicit steps needed to finalize this app for a fast, single-user mobile experience.</p>
+            <nav class="mt-6 flex gap-4 text-sm font-medium">
+                <a href="meta_processes.html" class="text-slate-500 hover:text-blue-600 transition">Meta Processes</a>
+                <a href="folder_structure.html" class="text-slate-500 hover:text-blue-600 transition">Folder Structure</a>
+                <a href="tech_stack.html" class="text-slate-500 hover:text-blue-600 transition">Tech Stack</a>
+                <a href="future_roadmap.html" class="text-blue-600 underline underline-offset-4">Future Roadmap</a>
+            </nav>
+        </header>
+
+        <main class="space-y-12">
+            
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-slate-300">Phase 1</span> PWA Transformation
+                </h2>
+                <div class="space-y-3 text-slate-700">
+                    <p>To achieve a "snappy and responsive" app natively over Android, we shouldn't build an `.apk`. We bypass the app store entirely by completing a Progressive Web App implementation.</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
+                        <li><strong>Manifest File:</strong> Creating a `manifest.json` injected via Next.js to provide standard launcher icon parameters, standalone display configurations (hiding the URL bar), and custom theme colors.</li>
+                        <li><strong>Service Workers:</strong> Caching the static `.js` routing bundles locally. With Dexie managing the data and Service Workers managing the frontend UI, the application will boot instantly from the Android desktop without requiring a network handshake.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-slate-300">Phase 2</span> Local-Network Backend Hosting
+                </h2>
+                <div class="space-y-3 text-slate-700">
+                    <p>Because there is no authentication mechanism needed, hosting this on public Vercel/Render introduces security risks. The endpoint should live fully locally on the host network.</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
+                        <li><strong>Dockerization:</strong> Containerizing the Next.js `npm run start` command along with the volume mapping for the `prisma/dev.db` file allows this app to persist indefinitely on a Raspberry Pi, Synology NAS, or any home server stack via port 3000.</li>
+                        <li><strong>Tailscale / VPN Proxy:</strong> Accessing the internal IP natively from an Android device while actively at the gym, leveraging Tailscale or a similar mesh proxy, completely avoiding domain purchase or external ingress management.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-slate-300">Phase 3</span> Production Clean-ups
+                </h2>
+                <div class="space-y-3 text-slate-700">
+                    <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
+                        <li><strong>TypeScript Bundle Sweeping:</strong> Reviewing existing component logic and converting completely dynamic Next.js API routes to `force-static` wherever feasible to minimize rendering cycles constraint.</li>
+                        <li><strong>Asset Minification:</strong> Compressing existing UI constants into the smallest possible `Next/Image` and raw UI footprint.</li>
+                        <li><strong>Robust Logging:</strong> Upgrading the silent database backup system built into `api/workouts/route.ts` to surface user-facing confirmation modals if syncing to the home server repeatedly timeouts.</li>
+                    </ul>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</body>
+</html>

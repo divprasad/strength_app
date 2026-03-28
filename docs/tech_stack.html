@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Stack - Strength Log Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 leading-relaxed min-h-screen p-6 md:p-12">
+    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200">
+        <header class="mb-12 border-b border-slate-100 pb-8">
+            <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 mb-3">Core Technologies</h1>
+            <p class="text-lg text-slate-500">The tooling choices emphasizing speed, local reliability, and visual coherence.</p>
+            <nav class="mt-6 flex gap-4 text-sm font-medium">
+                <a href="meta_processes.html" class="text-slate-500 hover:text-blue-600 transition">Meta Processes</a>
+                <a href="folder_structure.html" class="text-slate-500 hover:text-blue-600 transition">Folder Structure</a>
+                <a href="tech_stack.html" class="text-blue-600 underline underline-offset-4">Tech Stack</a>
+                <a href="future_roadmap.html" class="text-slate-500 hover:text-blue-600 transition">Future Roadmap</a>
+            </nav>
+        </header>
+
+        <main class="space-y-12">
+            
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">01</span> Next.js (App Router)
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> The foundation of the app. It unifies the frontend interfaces cleanly with the <code>/api</code> routing necessary to connect the local interface to the SQL backend database. Even though most data rendering occurs client-side for offline speed, Next.js gives us the infrastructure to seamlessly convert into a Progressive Web App (PWA).</p>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">02</span> Dexie.js (IndexedDB)
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> Under the hood, this replaces traditional React State arrays (like Redux or Zustand). Dexie acts as a minimalist wrapper over the browser's native IndexedDB. By treating the phone's browser as the primary database, the application becomes completely disconnected from network dependency, providing the crucial "0ms ping" required for a gym tracker app.</p>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">03</span> Prisma & SQLite
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> This is the server-side source of truth. Prisma forces strict relational typing, ensuring our exercise UUIDs map flawlessly to the logged sets. SQLite was selected over heavier dialects like PostgreSQL specifically because this is designed as a single-player application; SQLite runs literally anywhere (Raspberry Pi, NAS, or basic laptop) without requiring complex container setups.</p>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">04</span> Tailwind CSS & Shadcn/UI
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> For visual excellence and development speed. Shadcn provides unstyled accessible generic components that we bend via Tailwind. It achieves aesthetic density without polluting the javascript payload.</p>
+            </section>
+
+        </main>
+    </div>
+</body>
+</html>

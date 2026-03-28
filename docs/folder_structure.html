@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder Structure - Strength Log Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 leading-relaxed min-h-screen p-6 md:p-12">
+    <div class="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200">
+        <header class="mb-12 border-b border-slate-100 pb-8">
+            <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 mb-3">Codebase Organization</h1>
+            <p class="text-lg text-slate-500">A visual guide to where code lives and why it is separated this way.</p>
+            <nav class="mt-6 flex gap-4 text-sm font-medium">
+                <a href="meta_processes.html" class="text-slate-500 hover:text-blue-600 transition">Meta Processes</a>
+                <a href="folder_structure.html" class="text-blue-600 underline underline-offset-4">Folder Structure</a>
+                <a href="tech_stack.html" class="text-slate-500 hover:text-blue-600 transition">Tech Stack</a>
+                <a href="future_roadmap.html" class="text-slate-500 hover:text-blue-600 transition">Future Roadmap</a>
+            </nav>
+        </header>
+
+        <main class="space-y-12">
+            
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">The Directory Tree</h2>
+                
+                <div class="bg-slate-800 text-slate-200 p-6 rounded-2xl font-mono text-sm shadow-inner overflow-x-auto">
+<pre><code>antigravity_strength/
+├── docs/                 # Documentation (You are reading this!)
+├── prisma/               # Database definitions and active SQLite files
+│   ├── dev.db            # The local database
+│   ├── schema.prisma     # The SQL definitions mapped to TypeScript
+│   └── migrations/       # SQL history
+├── public/               # Static assets (images, icons, manifest config)
+└── src/
+    ├── app/              # Next.js App Router (Pages & Background API)
+    ├── components/       # Interface layer (React components)
+    ├── hooks/            # Custom logic loops specific to React
+    ├── lib/              # The "Brain" (Database config, Sync Engines, Utils)
+    └── types/            # TypeScript Domain Definitions
+</code></pre>
+                </div>
+            </section>
+
+            <section class="space-y-6">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><code>/src/app</code> (The Router)</h3>
+                    <p class="text-slate-700">This defines what the user sees when they type a URL. For example, <code>/src/app/workouts/page.tsx</code> dictates the view at <code>localhost:3000/workouts</code>. It also holds the critical <code>/api</code> directory, which serves as the ingress node for the synchronization engine to write to Prisma.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><code>/src/components</code> (The Interface)</h3>
+                    <p class="text-slate-700">Built primarily around specialized domain sections (e.g., <code>/components/workout/</code>, <code>/components/analytics/</code>) utilizing specialized UI primitive components like shadcn/ui. This folder holds zero networking logic, purely interfacing with <code>src/lib</code> methods.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><code>/src/lib</code> (The Core Logic)</h3>
+                    <p class="text-slate-700">The most important folder in the project. It handles all state management and heavy lifting:</p>
+                    <ul class="list-disc list-inside mt-3 space-y-2 text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <li><strong><code>db.ts</code></strong>: Initializes the local Dexie browser cache and the offline synchronization queue.</li>
+                        <li><strong><code>repository.ts</code></strong>: The unified controller. React components fire requests here, and it handles writing to IndexedDB and enqueuing background tasks simultaneously.</li>
+                        <li><strong><code>syncEngine.ts</code></strong>: The background worker that flushes stored browser logic safely into the SQLite files when network requests clear.</li>
+                    </ul>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</body>
+</html>

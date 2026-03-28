@@ -37,6 +37,7 @@ pnpm-debug.log*
 /prisma/dev.db
 /prisma/dev.db-journal
 prisma/*.backup-*
+prisma/db_backup_*.db
 
 # data output
 /data/

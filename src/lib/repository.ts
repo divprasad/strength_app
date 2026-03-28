@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { createId, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise, WorkoutStatus } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
+import { processSyncQueue } from "@/lib/syncEngine";
+
 
 function inferWorkoutStatus(workout: Pick<Workout, "sessionStartedAt" | "sessionEndedAt">): WorkoutStatus {
   if (!workout.sessionStartedAt) return "draft";
@@ -39,6 +41,7 @@ export async function createWorkoutForDate(date: string, options?: Pick<Workout,
 export async function updateWorkout(workoutId: string, patch: Partial<Workout>): Promise<void> {
   const now = nowIso();
   await db.workouts.update(workoutId, { ...patch, updatedAt: now });
+  await enqueueSync(workoutId);
 }
 
 export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
@@ -86,6 +89,7 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
   };
   await db.workoutExercises.put(item);
   await db.workouts.update(workoutId, { updatedAt: nowIso() });
+  await enqueueSync(workoutId);
   return item;
 }
 
@@ -114,6 +118,7 @@ export async function removeExerciseFromWorkout(workoutExerciseId: string): Prom
   });
 
   await normalizeWorkoutExerciseOrder(workoutId);
+  await enqueueSync(workoutId);
 }
 
 export async function addSetToWorkoutExercise(
@@ -135,6 +140,8 @@ export async function addSetToWorkoutExercise(
     updatedAt: now
   };
   await db.setEntries.put(entry);
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (workoutExercise) await enqueueSync(workoutExercise.workoutId);
   return entry;
 }
 
@@ -148,6 +155,8 @@ export async function renumberSets(workoutExerciseId: string): Promise<void> {
       })
     )
   );
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (workoutExercise) await enqueueSync(workoutExercise.workoutId);
 }
 
 export async function reorderSet(setId: string, direction: "up" | "down"): Promise<void> {
@@ -168,6 +177,8 @@ export async function reorderSet(setId: string, direction: "up" | "down"): Promi
     await db.setEntries.update(current.id, { setNumber: target.setNumber, updatedAt: nowIso() });
     await db.setEntries.update(target.id, { setNumber: current.setNumber, updatedAt: nowIso() });
   });
+  const workoutExercise = await db.workoutExercises.get(setEntry.workoutExerciseId);
+  if (workoutExercise) await enqueueSync(workoutExercise.workoutId);
 }
 
 export async function weekRangeDateStrings(anchorDateIso: string): Promise<{ start: string; end: string }> {
@@ -236,34 +247,28 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
   await db.muscles.delete(muscleId);
 }
 
-const WORKOUT_API_PATH = "/api/workouts";
-
-export async function syncWorkoutToServer(workoutId: string): Promise<void> {
-  await persistWorkoutSession("sync", workoutId);
+export async function enqueueSync(workoutId: string): Promise<void> {
+  const now = nowIso();
+  const existingJob = await db.syncQueue.get(workoutId);
+  if (!existingJob) {
+    await db.syncQueue.put({
+      id: workoutId,
+      action: "upsert",
+      status: "pending",
+      retryCount: 0,
+      createdAt: now,
+    });
+  } else if (existingJob.status === "failed") {
+    await db.syncQueue.update(workoutId, { status: "pending", retryCount: existingJob.retryCount + 1 });
+  }
+  
+  setTimeout(() => {
+    processSyncQueue().catch(console.error);
+  }, 100);
 }
 
-async function persistWorkoutSession(action: "start" | "finish" | "sync", workoutId: string) {
-  const bundle = await getWorkoutBundle(workoutId);
-  if (!bundle) return;
-
-  const payload = {
-    action,
-    userId: bundle.workout.userId ?? DEFAULT_USER_ID,
-    bundle
-  };
-
-  if (typeof fetch === "undefined") return;
-  try {
-    await fetch(WORKOUT_API_PATH, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-  } catch (error) {
-    console.warn("Unable to persist workout session", error);
-  }
+export async function syncWorkoutToServer(workoutId: string): Promise<void> {
+  await enqueueSync(workoutId);
 }
 
 export async function startWorkoutSession(date: string): Promise<Workout | null> {
@@ -283,7 +288,7 @@ export async function startWorkoutSessionForWorkout(workoutId: string): Promise<
     userId: workout.userId ?? DEFAULT_USER_ID,
     updatedAt: now
   });
-  await persistWorkoutSession("start", workoutId);
+  await enqueueSync(workoutId);
   return { ...workout, sessionStartedAt: now, sessionEndedAt: undefined, userId: workout.userId ?? DEFAULT_USER_ID, updatedAt: now };
 }
 
@@ -295,7 +300,7 @@ export async function finishWorkoutSession(workoutId: string): Promise<void> {
     sessionEndedAt: now,
     updatedAt: now
   });
-  await persistWorkoutSession("finish", workoutId);
+  await enqueueSync(workoutId);
 }
 
 export async function startWorkoutExercise(workoutExerciseId: string): Promise<void> {
@@ -307,7 +312,7 @@ export async function startWorkoutExercise(workoutExerciseId: string): Promise<v
     completedAt: undefined
   });
   await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
-  await persistWorkoutSession("sync", workoutExercise.workoutId);
+  await enqueueSync(workoutExercise.workoutId);
 }
 
 export async function finishWorkoutExercise(workoutExerciseId: string): Promise<void> {
@@ -318,7 +323,7 @@ export async function finishWorkoutExercise(workoutExerciseId: string): Promise<
     completedAt: now
   });
   await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
-  await persistWorkoutSession("sync", workoutExercise.workoutId);
+  await enqueueSync(workoutExercise.workoutId);
 }
 
 export async function finishActiveWorkoutExercise(workoutId: string): Promise<void> {
@@ -365,7 +370,7 @@ export async function syncAllExercises(): Promise<void> {
 export async function syncAllWorkouts(): Promise<void> {
   const workouts = await db.workouts.toArray();
   for (const workout of workouts) {
-    await persistWorkoutSession("sync", workout.id);
+    await enqueueSync(workout.id);
   }
 }
 
