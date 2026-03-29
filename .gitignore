@@ -7,6 +7,10 @@
 /out/
 next-env.d.ts
 
+# serwist (compiled service worker — build artifact)
+public/sw.js
+public/sw.js.map
+
 # production
 /build
 
@@ -34,6 +38,10 @@ pnpm-debug.log*
 /src/generated/prisma
 /dev.db
 /dev.db-journal
+/dev_pwa.db
+/dev_pwa.db-journal
+/prisma/dev_pwa.db
+/prisma/dev_pwa.db-journal
 /prisma/dev.db
 /prisma/dev.db-journal
 prisma/*.backup-*
