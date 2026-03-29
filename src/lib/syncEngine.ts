@@ -61,7 +61,7 @@ async function pushWorkoutToServer(workoutId: string): Promise<boolean> {
 
   const bundle: WorkoutBundle = {
     workout,
-    items: items.filter(Boolean) as unknown[]
+    items: validItems
   };
 
   const payload = {
