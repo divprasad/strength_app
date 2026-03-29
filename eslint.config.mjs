@@ -10,7 +10,7 @@ const config = [
     extends: ["next/core-web-vitals", "next/typescript"]
   }),
   {
-    ignores: ["next-env.d.ts", ".next/**", "node_modules/**"]
+    ignores: ["next-env.d.ts", ".next/**", "node_modules/**", "public/sw.js", "scripts/**"]
   }
 ];
 

@@ -220,7 +220,7 @@ export async function healDatabase(): Promise<{ healedCount: number }> {
     workoutGroups.set(we.workoutId, list);
   });
 
-  for (const [workoutId, items] of workoutGroups) {
+  for (const [, items] of workoutGroups) {
     const sorted = [...items].sort((a, b) => a.orderIndex - b.orderIndex);
     let needsReorder = false;
     for (let i = 0; i < sorted.length; i++) {
@@ -248,7 +248,7 @@ export async function healDatabase(): Promise<{ healedCount: number }> {
     workoutExerciseGroups.set(se.workoutExerciseId, list);
   });
 
-  for (const [weId, items] of workoutExerciseGroups) {
+  for (const [, items] of workoutExerciseGroups) {
     const sorted = [...items].sort((a, b) => a.setNumber - b.setNumber);
     let needsResequence = false;
     for (let i = 0; i < sorted.length; i++) {
