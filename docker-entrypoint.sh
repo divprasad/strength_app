@@ -44,12 +44,12 @@ fi
 # ── Apply migrations ─────────────────────────────────────────────────────────
 echo "[entrypoint] Running prisma migrate deploy..."
 cd /app
-/app/node_modules/.bin/prisma migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
+node /app/node_modules/prisma/build/index.js migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
 
 # ── Seed on fresh install only ───────────────────────────────────────────────
 if [ "$FRESH_DB" = "true" ]; then
   echo "[entrypoint] Fresh database detected — seeding default data..."
-  /app/node_modules/.bin/prisma db seed
+  node /app/node_modules/prisma/build/index.js db seed
 else
   echo "[entrypoint] Existing database found — skipping seed."
 fi
