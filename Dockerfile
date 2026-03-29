@@ -62,9 +62,8 @@ COPY --from=builder /app/node_modules/.prisma          ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma          ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma           ./node_modules/prisma
 
-# Seed script dependencies
-COPY --from=builder /app/node_modules/tsx              ./node_modules/tsx
-COPY --from=builder /app/node_modules/.bin/tsx         ./node_modules/.bin/tsx
+# Seed script dependencies — install tsx globally (avoids symlink copy issues)
+RUN npm install -g tsx
 
 # Stage migration files and schema separately from the volume mount path,
 # so the entrypoint can copy them in on every start (handles new migrations).
