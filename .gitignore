@@ -21,7 +21,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # env
-.env*
 
 # typescript
 *.tsbuildinfo
@@ -56,3 +55,5 @@ AFTER_LOGGING.json
 
 # debugging scripts (local dev tooling)
 /debugging_scripts/
+# dev test databases
+*dev_docker.db*
