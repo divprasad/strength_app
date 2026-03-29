@@ -17,9 +17,10 @@ The core infrastructure uses a **Local-First Sync Architecture**. The app remain
 
 ## Current development status
 
-The app is functionally complete and boasts a highly reliable architectural foundation:
+The app is functionally complete, fully installable as a PWA, and deployable via Docker:
 
-- The web app UI works perfectly offline and is heavily optimized.
+- **Progressive Web App:** Installable to any phone's home screen via Serwist service workers. Boots instantly offline with precached bundles.
+- **Docker Self-Hosting:** A multi-stage `Dockerfile` + `docker-compose.yml` produces a lean ~180 MB image that runs on any local network device (NAS, Raspberry Pi, laptop).
 - **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
 - **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
 - **Automated DB Backups:** Every successful server sync automatically commands the server to duplicate the SQLite `dev.db` locally as a fallback measure.
@@ -62,7 +63,7 @@ Four detailed static HTML reference files are available inside the `/docs` direc
 - A centralized API route at `src/app/api/workouts/route.ts` handles the unified `WorkoutBundle` payload via atomic Prisma `$transaction` upserts, preventing zombie rows.
 - SQLite acts as the final persistent ledger. 
 
-## Local setup
+## Local setup (development)
 
 1. Install dependencies:
 
@@ -86,18 +87,41 @@ npm run test:e2e
 npm run build
 ```
 
-## Future Stabilization roadmap
+## Docker deployment (production)
 
-With backend persistence formally accomplished via the sync queue, the final trajectory of the application focuses on turning it into a deployable, single-player native app experience:
+Build and start the container:
 
-### 1. PWA Transformation
-Adding standard `manifest.json` configurations and Service Workers to cache routing files locally, effectively removing the browser URL bar when installed to an Android desktop.
+```bash
+docker compose up --build -d
+```
 
-### 2. Local-Network Backend Hosting
-Dockerizing the repository to run silently on a home NAS or Raspberry Pi on the local network rather than a public Vercel instance, securing the unauthenticated app.
+The app will be available at `http://localhost:3000`. The SQLite database is persisted in a named Docker volume (`db-data`) and survives container rebuilds.
 
-### 3. Production Clean-ups
-Minifying components, expanding test coverage across the newly tabbed Exercises interface, and adding user-facing UI toggles if background syncing fails consecutively.
+To stop:
+
+```bash
+docker compose down
+```
+
+To view logs:
+
+```bash
+docker compose logs -f strength-log
+```
+
+## Roadmap
+
+### ✅ Phase 1 — PWA Transformation (shipped)
+The app is a fully installable PWA via Serwist service workers. Manifest, icons, and offline caching are complete.
+
+### ✅ Phase 2 — Local-Network Backend Hosting (shipped)
+Dockerized with a multi-stage build, named volumes for SQLite persistence, and an entrypoint that handles migrations and seeding.
+
+### ◆ Phase 3 — Production Hardening (in progress)
+- **Sync Status UI:** User-facing sync indicator and failure notifications.
+- **Docker Smoke Testing:** End-to-end validation on target hardware.
+- **Test Coverage Expansion:** E2E tests for Exercises UI, command palette, PWA install flow.
+- **Bundle Optimization:** Static route conversion and asset minification.
 
 ## Automated checks
 

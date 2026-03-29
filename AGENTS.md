@@ -4,13 +4,15 @@ This file is the stable operating guide for agents working in this repository.
 
 ## Mission
 
-Strength Log uses a robust "Local-First Sync Architecture" to deliver a zero-latency tracker that can operate fully offline. The structural persistence is currently complete: local Dexie changes drop `syncQueue` tickets which are processed by a background worker and `$transaction`-upserted cleanly onto a Prisma/SQLite instance whenever network drops.
+Strength Log uses a robust "Local-First Sync Architecture" to deliver a zero-latency tracker that can operate fully offline. The structural persistence is complete: local Dexie changes drop `syncQueue` tickets which are processed by a background worker and `$transaction`-upserted cleanly onto a Prisma/SQLite instance whenever network drops.
 
-The immediate priority for agents is no longer database design, but moving towards a smooth, single-user **PWA mobile app** deployment locally hosted via Docker.
+The app is now a fully installable **PWA** (via Serwist) and is **Docker-deployable** for self-hosted local-network hosting. The immediate priority for agents is **Phase 3: Production Hardening** — sync status visibility, Docker smoke testing, test coverage expansion, and bundle optimization.
 
 ## Current project state
 
 - The UI and core product flows work. Most computations act on IndexedDB.
+- **PWA Complete:** The app is installable to any phone's home screen via Serwist service workers with precached bundles and offline-first runtime caching.
+- **Docker Complete:** A multi-stage `Dockerfile` + `docker-compose.yml` produces a lean ~180 MB image with named volume persistence, auto-migrations, and conditional seeding.
 - **Background Sync Works:** `src/lib/syncEngine.ts` handles pushing all `WorkoutBundle` entities.
 - **Garbage Collection Works:** Orphaned local sets deleted from the app correctly cause cascading deletions on the Prisma backend, so zombie data does not regenerate when pulling from the DB.
 - **Auto Backups Work:** Pushing data automatically triggers a `fs.copyFile` backup of the SQLite database in the `/prisma/` folder in case corruption pushes upstream.

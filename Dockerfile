@@ -87,6 +87,9 @@ RUN chmod +x /app/docker-entrypoint.sh
 # /app/prisma is the volume mount point — nextjs user needs write access
 RUN mkdir -p /app/prisma && chown -R nextjs:nodejs /app/prisma
 
+# /app/backups for safe exports to the host machine
+RUN mkdir -p /app/backups && chown -R nextjs:nodejs /app/backups
+
 USER nextjs
 
 EXPOSE 3000

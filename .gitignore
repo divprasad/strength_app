@@ -47,6 +47,7 @@ pnpm-debug.log*
 /prisma/dev_palette.db*
 prisma/*.backup-*
 prisma/db_backup_*.db
+/backups/
 
 # data output
 /data/

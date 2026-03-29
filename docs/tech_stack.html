@@ -52,6 +52,20 @@
                 <p class="text-slate-700"><strong>Why we chose it:</strong> For visual excellence and development speed. Shadcn provides unstyled accessible generic components that we bend via Tailwind. It achieves aesthetic density without polluting the javascript payload.</p>
             </section>
 
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">05</span> Serwist (PWA Service Workers)
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> Serwist is a modern, actively maintained fork of Google's Workbox with first-class Next.js integration via <code>@serwist/next</code>. It precaches all static routing bundles and applies runtime caching strategies, enabling the app to boot instantly from a phone's home screen — even completely offline. Combined with Dexie managing the data layer, this delivers a true native-app feel without an app store.</p>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">06</span> Docker (Self-Hosted Deployment)
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> A multi-stage Dockerfile produces a lean ~180 MB production image using Next.js standalone output. Combined with <code>docker-compose.yml</code> and a named volume for SQLite persistence, the entire backend runs silently on any Docker-capable device (Raspberry Pi, Synology NAS, or laptop) on the local network — avoiding public cloud hosting for an unauthenticated single-user app.</p>
+            </section>
+
         </main>
     </div>
 </body>
