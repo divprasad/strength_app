@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { DEFAULT_USER_ID } from "@/lib/constants";
+import type { WorkoutBundle } from "@/types/domain";
 
 const WORKOUT_API_PATH = "/api/workouts";
 let isProcessing = false;
@@ -56,9 +57,11 @@ async function pushWorkoutToServer(workoutId: string): Promise<boolean> {
     })
   );
 
-  const bundle = {
+  const validItems = items.filter((item): item is NonNullable<typeof item> => item !== null);
+
+  const bundle: WorkoutBundle = {
     workout,
-    items: items.filter(Boolean) as unknown[]
+    items: validItems
   };
 
   const payload = {
