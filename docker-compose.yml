@@ -1,0 +1,23 @@
+services:
+  strength-log:
+    build: .
+    container_name: strength-log
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Named volume: survives container teardown and rebuilds.
+      # Maps to /app/prisma inside the container, which is where
+      # process.cwd()/prisma/dev.db resolves — matching the backup
+      # path logic in src/app/api/workouts/route.ts.
+      - db-data:/app/prisma
+    environment:
+      - NODE_ENV=production
+      # file:./dev.db is relative to the schema location (/app/prisma),
+      # so the full resolved path is /app/prisma/dev.db
+      - DATABASE_URL=file:./dev.db
+
+volumes:
+  db-data:
+    # Named volume managed by Docker — persists across `docker compose down`
+    # and `docker compose up --build`.

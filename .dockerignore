@@ -1,0 +1,26 @@
+node_modules
+.next
+.git
+.github
+.codex
+
+# Database files (live data lives in the Docker volume)
+prisma/dev.db
+prisma/dev.db-journal
+prisma/db_backup_*
+
+# Dev / test artifacts
+data/
+tests/
+playwright-report/
+test-results/
+docs/
+debugging_scripts/
+
+# Misc
+*.md
+!prisma/migrations/**/*.sql
+.DS_Store
+*.code-workspace
+strength-export*.json
+AFTER_LOGGING.json
