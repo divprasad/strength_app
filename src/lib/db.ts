@@ -115,11 +115,9 @@ async function bootstrapIfNeeded(): Promise<void> {
 async function seedDatabase(database: StrengthDatabase): Promise<void> {
   const now = nowIso();
 
-  // Clear existing data to ensure stable IDs take effect
-  await database.transaction("rw", [database.muscles, database.exercises, database.workouts, database.workoutExercises, database.setEntries, database.settings], async () => {
-    await database.setEntries.clear();
-    await database.workoutExercises.clear();
-    await database.workouts.clear();
+  // Only clear reference data. Workouts are user data and must never be wiped
+  // by a re-seed triggered by bootstrap fallback.
+  await database.transaction("rw", [database.muscles, database.exercises, database.settings], async () => {
     await database.exercises.clear();
     await database.muscles.clear();
     await database.settings.clear();
@@ -180,53 +178,6 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
   ];
 
   await database.exercises.bulkPut(exercises);
-
-  const workoutId = createId("workout");
-  const workoutExerciseId = createId("workoutExercise");
-  const today = localDateIso(new Date());
-
-  await database.workouts.put({
-    id: workoutId,
-    name: "Sample Workout",
-    date: today,
-    status: "draft",
-    notes: "Sample workout",
-    createdAt: now,
-    updatedAt: now,
-    userId: DEFAULT_USER_ID
-  });
-
-  await database.workoutExercises.put({
-    id: workoutExerciseId,
-    workoutId,
-    exerciseId: exercises[0].id,
-    orderIndex: 0,
-    createdAt: now
-  });
-
-  await database.setEntries.bulkPut([
-    {
-      id: createId("set"),
-      workoutExerciseId,
-      setNumber: 1,
-      reps: 5,
-      weight: 60,
-      type: "warmup",
-      notes: "Warm-up",
-      createdAt: now,
-      updatedAt: now
-    },
-    {
-      id: createId("set"),
-      workoutExerciseId,
-      setNumber: 2,
-      reps: 5,
-      weight: 70,
-      type: "normal",
-      createdAt: now,
-      updatedAt: now
-    }
-  ]);
 
   await database.settings.put({
     id: "default",

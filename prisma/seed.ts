@@ -14,10 +14,8 @@ function createStableId(prefix: string, seed: string): string {
 async function main() {
   console.log("Seeding defaults...");
 
-  // Clear existing data to ensure stable IDs take effect
-  await prisma.setEntry.deleteMany();
-  await prisma.workoutExercise.deleteMany();
-  await prisma.workout.deleteMany();
+  // Only clear reference data (muscles + exercises). Never delete workouts —
+  // those are user data that must survive re-seeding.
   await prisma.exercise.deleteMany();
   await prisma.muscleGroup.deleteMany();
 
