@@ -106,7 +106,7 @@ export type WorkoutStatus = "draft" | "active" | "completed" | "archived";
 
 export interface SyncJob {
   id: string;
-  action: "upsert";
+  action: "upsert" | "delete";
   status: "pending" | "failed";
   retryCount: number;
   lastAttemptAt?: string;

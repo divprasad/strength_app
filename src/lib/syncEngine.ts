@@ -17,7 +17,7 @@ export async function processSyncQueue(): Promise<void> {
     const pendingJobs = await db.syncQueue.where("status").equals("pending").toArray();
 
     for (const job of pendingJobs) {
-      const success = await pushWorkoutToServer(job.id);
+      const success = await pushWorkoutToServer(job.id, job.action as "upsert" | "delete");
       if (success) {
         await db.syncQueue.delete(job.id);
       } else {
@@ -46,7 +46,19 @@ export async function flushSyncQueue(): Promise<void> {
 /**
  * Builds the workout bundle and POSTs to the server.
  */
-async function pushWorkoutToServer(workoutId: string): Promise<boolean> {
+async function pushWorkoutToServer(workoutId: string, action: "upsert" | "delete" = "upsert"): Promise<boolean> {
+  if (action === "delete") {
+    try {
+      const response = await fetch(`${WORKOUT_API_PATH}?id=${workoutId}`, {
+        method: "DELETE",
+      });
+      return response.ok;
+    } catch (error) {
+      console.warn("[SyncEngine] Failed to sync delete for workout", workoutId, error);
+      return false;
+    }
+  }
+
   // Replicating getWorkoutBundle directly to avoid circular dependency with repository.ts
   const workout = await db.workouts.get(workoutId);
   if (!workout) return true; // It was deleted locally before sync? Just clear from queue.

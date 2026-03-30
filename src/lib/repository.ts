@@ -247,17 +247,19 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
   await db.muscles.delete(muscleId);
 }
 
-export async function enqueueSync(workoutId: string): Promise<void> {
+export async function enqueueSync(workoutId: string, action: "upsert" | "delete" = "upsert"): Promise<void> {
   const now = nowIso();
   const existingJob = await db.syncQueue.get(workoutId);
   if (!existingJob) {
     await db.syncQueue.put({
       id: workoutId,
-      action: "upsert",
+      action,
       status: "pending",
       retryCount: 0,
       createdAt: now,
     });
+  } else if (existingJob.action !== action) {
+    await db.syncQueue.update(workoutId, { action, status: "pending", retryCount: 0 });
   } else if (existingJob.status === "failed") {
     await db.syncQueue.update(workoutId, { status: "pending", retryCount: existingJob.retryCount + 1 });
   }
@@ -492,6 +494,8 @@ export async function deleteWorkout(workoutId: string): Promise<void> {
     await db.workoutExercises.bulkDelete(workoutExercises.map((we) => we.id));
     await db.workouts.delete(workoutId);
   });
+
+  await enqueueSync(workoutId, "delete");
 }
 
 /* ─── Command Palette convenience wrappers ─── */
