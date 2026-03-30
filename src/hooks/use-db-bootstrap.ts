@@ -16,17 +16,13 @@ export function useDbBootstrap() {
         // 1. Try pulling canonical data from the server first.
         //    This is the primary source of truth for muscles, exercises and workouts.
         await bootstrapFromServer();
-
-        // 2. If server bootstrap succeeded but returned no exercises
-        //    (i.e. the server DB is also empty), fall back to local defaults.
-        const hasExercises = await db.exercises.count();
-        if (hasExercises === 0) {
-          await ensureBootstrapped();
-        }
+        
+        // 2. Ensure settings are initialized (won't wipe anything)
+        await ensureBootstrapped();
       } catch {
         // Server unreachable (e.g. offline / first load without network).
         // Fall back to local seed so the app is still usable.
-        console.warn("Server bootstrap failed, falling back to local seed.");
+        console.warn("Server bootstrap failed, initializing local settings only.");
         await ensureBootstrapped();
       } finally {
         if (mounted) setReady(true);
