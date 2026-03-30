@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
+  globalSetup: "./tests/global-setup.ts",
+  globalTeardown: "./tests/global-teardown.ts",
   fullyParallel: true,
   retries: 0,
   reporter: "list",
@@ -10,10 +12,14 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3200",
+    // Spin up Next.js pointed at the isolated test database
+    command: "DATABASE_URL=file:./prisma/dev_test.db npm run dev -- --hostname 127.0.0.1 --port 3200",
     url: "http://127.0.0.1:3200",
-    reuseExistingServer: true,
-    timeout: 120000
+    reuseExistingServer: false, // Always use fresh server with the test DB
+    timeout: 120000,
+    env: {
+      DATABASE_URL: "file:./prisma/dev_test.db",
+    },
   },
   projects: [
     {
