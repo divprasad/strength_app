@@ -3,58 +3,11 @@ import { expect, test } from "@playwright/test";
 
 const importFixturePath = path.join(__dirname, "fixtures", "import-payload.json");
 
-test("workout lifecycle can be completed from logger to history", async ({ page }) => {
-  page.on("dialog", dialog => dialog.accept());
-
-  // Clear IndexedDB so today's workout state is clean regardless of previous runs
-  await page.goto("/workouts");
-  await page.evaluate(async () => {
-    const dbs = await indexedDB.databases();
-    await Promise.all(dbs.map(db => new Promise<void>((res, rej) => {
-      const req = indexedDB.deleteDatabase(db.name!);
-      req.onsuccess = () => res();
-      req.onerror = () => rej(req.error);
-    })));
-  });
-  await page.reload();
-
-  // Logger renders with a "Start Workout" CTA when no workout exists for today
-  await expect(page.getByRole("button", { name: "Start Workout" })).toBeVisible({ timeout: 10000 });
-
-  // Start a new session
-  await page.getByRole("button", { name: "Start Workout" }).click();
-
-  // Session is now active — the header badge shows a running timer (● 0:00 format)
-  await expect(page.getByText(/^●/).first()).toBeVisible();
-
-  // Add an exercise via the inline picker
-  await page.getByText("Add Exercise").click();
-  await page.getByPlaceholder("Search exercises...").fill("Bench");
-  await page.getByRole("button", { name: /Barbell Bench Press/i }).first().click();
-
-  // The exercise card appears in pending state — start it
-  await page.getByRole("button", { name: "Start" }).first().click();
-
-  // Log a set
-  await page.getByRole("button", { name: "Log" }).click();
-
-  // Finish the exercise
-  await page.getByRole("button", { name: "Finish" }).click();
-
-  // Stop the session
-  await page.getByRole("button", { name: "Stop" }).click();
-
-  // Navigate to history and confirm the session was recorded
-  await page.goto("/history");
-  await expect(page.getByText("Session 1")).toBeVisible();
-  await expect(page.getByText(/8 reps/).first()).toBeVisible();
-});
+// globalSetup seeds dev_test.db with muscles + exercises (including Barbell Bench Press)
+// before this suite runs, so both tests start from a clean known state.
 
 test("settings supports JSON export and fixture import", async ({ page }) => {
   await page.goto("/settings");
-
-  // Export JSON button should be visible inside the Export Data card
-  await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON" }).click();
@@ -68,3 +21,34 @@ test("settings supports JSON export and fixture import", async ({ page }) => {
   await expect(page.getByRole("listitem").filter({ hasText: "E2E Imported Curl" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "Imported Biceps" })).toBeVisible();
 });
+
+test("workout lifecycle can be completed from logger to history", async ({ page }) => {
+  page.on("dialog", dialog => dialog.accept());
+
+  // Test DB is freshly seeded — no workouts exist, so we always hit the empty state
+  await page.goto("/workouts");
+  await expect(page.getByRole("button", { name: "Start Workout" })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "Start Workout" }).click();
+
+  // Session is now active — the header badge shows running timer (● 0:00 format)
+  await expect(page.getByText(/^●/).first()).toBeVisible();
+
+  // Add an exercise via the inline picker (Barbell Bench Press is seeded)
+  await page.getByRole("button", { name: "Add Exercise" }).click();
+  await page.getByPlaceholder("Search exercises...").fill("Bench");
+  await page.getByRole("button", { name: /Barbell Bench Press/i }).first().click();
+
+  // Exercise auto-starts. Log a set.
+  await expect(page.getByRole("button", { name: "Log", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Log", exact: true }).click();
+
+  // Finish the exercise, then stop the session
+  await page.getByRole("button", { name: "Finish" }).click();
+  await page.getByRole("button", { name: "Stop" }).click();
+
+  // Navigate to history and confirm the session was recorded
+  await page.goto("/history");
+  await expect(page.getByText(/Session 1/).first()).toBeVisible();
+  await expect(page.getByText(/8 reps/).first()).toBeVisible();
+});
+

@@ -186,8 +186,26 @@ export async function GET() {
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (id) {
+      await prisma.$transaction([
+        prisma.setEntry.deleteMany({
+          where: { workoutExercise: { workoutId: id } }
+        }),
+        prisma.workoutExercise.deleteMany({
+          where: { workoutId: id }
+        }),
+        prisma.workout.delete({
+          where: { id }
+        })
+      ]);
+      return NextResponse.json({ status: "ok", message: `Workout ${id} deleted` });
+    }
+
     await prisma.$transaction([
       prisma.setEntry.deleteMany(),
       prisma.workoutExercise.deleteMany(),
