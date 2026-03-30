@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92" fill="#131519"/>
+  <!-- Outer ring (weight plate) -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#4A7AE8" stroke-width="22" opacity="0.3"/>
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#4A7AE8" stroke-width="16" opacity="0.5"/>
+  <!-- Center hub -->
+  <circle cx="256" cy="256" r="36" fill="#4A7AE8"/>
+  <!-- SL initials -->
+  <text x="256" y="268" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="36" fill="#131519">SL</text>
+</svg>

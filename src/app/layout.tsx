@@ -1,12 +1,27 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/app/globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { BootstrapGate } from "@/components/layout/bootstrap-gate";
+import { RegisterSW } from "@/components/layout/register-sw";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 
 export const metadata: Metadata = {
   title: "Strength Log",
-  description: "Mobile-first personal strength workout tracker"
+  description: "Mobile-first personal strength workout tracker",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Strength Log",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#131519",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const ThemeScript = () => (
@@ -31,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <head>
         <ThemeScript />
+        <link rel="apple-touch-icon" href="/icon-512.svg" />
       </head>
       <body>
         <ThemeProvider>
@@ -38,7 +54,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <BootstrapGate>{children}</BootstrapGate>
           </AppShell>
         </ThemeProvider>
+        <RegisterSW />
       </body>
     </html>
   );
 }
+

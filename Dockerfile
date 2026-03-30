@@ -46,6 +46,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install prisma and tsx globally so the entrypoint can unconditionally use them without fighting symlinks
+RUN npm install -g prisma@6.4.1 tsx
+
 # Non-root user for safety
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
@@ -53,19 +56,9 @@ RUN addgroup --system --gid 1001 nodejs \
 # ── Next.js standalone server ────────────────────────────────────────────────
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/public* ./public/
 
 # ── Prisma: client binary + schema + migrations ──────────────────────────────
-# The generated client is already bundled inside standalone/node_modules,
-# but we also need the query engine binary and the CLI for migrate/seed.
-COPY --from=builder /app/node_modules/.prisma          ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma          ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma           ./node_modules/prisma
-
-# Seed script dependencies
-COPY --from=builder /app/node_modules/tsx              ./node_modules/tsx
-COPY --from=builder /app/node_modules/.bin/tsx         ./node_modules/.bin/tsx
-
 # Stage migration files and schema separately from the volume mount path,
 # so the entrypoint can copy them in on every start (handles new migrations).
 COPY --from=builder /app/prisma/migrations /app/prisma_migrations_staging

@@ -9,10 +9,20 @@ export function useDbBootstrap() {
 
   useEffect(() => {
     let mounted = true;
-    ensureBootstrapped().then(async () => {
-      await bootstrapFromServer();
-      if (mounted) setReady(true);
-    });
+
+    async function initDb() {
+      try {
+        await ensureBootstrapped();
+        await bootstrapFromServer();
+      } catch (error) {
+        console.error("Critical error during database bootstrap:", error);
+      } finally {
+        if (mounted) setReady(true);
+      }
+    }
+
+    initDb();
+
     return () => {
       mounted = false;
     };

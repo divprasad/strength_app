@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4A7AE8" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#131519" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="92" fill="#131519"/>
+  <!-- Ambient glow -->
+  <circle cx="256" cy="256" r="200" fill="url(#glow)"/>
+  <!-- Vertical bar -->
+  <rect x="242" y="130" width="28" height="252" rx="14" fill="#4A7AE8" opacity="0.55"/>
+  <!-- Top plate (wide) -->
+  <rect x="178" y="112" width="156" height="44" rx="12" fill="#4A7AE8"/>
+  <!-- Bottom plate (wide) -->
+  <rect x="178" y="356" width="156" height="44" rx="12" fill="#4A7AE8"/>
+  <!-- Subtle S letter in bottom right -->
+  <text x="404" y="432" font-family="system-ui, sans-serif" font-weight="700" font-size="64" fill="#4A7AE8" opacity="0.15">S</text>
+</svg>

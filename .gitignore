@@ -57,3 +57,10 @@ AFTER_LOGGING.json
 /debugging_scripts/
 # dev test databases
 *dev_docker.db*
+
+# caddy exported cert
+caddy-root.crt
+
+# AI/IDE configs
+.codex
+Caddyfile

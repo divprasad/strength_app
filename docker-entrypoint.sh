@@ -27,7 +27,7 @@ mkdir -p "${PRISMA_VOLUME}/migrations"
 # Copy any new migration folders from the staging area baked into the image.
 # rsync-style: only adds/updates, never deletes existing migration history.
 if [ -d "${MIGRATIONS_STAGING}" ]; then
-  cp -rn "${MIGRATIONS_STAGING}/." "${PRISMA_VOLUME}/migrations/" 2>/dev/null || true
+  cp -R "${MIGRATIONS_STAGING}/"* "${PRISMA_VOLUME}/migrations/" 2>/dev/null || true
 fi
 
 # Always ensure the schema and lock file are current in the volume
@@ -49,7 +49,7 @@ npx prisma migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
 # ── Seed on fresh install only ───────────────────────────────────────────────
 if [ "$FRESH_DB" = "true" ]; then
   echo "[entrypoint] Fresh database detected — seeding default data..."
-  npx prisma db seed
+  npx tsx prisma/seed.ts
 else
   echo "[entrypoint] Existing database found — skipping seed."
 fi
