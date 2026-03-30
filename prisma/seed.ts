@@ -39,7 +39,7 @@ async function main() {
 
   // Fetch created muscles to get IDs
   const allMuscles = await prisma.muscleGroup.findMany();
-  const getMuscleId = (name: string) => allMuscles.find((m: any) => m.name === name)?.id || "";
+  const getMuscleId = (name: string) => allMuscles.find((m) => m.name === name)?.id || "";
 
   const defaultExercises = [
     {
