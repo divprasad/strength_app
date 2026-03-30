@@ -41,14 +41,14 @@ if [ ! -f "${DB_PATH}" ]; then
   echo "[entrypoint] No existing dev.db found — fresh install."
 fi
 
-# ── Ensure dev.db is writable by this process ────────────────────────────────
-# When the Docker volume is pre-populated from a host bind-mount or a previous
-# container with a different UID, the file may be owned by root or UID 501
-# (the macOS host user), making it read-only to the nextjs runtime user.
-# This one-time repair idempotently fixes ownership and permissions.
+# ── Ensure dev.db is writable by the nextjs user ─────────────────────────────
+# This entrypoint runs as root so we can safely chown before dropping privileges.
+# Handles the case where dev.db was seeded by a macOS host (UID 501) or a
+# previous container with a mismatched UID, making it unwritable at runtime.
 if [ -f "${DB_PATH}" ]; then
-  echo "[entrypoint] Ensuring dev.db is writable..."
-  chmod 664 "${DB_PATH}" 2>/dev/null || true
+  echo "[entrypoint] Fixing ownership of dev.db..."
+  chown nextjs:nodejs "${DB_PATH}"
+  chmod 664 "${DB_PATH}"
 fi
 
 # ── Apply migrations ─────────────────────────────────────────────────────────
@@ -64,5 +64,5 @@ else
   echo "[entrypoint] Existing database found — skipping seed."
 fi
 
-echo "[entrypoint] Starting Next.js server..."
-exec node server.js
+echo "[entrypoint] Starting Next.js server as nextjs user..."
+exec su-exec nextjs node server.js

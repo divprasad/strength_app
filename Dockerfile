@@ -47,7 +47,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install prisma and tsx globally so the entrypoint can unconditionally use them without fighting symlinks
-RUN npm install -g prisma@6.4.1 tsx
+# su-exec is used by the entrypoint to fix file ownership (root) then drop to nextjs before exec
+RUN apk add --no-cache su-exec \
+ && npm install -g prisma@6.4.1 tsx
 
 # Non-root user for safety
 RUN addgroup --system --gid 1001 nodejs \
@@ -77,10 +79,12 @@ COPY --from=builder /app/tsconfig.json /app/tsconfig.json
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# /app/prisma is the volume mount point — nextjs user needs write access
-RUN mkdir -p /app/prisma && chown -R nextjs:nodejs /app/prisma
+# /app/prisma is the volume mount point — nextjs user needs write access to it at runtime
+# (ownership of dev.db itself is fixed by the entrypoint as root before dropping privileges)
+RUN mkdir -p /app/prisma && chown nextjs:nodejs /app/prisma
 
-USER nextjs
+# Run entrypoint as root so it can fix dev.db ownership; it drops to nextjs via su-exec
+# USER nextjs  ← intentionally removed; privilege drop happens in docker-entrypoint.sh
 
 EXPOSE 3000
 ENV PORT=3000
