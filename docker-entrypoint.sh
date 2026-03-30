@@ -41,6 +41,16 @@ if [ ! -f "${DB_PATH}" ]; then
   echo "[entrypoint] No existing dev.db found — fresh install."
 fi
 
+# ── Ensure dev.db is writable by this process ────────────────────────────────
+# When the Docker volume is pre-populated from a host bind-mount or a previous
+# container with a different UID, the file may be owned by root or UID 501
+# (the macOS host user), making it read-only to the nextjs runtime user.
+# This one-time repair idempotently fixes ownership and permissions.
+if [ -f "${DB_PATH}" ]; then
+  echo "[entrypoint] Ensuring dev.db is writable..."
+  chmod 664 "${DB_PATH}" 2>/dev/null || true
+fi
+
 # ── Apply migrations ─────────────────────────────────────────────────────────
 echo "[entrypoint] Running prisma migrate deploy..."
 cd /app
