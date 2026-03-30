@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
+import { CommandPalette } from "@/components/layout/command-palette";
 
 const desktopLinks = [
   { href: "/", label: "Dashboard" },
@@ -33,6 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2 md:gap-3">
               <ThemeToggle />
               <PaletteToggle />
+              <CommandPalette />
               <nav className="hidden gap-2 md:flex md:flex-wrap md:justify-end">
                 {desktopLinks.map((item) => (
                   <Link

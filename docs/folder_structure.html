@@ -40,7 +40,10 @@
 │   ├── manifest.json     # PWA Installer Configuration
 │   └── sw.js             # Service Worker for offline caching
 └── src/
-    ├── app/              # Next.js App Router (Pages & Background API)
+    ├── app/
+    │   ├── manifest.ts   # PWA manifest (standalone display, theme)
+    │   ├── sw.ts         # Serwist service worker (precache + runtime cache)
+    │   └── api/          # Server API routes (workouts, exercises, muscles)
     ├── components/       # Interface layer (React components)
     ├── hooks/            # Custom logic loops specific to React
     ├── lib/              # The "Brain" (Database config, Sync Engines, Utils)

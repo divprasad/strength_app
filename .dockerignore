@@ -8,6 +8,7 @@ node_modules
 prisma/dev.db
 prisma/dev.db-journal
 prisma/db_backup_*
+backups/
 
 # Dev / test artifacts
 data/

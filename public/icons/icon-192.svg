@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="34.56" fill="#131519"/>
+  <!-- Bar -->
+  <rect x="53.760000000000005" y="88.32" width="84.48" height="15.36" rx="7.68" fill="#4A7AE8" opacity="0.7"/>
+  <!-- Left plate -->
+  <circle cx="53.760000000000005" cy="96" r="42.24" fill="none" stroke="#4A7AE8" stroke-width="7.68"/>
+  <circle cx="53.760000000000005" cy="96" r="23.232000000000003" fill="#4A7AE8" opacity="0.15"/>
+  <!-- Right plate -->
+  <circle cx="138.24" cy="96" r="42.24" fill="none" stroke="#4A7AE8" stroke-width="7.68"/>
+  <circle cx="138.24" cy="96" r="23.232000000000003" fill="#4A7AE8" opacity="0.15"/>
+  <!-- Center grip lines -->
+  <rect x="84.48" y="84.48" width="3.84" height="23.04" rx="0.96" fill="#4A7AE8" opacity="0.4"/>
+  <rect x="94.08" y="84.48" width="3.84" height="23.04" rx="0.96" fill="#4A7AE8" opacity="0.4"/>
+  <rect x="103.68" y="84.48" width="3.84" height="23.04" rx="0.96" fill="#4A7AE8" opacity="0.4"/>
+</svg>

@@ -54,7 +54,7 @@ fi
 # ── Apply migrations ─────────────────────────────────────────────────────────
 echo "[entrypoint] Running prisma migrate deploy..."
 cd /app
-npx prisma migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
+node /app/node_modules/prisma/build/index.js migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
 
 # ── Seed on fresh install only ───────────────────────────────────────────────
 if [ "$FRESH_DB" = "true" ]; then

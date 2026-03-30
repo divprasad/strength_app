@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
     
     // The workspace convention lists prisma/dev.db as the standard database location
     const sourceDbPath = path.join(process.cwd(), "prisma", "dev.db");
-    const backupPath = path.join(process.cwd(), "prisma", backupFilename);
+    
+    // Ensure the backups directory exists
+    const backupDir = path.join(process.cwd(), "backups");
+    await fs.mkdir(backupDir, { recursive: true }).catch(() => {});
+    
+    const backupPath = path.join(backupDir, backupFilename);
 
     // Attempt the backup (fails silently so it doesn't break the sync if db is locked/missing)
     await fs.access(sourceDbPath);

@@ -1,6 +1,6 @@
 import { endOfWeek, format, parseISO, startOfWeek } from "date-fns";
 import { db } from "@/lib/db";
-import { createId, nowIso } from "@/lib/utils";
+import { createId, localDateIso, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise, WorkoutStatus } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { processSyncQueue, flushSyncQueue } from "@/lib/syncEngine";
@@ -492,4 +492,24 @@ export async function deleteWorkout(workoutId: string): Promise<void> {
     await db.workoutExercises.bulkDelete(workoutExercises.map((we) => we.id));
     await db.workouts.delete(workoutId);
   });
+}
+
+/* ─── Command Palette convenience wrappers ─── */
+
+export async function quickCreateExercise(name: string): Promise<Exercise> {
+  return createExercise({
+    name,
+    primaryMuscleIds: [],
+    secondaryMuscleIds: [],
+  });
+}
+
+export async function quickStartWorkout(name?: string): Promise<Workout> {
+  const date = localDateIso(new Date());
+  const workout = await createWorkoutForDate(date);
+  if (name) {
+    await updateWorkout(workout.id, { name });
+  }
+  const started = await startWorkoutSessionForWorkout(workout.id);
+  return started ?? workout;
 }

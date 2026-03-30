@@ -17,7 +17,7 @@ The core infrastructure uses a **Local-First Sync Architecture**. The app remain
 
 ## Current development status
 
-The app is functionally complete and boasts a highly reliable architectural foundation:
+The app is functionally complete, fully installable as a PWA, and deployable via Docker:
 
 - **Progressive Web App (PWA):** Installs natively to Android/iOS desktops via modern Service Workers, skipping the app store entirely. Boots instantly with no browser UI padding.
 - **Local-Network Docker Hosting:** Runs silently via Docker container on any home NAS or Pi network (`docker-compose up -d`), persisting SQLite tightly via `db-data` named volumes.
@@ -64,7 +64,7 @@ Four detailed static HTML reference files are available inside the `/docs` direc
 - A centralized API route at `src/app/api/workouts/route.ts` handles the unified `WorkoutBundle` payload via atomic Prisma `$transaction` upserts, preventing zombie rows.
 - SQLite acts as the final persistent ledger. 
 
-## Local setup
+## Local setup (development)
 
 ### Via Docker (Recommended for PWA hosting)
 
@@ -92,7 +92,7 @@ npm run dev
 npm run check
 ```
 
-## Future Stabilization roadmap
+## Docker deployment (production)
 
 With backend persistence and infrastructure formally secured via Docker and PWA, the primary architecture is stable. The remaining trajectory focuses on opening the app's functionality:
 
