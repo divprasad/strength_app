@@ -10,7 +10,7 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
-  allowedDevOrigins: ["192.168.2.202"],
+  allowedDevOrigins: ["192.168.2.202", "127.0.0.1"],
 };
 
 export default withSerwist(nextConfig);
