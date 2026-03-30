@@ -29,17 +29,16 @@
                 
                 <div class="bg-slate-800 text-slate-200 p-6 rounded-2xl font-mono text-sm shadow-inner overflow-x-auto">
 <pre><code>antigravity_strength/
-├── Dockerfile            # Multi-stage production build (Node 20 Alpine)
-├── docker-compose.yml    # Single-service config with named volume
-├── docker-entrypoint.sh  # Migration, seed, and server boot script
+├── docker-compose.yml    # Orchestrates local hosting and storage
+├── Dockerfile            # Builds the Next.js production image
 ├── docs/                 # Documentation (You are reading this!)
 ├── prisma/               # Database definitions and active SQLite files
 │   ├── dev.db            # The local database
 │   ├── schema.prisma     # The SQL definitions mapped to TypeScript
 │   └── migrations/       # SQL history
-├── public/
-│   └── icons/            # PWA launcher icons (SVG + PNG at 192/512px)
-├── scripts/              # Utility scripts (icon generation, DB diagnostics)
+├── public/               # Static assets (images, icons, manifest config)
+│   ├── manifest.json     # PWA Installer Configuration
+│   └── sw.js             # Service Worker for offline caching
 └── src/
     ├── app/
     │   ├── manifest.ts   # PWA manifest (standalone display, theme)

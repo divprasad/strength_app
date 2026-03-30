@@ -19,8 +19,9 @@ The core infrastructure uses a **Local-First Sync Architecture**. The app remain
 
 The app is functionally complete, fully installable as a PWA, and deployable via Docker:
 
-- **Progressive Web App:** Installable to any phone's home screen via Serwist service workers. Boots instantly offline with precached bundles.
-- **Docker Self-Hosting:** A multi-stage `Dockerfile` + `docker-compose.yml` produces a lean ~180 MB image that runs on any local network device (NAS, Raspberry Pi, laptop).
+- **Progressive Web App (PWA):** Installs natively to Android/iOS desktops via modern Service Workers, skipping the app store entirely. Boots instantly with no browser UI padding.
+- **Local-Network Docker Hosting:** Runs silently via Docker container on any home NAS or Pi network (`docker-compose up -d`), persisting SQLite tightly via `db-data` named volumes.
+- **Global Command Palette:** Keyboard-friendly (`Cmd+K`) unified navigation and fast-action menu for blazing-fast workflow jumping.
 - **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
 - **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
 - **Automated DB Backups:** Every successful server sync automatically commands the server to duplicate the SQLite `dev.db` locally as a fallback measure.
@@ -65,63 +66,41 @@ Four detailed static HTML reference files are available inside the `/docs` direc
 
 ## Local setup (development)
 
-1. Install dependencies:
+### Via Docker (Recommended for PWA hosting)
 
-```bash
-npm install
-```
-
-2. Start the app:
-
-```bash
-npm run dev
-```
-
-3. Run checks:
-
-```bash
-npm run typecheck
-npm run lint
-npm run test:unit
-npm run test:e2e
-npm run build
-```
-
-## Docker deployment (production)
-
-Build and start the container:
+To emulate the production environment serving the Progressive Web App locally via port 3400:
 
 ```bash
 docker compose up --build -d
 ```
+*(Tip: In Brave/Chrome Android, navigate to `brave://flags` and explicitly allow `http://<your-local-ip>:3400` under "Insecure origins treated as secure" to trigger the PWA Install prompt on your local home Wi-Fi!)*
 
-The app will be available at `http://localhost:3000`. The SQLite database is persisted in a named Docker volume (`db-data`) and survives container rebuilds.
+### Via local Node (Development)
 
-To stop:
-
+1. Install dependencies:
 ```bash
-docker compose down
+npm ci
 ```
 
-To view logs:
-
+2. Start the app:
 ```bash
-docker compose logs -f strength-log
+npm run dev
 ```
 
-## Roadmap
+3. Run automated checks:
+```bash
+npm run check
+```
 
-### ✅ Phase 1 — PWA Transformation (shipped)
-The app is a fully installable PWA via Serwist service workers. Manifest, icons, and offline caching are complete.
+## Docker deployment (production)
 
-### ✅ Phase 2 — Local-Network Backend Hosting (shipped)
-Dockerized with a multi-stage build, named volumes for SQLite persistence, and an entrypoint that handles migrations and seeding.
+With backend persistence and infrastructure formally secured via Docker and PWA, the primary architecture is stable. The remaining trajectory focuses on opening the app's functionality:
 
-### ◆ Phase 3 — Production Hardening (in progress)
-- **Sync Status UI:** User-facing sync indicator and failure notifications.
-- **Docker Smoke Testing:** End-to-end validation on target hardware.
-- **Test Coverage Expansion:** E2E tests for Exercises UI, command palette, PWA install flow.
-- **Bundle Optimization:** Static route conversion and asset minification.
+### 1. Multi-User Accounts & Authentication
+Implementing multiple parallel user structures so family/friends sharing the same local URL can separate workloads. This will be protected by an **Offline 4-Digit PIN** mechanism stored in IndexedDB since standard cloud OAuth cannot bridge over a local disconnected home PWA smoothly.
+
+### 2. Production Clean-ups
+Minifying components, expanding test coverage across the newly tabbed Exercises interface, and adding user-facing UI toggles if background syncing fails consecutively.
 
 ## Automated checks
 

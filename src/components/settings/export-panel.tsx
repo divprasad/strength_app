@@ -84,34 +84,36 @@ export function ExportPanel() {
         }
       }
 
-      // 2. Clear and replace
+      // 2. Clear and replace atomically
       setStatus("Replacing local data...");
-      await db.muscles.clear();
-      await db.exercises.clear();
-      await db.workouts.clear();
-      await db.workoutExercises.clear();
-      await db.setEntries.clear();
-      await db.settings.clear();
+      await db.transaction("rw", [db.muscles, db.exercises, db.workouts, db.workoutExercises, db.setEntries, db.settings], async () => {
+        await db.muscles.clear();
+        await db.exercises.clear();
+        await db.workouts.clear();
+        await db.workoutExercises.clear();
+        await db.setEntries.clear();
+        await db.settings.clear();
 
-      await db.muscles.bulkPut(payload.muscleGroups);
-      await db.exercises.bulkPut(payload.exercises);
-      await db.workouts.bulkPut(
-        payload.workouts.map((workout) => {
-          const hasStarted = Boolean(workout.sessionStartedAt);
-          const hasEnded = Boolean(workout.sessionEndedAt);
-          const autoStatus = hasStarted ? (hasEnded ? "completed" : "active") : "draft";
+        await db.muscles.bulkPut(payload.muscleGroups);
+        await db.exercises.bulkPut(payload.exercises);
+        await db.workouts.bulkPut(
+          payload.workouts.map((workout) => {
+            const hasStarted = Boolean(workout.sessionStartedAt);
+            const hasEnded = Boolean(workout.sessionEndedAt);
+            const autoStatus = hasStarted ? (hasEnded ? "completed" : "active") : "draft";
 
-          return {
-            ...workout,
-            name: workout.name ?? `Workout ${workout.date}`,
-            userId: workout.userId ?? DEFAULT_USER_ID,
-            status: workout.status ?? autoStatus
-          };
-        })
-      );
-      await db.workoutExercises.bulkPut(payload.workoutExercises);
-      await db.setEntries.bulkPut(payload.setEntries);
-      await db.settings.put(payload.settings);
+            return {
+              ...workout,
+              name: workout.name ?? `Workout ${workout.date}`,
+              userId: workout.userId ?? DEFAULT_USER_ID,
+              status: workout.status ?? autoStatus
+            };
+          })
+        );
+        await db.workoutExercises.bulkPut(payload.workoutExercises);
+        await db.setEntries.bulkPut(payload.setEntries);
+        await db.settings.put(payload.settings);
+      });
 
       // Normalize exercise order for all imported workouts to fix any existing corruption
       for (const workout of payload.workouts) {

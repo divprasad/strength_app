@@ -34,6 +34,16 @@ export async function processSyncQueue(): Promise<void> {
 }
 
 /**
+ * Like processSyncQueue, but forces execution even if a previous run is still
+ * marked as in-progress (e.g. from a prior stale call). Used by syncAllWorkouts
+ * to guarantee the queue is fully drained before the caller returns.
+ */
+export async function flushSyncQueue(): Promise<void> {
+  isProcessing = false; // Reset guard so we always run
+  await processSyncQueue();
+}
+
+/**
  * Builds the workout bundle and POSTs to the server.
  */
 async function pushWorkoutToServer(workoutId: string): Promise<boolean> {

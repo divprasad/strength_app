@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4A7AE8"/>
+      <stop offset="100%" stop-color="#2E54B0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="92" fill="#131519"/>
+  <!-- Hex weight plates (like real rubber hex dumbbells) -->
+  <g fill="url(#hg)">
+    <!-- Left hex plate -->
+    <polygon points="166,196 206,176 246,196 246,316 206,336 166,316" opacity="0.85"/>
+    <!-- Right hex plate -->
+    <polygon points="266,196 306,176 346,196 346,316 306,336 266,316" opacity="0.85"/>
+  </g>
+  <!-- Bar connecting them -->
+  <rect x="246" y="242" width="20" height="28" rx="4" fill="#4A7AE8" opacity="0.5"/>
+  <!-- Grip texture -->
+  <line x1="250" y1="250" x2="262" y2="250" stroke="#131519" stroke-width="2" opacity="0.3"/>
+  <line x1="250" y1="256" x2="262" y2="256" stroke="#131519" stroke-width="2" opacity="0.3"/>
+  <line x1="250" y1="262" x2="262" y2="262" stroke="#131519" stroke-width="2" opacity="0.3"/>
+</svg>

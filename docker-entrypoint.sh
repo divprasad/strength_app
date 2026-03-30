@@ -27,7 +27,7 @@ mkdir -p "${PRISMA_VOLUME}/migrations"
 # Copy any new migration folders from the staging area baked into the image.
 # rsync-style: only adds/updates, never deletes existing migration history.
 if [ -d "${MIGRATIONS_STAGING}" ]; then
-  cp -rn "${MIGRATIONS_STAGING}/." "${PRISMA_VOLUME}/migrations/" 2>/dev/null || true
+  cp -R "${MIGRATIONS_STAGING}/"* "${PRISMA_VOLUME}/migrations/" 2>/dev/null || true
 fi
 
 # Always ensure the schema and lock file are current in the volume
@@ -41,6 +41,16 @@ if [ ! -f "${DB_PATH}" ]; then
   echo "[entrypoint] No existing dev.db found — fresh install."
 fi
 
+# ── Ensure dev.db is writable by the nextjs user ─────────────────────────────
+# This entrypoint runs as root so we can safely chown before dropping privileges.
+# Handles the case where dev.db was seeded by a macOS host (UID 501) or a
+# previous container with a mismatched UID, making it unwritable at runtime.
+if [ -f "${DB_PATH}" ]; then
+  echo "[entrypoint] Fixing ownership of dev.db..."
+  chown nextjs:nodejs "${DB_PATH}"
+  chmod 664 "${DB_PATH}"
+fi
+
 # ── Apply migrations ─────────────────────────────────────────────────────────
 echo "[entrypoint] Running prisma migrate deploy..."
 cd /app
@@ -49,10 +59,10 @@ node /app/node_modules/prisma/build/index.js migrate deploy --schema="${PRISMA_V
 # ── Seed on fresh install only ───────────────────────────────────────────────
 if [ "$FRESH_DB" = "true" ]; then
   echo "[entrypoint] Fresh database detected — seeding default data..."
-  node /app/node_modules/prisma/build/index.js db seed
+  npx tsx prisma/seed.ts
 else
   echo "[entrypoint] Existing database found — skipping seed."
 fi
 
-echo "[entrypoint] Starting Next.js server..."
-exec node server.js
+echo "[entrypoint] Starting Next.js server as nextjs user..."
+exec su-exec nextjs node server.js

@@ -55,6 +55,12 @@
                 <p class="text-slate-700">Whenever a device successfully pushes new mutations to the Next.js API, the server executes an instantaneous filesystem copy of <code>dev.db</code> before applying the transaction. These backups are stored locally in the <code>/prisma/</code> directory with exact timestamp definitions, providing the user an easy rollback vector if local data corruption is inadvertently pushed upstream.</p>
             </section>
 
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">Application Initialization</h2>
+                <p class="text-slate-700">When the PWA routes a user to the interface, we utilize strict client-side data gating to ensure consistency. The <code>useDbBootstrap</code> hook forces the UI into a loading state until it can securely access IndexedDB to verify core structural records (like generic Muscle Groups and standard Exercises) exist.</p>
+                <p class="text-slate-700">To prevent infinite hanging if a user's browser cache is corrupted or multiple service workers collide, this initialization is heavily armored with <code>try/catch/finally</code> boundaries that explicitly resolve the React component, displaying fallback error states rather than silently freezing the app.</p>
+            </section>
+
         </main>
     </div>
 </body>

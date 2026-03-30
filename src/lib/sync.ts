@@ -26,21 +26,42 @@ export async function bootstrapExercises(): Promise<void> {
 }
 
 export async function bootstrapFromServer(): Promise<void> {
-  try {
-    await bootstrapMuscles();
-    await bootstrapExercises();
+  // ── 1. Fetch ALL data from server first (network phase) ──────────────
+  const [muscleRes, exerciseRes, workoutRes] = await Promise.all([
+    fetch(MUSCLE_API_PATH),
+    fetch(EXERCISE_API_PATH),
+    fetch(WORKOUT_API_PATH),
+  ]);
 
-    const response = await fetch(WORKOUT_API_PATH);
-    if (!response.ok) throw new Error("Failed to fetch from server");
+  if (!muscleRes.ok) throw new Error("Failed to fetch muscles");
+  if (!exerciseRes.ok) throw new Error("Failed to fetch exercises");
+  if (!workoutRes.ok) throw new Error("Failed to fetch workouts");
 
-    const data = await response.json();
-    const serverWorkouts = data.workouts;
+  const { muscles } = await muscleRes.json();
+  const { exercises: rawExercises } = await exerciseRes.json();
+  const { workouts: serverWorkouts } = await workoutRes.json();
 
-    if (!serverWorkouts || serverWorkouts.length === 0) return;
+  const exercises = rawExercises.map(
+    (e: { primaryMuscleIds: string | string[]; secondaryMuscleIds: string | string[] }) => ({
+      ...e,
+      primaryMuscleIds: typeof e.primaryMuscleIds === "string" ? JSON.parse(e.primaryMuscleIds) : e.primaryMuscleIds,
+      secondaryMuscleIds: typeof e.secondaryMuscleIds === "string" ? JSON.parse(e.secondaryMuscleIds) : e.secondaryMuscleIds,
+    })
+  );
 
-    await db.transaction("rw", [db.workouts, db.workoutExercises, db.setEntries], async () => {
+  // ── 2. Write ALL data in one atomic transaction ──────────────────────
+  //    This ensures useLiveQuery never observes partial state
+  //    (e.g. workouts without their exercise definitions).
+  await db.transaction(
+    "rw",
+    [db.muscles, db.exercises, db.workouts, db.workoutExercises, db.setEntries],
+    async () => {
+      await db.muscles.bulkPut(muscles);
+      await db.exercises.bulkPut(exercises);
+
+      if (!serverWorkouts || serverWorkouts.length === 0) return;
+
       for (const sw of serverWorkouts) {
-        // 1. Put Workout
         await db.workouts.put({
           id: sw.id,
           name: sw.name,
@@ -54,7 +75,6 @@ export async function bootstrapFromServer(): Promise<void> {
           updatedAt: sw.updatedAt,
         });
 
-        // 2. Put Exercises
         for (const se of sw.exercises) {
           await db.workoutExercises.put({
             id: se.id,
@@ -66,7 +86,6 @@ export async function bootstrapFromServer(): Promise<void> {
             completedAt: se.completedAt,
           });
 
-          // 3. Put Sets
           for (const s of se.sets) {
             await db.setEntries.put({
               id: s.id,
@@ -83,10 +102,9 @@ export async function bootstrapFromServer(): Promise<void> {
           }
         }
       }
-    });
+    }
+  );
 
-    console.log(`Bootstrapped ${serverWorkouts.length} workouts from server.`);
-  } catch (error) {
-    console.error("Bootstrap from server failed:", error);
-  }
+  console.log(`Bootstrapped ${muscles.length} muscles, ${exercises.length} exercises, ${serverWorkouts?.length ?? 0} workouts from server.`);
 }
+

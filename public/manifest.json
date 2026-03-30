@@ -1,0 +1,17 @@
+{
+  "name": "Strength Log",
+  "short_name": "Strength",
+  "description": "Mobile-first personal strength workout tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131519",
+  "theme_color": "#131519",
+  "icons": [
+    {
+      "src": "/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

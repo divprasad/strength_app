@@ -46,6 +46,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install prisma and tsx globally so the entrypoint can unconditionally use them without fighting symlinks
+# su-exec is used by the entrypoint to fix file ownership (root) then drop to nextjs before exec
+RUN apk add --no-cache su-exec \
+ && npm install -g prisma@6.4.1 tsx
+
 # Non-root user for safety
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
@@ -53,18 +58,9 @@ RUN addgroup --system --gid 1001 nodejs \
 # ── Next.js standalone server ────────────────────────────────────────────────
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/public* ./public/
 
 # ── Prisma: client binary + schema + migrations ──────────────────────────────
-# The generated client is already bundled inside standalone/node_modules,
-# but we also need the query engine binary and the CLI for migrate/seed.
-COPY --from=builder /app/node_modules/.prisma          ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma          ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma           ./node_modules/prisma
-
-# Seed script dependencies — install tsx globally (avoids symlink copy issues)
-RUN npm install -g tsx
-
 # Stage migration files and schema separately from the volume mount path,
 # so the entrypoint can copy them in on every start (handles new migrations).
 COPY --from=builder /app/prisma/migrations /app/prisma_migrations_staging
@@ -83,13 +79,12 @@ COPY --from=builder /app/tsconfig.json /app/tsconfig.json
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# /app/prisma is the volume mount point — nextjs user needs write access
-RUN mkdir -p /app/prisma && chown -R nextjs:nodejs /app/prisma
+# /app/prisma is the volume mount point — nextjs user needs write access to it at runtime
+# (ownership of dev.db itself is fixed by the entrypoint as root before dropping privileges)
+RUN mkdir -p /app/prisma && chown nextjs:nodejs /app/prisma
 
-# /app/backups for safe exports to the host machine
-RUN mkdir -p /app/backups && chown -R nextjs:nodejs /app/backups
-
-USER nextjs
+# Run entrypoint as root so it can fix dev.db ownership; it drops to nextjs via su-exec
+# USER nextjs  ← intentionally removed; privilege drop happens in docker-entrypoint.sh
 
 EXPOSE 3000
 ENV PORT=3000

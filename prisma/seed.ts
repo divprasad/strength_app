@@ -1,13 +1,21 @@
-import { prisma } from "../src/lib/prisma";
-import { createStableId } from "../src/lib/utils";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
+function createStableId(prefix: string, seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(8, "0");
+  return `${prefix}_static_${hex}`;
+}
 async function main() {
   console.log("Seeding defaults...");
 
-  // Clear existing data to ensure stable IDs take effect
-  await prisma.setEntry.deleteMany();
-  await prisma.workoutExercise.deleteMany();
-  await prisma.workout.deleteMany();
+  // Only clear reference data (muscles + exercises). Never delete workouts —
+  // those are user data that must survive re-seeding.
   await prisma.exercise.deleteMany();
   await prisma.muscleGroup.deleteMany();
 
@@ -29,7 +37,7 @@ async function main() {
 
   // Fetch created muscles to get IDs
   const allMuscles = await prisma.muscleGroup.findMany();
-  const getMuscleId = (name: string) => allMuscles.find(m => m.name === name)?.id || "";
+  const getMuscleId = (name: string) => allMuscles.find((m) => m.name === name)?.id || "";
 
   const defaultExercises = [
     {

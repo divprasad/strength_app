@@ -4,7 +4,7 @@ services:
     container_name: strength-log
     restart: unless-stopped
     ports:
-      - "4000:3000"
+      - "3400:3000"
     volumes:
       # Named volume: survives container teardown and rebuilds.
       # Maps to /app/prisma inside the container, which is where

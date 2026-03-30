@@ -26,47 +26,51 @@
             
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-emerald-500">✓ Phase 1</span> PWA Transformation
-                    <span class="ml-auto text-sm font-normal text-slate-400">Shipped Mar 29, 2026</span>
+                    <span class="text-emerald-500 line-through decoration-2">Phase 1</span> <span class="text-slate-900">PWA Transformation [COMPLETED]</span>
                 </h2>
-                <div class="space-y-3 text-slate-700 bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100">
-                    <p>The application is a fully installable Progressive Web App via <strong>Serwist</strong>, a modern service worker toolkit built on Google's Workbox.</p>
+                <div class="space-y-3 text-slate-700">
+                    <p>To achieve a "snappy and responsive" app natively over Android, we bypass the app store entirely by completing a Progressive Web App implementation.</p>
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>Manifest File:</strong> A <code>manifest.ts</code> injected via Next.js provides standard launcher icon parameters, standalone display configuration (hiding the URL bar), and custom theme colors (#131519).</li>
-                        <li><strong>Service Workers:</strong> Serwist precaches all static bundles and applies runtime caching strategies. Combined with Dexie managing the data layer, the application boots instantly from Android/iOS desktops without requiring a network handshake.</li>
-                        <li><strong>App Icons:</strong> SVG source icons with a generated PNG set at 192px and 512px (including maskable variants and Apple Touch icons) stored in <code>public/icons/</code>.</li>
+                        <li><strong>Manifest File:</strong> Created a `manifest.json` injected via Next.js to provide standard launcher icon parameters and standalone display configurations.</li>
+                        <li><strong>Service Workers:</strong> Cached the static `.js` routing bundles locally via `sw.js` (cache-first static, network-first SSR).</li>
                     </ul>
                 </div>
             </section>
 
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-emerald-500">✓ Phase 2</span> Local-Network Backend Hosting
-                    <span class="ml-auto text-sm font-normal text-slate-400">Shipped Mar 29, 2026</span>
+                    <span class="text-emerald-500 line-through decoration-2">Phase 2</span> <span class="text-slate-900">Local-Network Backend Hosting [COMPLETED]</span>
                 </h2>
-                <div class="space-y-3 text-slate-700 bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100">
-                    <p>The application is fully Dockerized for self-hosted deployment on any local network device.</p>
+                <div class="space-y-3 text-slate-700">
+                    <p>Because there is no authentication mechanism needed yet, the endpoint lives fully locally on the host network.</p>
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>Dockerization:</strong> A multi-stage <code>Dockerfile</code> (deps → builder → runner) on Node 20 Alpine produces a lean ~180 MB image. A <code>docker-compose.yml</code> manages the single service with a named volume (<code>db-data</code>) persisting the SQLite database across container rebuilds.</li>
-                        <li><strong>Entrypoint Automation:</strong> The <code>docker-entrypoint.sh</code> script handles fresh migration syncing, <code>prisma migrate deploy</code>, conditional seeding on first boot, and then starts the Next.js standalone server.</li>
-                        <li><strong>Tailscale / VPN Proxy:</strong> The containerized app runs on port 3000, accessible from any device on the local network. For gym access outside the home, a Tailscale mesh VPN provides secure connectivity without domain purchases or public ingress.</li>
+                        <li><strong>Dockerization:</strong> Containerized the `next start` command along with a named persistent volume mapping for the `prisma/dev.db` file (`db-data`).</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3 bg-blue-50/50 p-2 rounded-lg">
+                    <span class="text-blue-600">Phase 3</span> Multi-User & Offline PIN Auth
+                </h2>
+                <div class="space-y-3 text-slate-700 px-2">
+                    <p>Transitioning the app from a strictly single-player experience to a family/shared environment where multiple users can hit the same local server from different devices.</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
+                        <li><strong>Context Switching:</strong> Implementing user switching that partitions the local IndexedDB state by `userId`.</li>
+                        <li><strong>Local Auth:</strong> Creating an offline-capable 4-digit PIN lock screen so workouts stay private, validating against salted IndexedDB hashes rather than round-tripping to cloud OAuth.</li>
                     </ul>
                 </div>
             </section>
 
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-amber-500">◆ Phase 3</span> Production Hardening
-                    <span class="ml-auto text-sm font-normal text-slate-400">In Progress</span>
+                    <span class="text-slate-300">Phase 4</span> Production Clean-ups
                 </h2>
                 <div class="space-y-3 text-slate-700">
                     <p>With the PWA and Docker infrastructure shipped, the remaining work focuses on reliability, visibility, and polish for daily use.</p>
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>Sync Status UI:</strong> Adding a user-facing sync indicator in the app shell (green/amber/red) and surfacing toast notifications when background pushes to the server fail consecutively — eliminating silent data-loss anxiety.</li>
-                        <li><strong>End-to-End Docker Validation:</strong> Running through a full smoke test cycle on the target hardware: container boot → workout logging → sync push → backup verification → container restart → data persistence confirmation.</li>
-                        <li><strong>TypeScript Bundle Sweeping:</strong> Reviewing component logic and converting dynamic API routes to <code>force-static</code> wherever feasible to minimize rendering cycles.</li>
-                        <li><strong>Test Coverage Expansion:</strong> Adding targeted E2E and unit tests for the newly tabbed Exercises UI, the command palette actions, and the PWA install flow.</li>
-                        <li><strong>Asset Minification:</strong> Compressing UI constants and images to the smallest possible footprint for mobile load times.</li>
+                        <li><strong>TypeScript Bundle Sweeping:</strong> Reviewing existing component logic and converting completely dynamic Next.js API routes to `force-static` wherever feasible to minimize rendering cycles.</li>
+                        <li><strong>Robust Logging:</strong> Upgrading the silent database backup system built into `api/workouts/route.ts` to surface user-facing confirmation modals.</li>
                     </ul>
                 </div>
             </section>
