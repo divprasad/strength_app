@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { createId, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise, WorkoutStatus } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
-import { processSyncQueue } from "@/lib/syncEngine";
+import { processSyncQueue, flushSyncQueue } from "@/lib/syncEngine";
 
 
 function inferWorkoutStatus(workout: Pick<Workout, "sessionStartedAt" | "sessionEndedAt">): WorkoutStatus {
@@ -365,13 +365,28 @@ export async function syncAllExercises(): Promise<void> {
 
 /**
  * Pushes all local workouts to the server.
- * Note: This can be slow for large histories, but is useful for initial imports.
+ * Enqueues all workouts then flushes the queue synchronously,
+ * so callers can await actual completion (not just enqueuing).
  */
 export async function syncAllWorkouts(): Promise<void> {
   const workouts = await db.workouts.toArray();
   for (const workout of workouts) {
-    await enqueueSync(workout.id);
+    // Put directly into queue without triggering the deferred setTimeout
+    const existingJob = await db.syncQueue.get(workout.id);
+    if (!existingJob) {
+      await db.syncQueue.put({
+        id: workout.id,
+        action: "upsert",
+        status: "pending",
+        retryCount: 0,
+        createdAt: nowIso(),
+      });
+    } else if (existingJob.status === "failed") {
+      await db.syncQueue.update(workout.id, { status: "pending", retryCount: 0 });
+    }
   }
+  // Now flush the entire queue to completion before returning
+  await flushSyncQueue();
 }
 
 export async function checkServerSyncStatus(): Promise<boolean> {
