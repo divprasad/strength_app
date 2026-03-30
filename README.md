@@ -19,7 +19,9 @@ The core infrastructure uses a **Local-First Sync Architecture**. The app remain
 
 The app is functionally complete and boasts a highly reliable architectural foundation:
 
-- The web app UI works perfectly offline and is heavily optimized.
+- **Progressive Web App (PWA):** Installs natively to Android/iOS desktops via modern Service Workers, skipping the app store entirely. Boots instantly with no browser UI padding.
+- **Local-Network Docker Hosting:** Runs silently via Docker container on any home NAS or Pi network (`docker-compose up -d`), persisting SQLite tightly via `db-data` named volumes.
+- **Global Command Palette:** Keyboard-friendly (`Cmd+K`) unified navigation and fast-action menu for blazing-fast workflow jumping.
 - **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
 - **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
 - **Automated DB Backups:** Every successful server sync automatically commands the server to duplicate the SQLite `dev.db` locally as a fallback measure.
@@ -64,39 +66,40 @@ Four detailed static HTML reference files are available inside the `/docs` direc
 
 ## Local setup
 
-1. Install dependencies:
+### Via Docker (Recommended for PWA hosting)
+
+To emulate the production environment serving the Progressive Web App locally via port 3400:
 
 ```bash
-npm install
+docker compose up --build -d
+```
+*(Tip: In Brave/Chrome Android, navigate to `brave://flags` and explicitly allow `http://<your-local-ip>:3400` under "Insecure origins treated as secure" to trigger the PWA Install prompt on your local home Wi-Fi!)*
+
+### Via local Node (Development)
+
+1. Install dependencies:
+```bash
+npm ci
 ```
 
 2. Start the app:
-
 ```bash
 npm run dev
 ```
 
-3. Run checks:
-
+3. Run automated checks:
 ```bash
-npm run typecheck
-npm run lint
-npm run test:unit
-npm run test:e2e
-npm run build
+npm run check
 ```
 
 ## Future Stabilization roadmap
 
-With backend persistence formally accomplished via the sync queue, the final trajectory of the application focuses on turning it into a deployable, single-player native app experience:
+With backend persistence and infrastructure formally secured via Docker and PWA, the primary architecture is stable. The remaining trajectory focuses on opening the app's functionality:
 
-### 1. PWA Transformation
-Adding standard `manifest.json` configurations and Service Workers to cache routing files locally, effectively removing the browser URL bar when installed to an Android desktop.
+### 1. Multi-User Accounts & Authentication
+Implementing multiple parallel user structures so family/friends sharing the same local URL can separate workloads. This will be protected by an **Offline 4-Digit PIN** mechanism stored in IndexedDB since standard cloud OAuth cannot bridge over a local disconnected home PWA smoothly.
 
-### 2. Local-Network Backend Hosting
-Dockerizing the repository to run silently on a home NAS or Raspberry Pi on the local network rather than a public Vercel instance, securing the unauthenticated app.
-
-### 3. Production Clean-ups
+### 2. Production Clean-ups
 Minifying components, expanding test coverage across the newly tabbed Exercises interface, and adding user-facing UI toggles if background syncing fails consecutively.
 
 ## Automated checks

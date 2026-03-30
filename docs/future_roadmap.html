@@ -26,39 +26,50 @@
             
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-slate-300">Phase 1</span> PWA Transformation
+                    <span class="text-emerald-500 line-through decoration-2">Phase 1</span> <span class="text-slate-900">PWA Transformation [COMPLETED]</span>
                 </h2>
                 <div class="space-y-3 text-slate-700">
-                    <p>To achieve a "snappy and responsive" app natively over Android, we shouldn't build an `.apk`. We bypass the app store entirely by completing a Progressive Web App implementation.</p>
+                    <p>To achieve a "snappy and responsive" app natively over Android, we bypass the app store entirely by completing a Progressive Web App implementation.</p>
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>Manifest File:</strong> Creating a `manifest.json` injected via Next.js to provide standard launcher icon parameters, standalone display configurations (hiding the URL bar), and custom theme colors.</li>
-                        <li><strong>Service Workers:</strong> Caching the static `.js` routing bundles locally. With Dexie managing the data and Service Workers managing the frontend UI, the application will boot instantly from the Android desktop without requiring a network handshake.</li>
+                        <li><strong>Manifest File:</strong> Created a `manifest.json` injected via Next.js to provide standard launcher icon parameters and standalone display configurations.</li>
+                        <li><strong>Service Workers:</strong> Cached the static `.js` routing bundles locally via `sw.js` (cache-first static, network-first SSR).</li>
                     </ul>
                 </div>
             </section>
 
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-slate-300">Phase 2</span> Local-Network Backend Hosting
+                    <span class="text-emerald-500 line-through decoration-2">Phase 2</span> <span class="text-slate-900">Local-Network Backend Hosting [COMPLETED]</span>
                 </h2>
                 <div class="space-y-3 text-slate-700">
-                    <p>Because there is no authentication mechanism needed, hosting this on public Vercel/Render introduces security risks. The endpoint should live fully locally on the host network.</p>
+                    <p>Because there is no authentication mechanism needed yet, the endpoint lives fully locally on the host network.</p>
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>Dockerization:</strong> Containerizing the Next.js `npm run start` command along with the volume mapping for the `prisma/dev.db` file allows this app to persist indefinitely on a Raspberry Pi, Synology NAS, or any home server stack via port 3000.</li>
-                        <li><strong>Tailscale / VPN Proxy:</strong> Accessing the internal IP natively from an Android device while actively at the gym, leveraging Tailscale or a similar mesh proxy, completely avoiding domain purchase or external ingress management.</li>
+                        <li><strong>Dockerization:</strong> Containerized the `next start` command along with a named persistent volume mapping for the `prisma/dev.db` file (`db-data`).</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3 bg-blue-50/50 p-2 rounded-lg">
+                    <span class="text-blue-600">Phase 3</span> Multi-User & Offline PIN Auth
+                </h2>
+                <div class="space-y-3 text-slate-700 px-2">
+                    <p>Transitioning the app from a strictly single-player experience to a family/shared environment where multiple users can hit the same local server from different devices.</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
+                        <li><strong>Context Switching:</strong> Implementing user switching that partitions the local IndexedDB state by `userId`.</li>
+                        <li><strong>Local Auth:</strong> Creating an offline-capable 4-digit PIN lock screen so workouts stay private, validating against salted IndexedDB hashes rather than round-tripping to cloud OAuth.</li>
                     </ul>
                 </div>
             </section>
 
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
-                    <span class="text-slate-300">Phase 3</span> Production Clean-ups
+                    <span class="text-slate-300">Phase 4</span> Production Clean-ups
                 </h2>
                 <div class="space-y-3 text-slate-700">
                     <ul class="list-disc list-inside space-y-2 mt-2 ml-2">
-                        <li><strong>TypeScript Bundle Sweeping:</strong> Reviewing existing component logic and converting completely dynamic Next.js API routes to `force-static` wherever feasible to minimize rendering cycles constraint.</li>
-                        <li><strong>Asset Minification:</strong> Compressing existing UI constants into the smallest possible `Next/Image` and raw UI footprint.</li>
-                        <li><strong>Robust Logging:</strong> Upgrading the silent database backup system built into `api/workouts/route.ts` to surface user-facing confirmation modals if syncing to the home server repeatedly timeouts.</li>
+                        <li><strong>TypeScript Bundle Sweeping:</strong> Reviewing existing component logic and converting completely dynamic Next.js API routes to `force-static` wherever feasible to minimize rendering cycles.</li>
+                        <li><strong>Robust Logging:</strong> Upgrading the silent database backup system built into `api/workouts/route.ts` to surface user-facing confirmation modals.</li>
                     </ul>
                 </div>
             </section>

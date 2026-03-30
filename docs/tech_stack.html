@@ -52,6 +52,13 @@
                 <p class="text-slate-700"><strong>Why we chose it:</strong> For visual excellence and development speed. Shadcn provides unstyled accessible generic components that we bend via Tailwind. It achieves aesthetic density without polluting the javascript payload.</p>
             </section>
 
+            <section class="space-y-4">
+                <h2 class="text-2xl font-bold border-b border-slate-100 pb-2 flex items-center gap-3">
+                    <span class="text-blue-600">05</span> Docker & PWA Architecture
+                </h2>
+                <p class="text-slate-700"><strong>Why we chose it:</strong> Bypassing the native iOS/Android App Stores while retaining a full-screen, native-feeling app experience. The <code>public/sw.js</code> caches all application shells to allow the app to launch instantly while completely offline. The <code>docker-compose.yml</code> file orchestrates the local <code>next start</code> process while enforcing strict SQLite persistence through named volumes (<code>db-data</code>), allowing this app to run infinitely safely on a cheap local NAS or Raspberry Pi.</p>
+            </section>
+
         </main>
     </div>
 </body>
