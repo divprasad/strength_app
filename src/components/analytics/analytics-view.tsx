@@ -102,7 +102,7 @@ function MeasuredChart({
 export function AnalyticsView() {
   const today = localDateIso(new Date());
   const metrics = useLiveQuery(() => getWeeklyMetrics(today), [today]);
-  const muscles = useLiveQuery(() => db.muscles.toArray(), []);
+  const muscles = useLiveQuery(() => db.muscleGroups.toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const [exerciseId, setExerciseId] = useState("");
   const progress = useLiveQuery(() => (exerciseId ? getExerciseProgress(exerciseId) : Promise.resolve([])), [exerciseId]);

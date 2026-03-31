@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { ExerciseForm } from "@/components/exercise/exercise-form";
 
 export function ExerciseList() {
-  const muscles = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
+  const muscles = useLiveQuery(() => db.muscleGroups.orderBy("name").toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);

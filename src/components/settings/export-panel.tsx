@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 
 async function buildPayload(): Promise<ExportPayload> {
   const [muscleGroups, exercises, workouts, workoutExercises, setEntries, settings] = await Promise.all([
-    db.muscles.toArray(),
+    db.muscleGroups.toArray(),
     db.exercises.toArray(),
     db.workouts.toArray(),
     db.workoutExercises.toArray(),
@@ -104,15 +104,15 @@ export function ExportPanel() {
 
       // 2. Clear and replace atomically
       setStatus("Replacing local data...");
-      await db.transaction("rw", [db.muscles, db.exercises, db.workouts, db.workoutExercises, db.setEntries, db.settings], async () => {
-        await db.muscles.clear();
+      await db.transaction("rw", [db.muscleGroups, db.exercises, db.workouts, db.workoutExercises, db.setEntries, db.settings], async () => {
+        await db.muscleGroups.clear();
         await db.exercises.clear();
         await db.workouts.clear();
         await db.workoutExercises.clear();
         await db.setEntries.clear();
         await db.settings.clear();
 
-        await db.muscles.bulkPut(payload.muscleGroups);
+        await db.muscleGroups.bulkPut(payload.muscleGroups);
         await db.exercises.bulkPut(payload.exercises);
         await db.workouts.bulkPut(
           payload.workouts.map((workout) => {
@@ -186,7 +186,7 @@ export function ExportPanel() {
     setLoading(true);
     setStatus("Resetting and pulling from server...");
     try {
-      await db.muscles.clear();
+      await db.muscleGroups.clear();
       await db.exercises.clear();
       await db.workouts.clear();
       await db.workoutExercises.clear();
