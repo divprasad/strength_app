@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import {
@@ -19,7 +19,9 @@ import {
   startWorkoutExercise,
   summarizeSets,
   updateWorkout,
-  syncWorkoutToServer
+  syncWorkoutToServer,
+  archiveWorkout,
+  deleteWorkout
 } from "@/lib/repository";
 import { useUiStore } from "@/lib/store";
 import { formatLocalDate, localDateIso, nowIso } from "@/lib/utils";
@@ -60,6 +62,11 @@ function formatSetsInline(sets: SetEntry[]): string {
     }
   }
   return groups.map(g => `${g.count}×${g.reps}@${g.weight}kg`).join(", ");
+}
+
+/** Rounds duration to nearest minute. <30s → 0m, ≥30s → round up. */
+function formatDurationRounded(seconds: number): string {
+  return `${Math.round(seconds / 60)}m`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -148,7 +155,7 @@ export function WorkoutLogger() {
     : sessionActive
       ? formatTimer(sessionElapsed)
       : workout.status === "completed"
-        ? "Complete"
+        ? "Done"
         : "Stopped";
 
   // Edit mode via URL param
@@ -222,18 +229,44 @@ export function WorkoutLogger() {
     }
   };
 
-  const handleSaveAndPush = async () => {
-    if (!activeWorkoutId) return;
+  const handleCopyAsTemplate = async () => {
+    if (!activeWorkoutId || !workoutExercises) return;
     setSessionBusy(true);
     try {
-      await syncWorkoutToServer(activeWorkoutId);
-      alert("Changes saved and pushed to server successfully.");
-    } catch (error) {
-      console.error("Failed to push changes:", error);
-      alert("Failed to push changes to server. Changes are saved locally.");
+      const today = localDateIso(new Date());
+      // Remove any existing draft workouts on today to prevent accumulation
+      const todayWorkouts = await listWorkoutsByDate(today);
+      for (const w of todayWorkouts) {
+        if (w.status === "draft") await deleteWorkout(w.id);
+      }
+      const newWorkout = await createWorkoutForDate(today);
+      for (const we of workoutExercises) {
+        await addExerciseToWorkout(newWorkout.id, we.exerciseId);
+      }
+      setSelectedDate(today);
+      setActiveWorkoutId(newWorkout.id);
     } finally {
       setSessionBusy(false);
     }
+  };
+
+  const handleArchiveWorkout = async () => {
+    if (!activeWorkoutId) return;
+    const confirmed = window.confirm(
+      "Archive this workout? It will be hidden from your history and analytics, but can be restored from Settings."
+    );
+    if (!confirmed) return;
+    await archiveWorkout(activeWorkoutId);
+    clearActiveWorkout();
+  };
+
+  const handleDeleteSession = async (workoutId: string, status: string) => {
+    if (status !== "draft") {
+      const confirmed = window.confirm("Delete this session permanently? This cannot be undone.");
+      if (!confirmed) return;
+    }
+    await deleteWorkout(workoutId);
+    if (workoutId === activeWorkoutId) clearActiveWorkout();
   };
 
   const handleUpdateTime = async (time: string) => {
@@ -305,9 +338,9 @@ export function WorkoutLogger() {
 
   return (
     <div className="space-y-3">
-      {/* ── Phase 4: Compact Header Bar ── */}
+      {/* ── Compact Header Bar ── */}
       <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border border-border/60 bg-card/90 px-4 py-3 shadow-[0_12px_36px_-24px_hsl(var(--foreground)/0.3)]">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
             className="text-sm font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
@@ -327,6 +360,24 @@ export function WorkoutLogger() {
           >
             {sessionActive ? `● ${sessionSummary}` : sessionSummary}
           </Badge>
+
+          {/* Copy as Template — animated dumbbell, only on completed */}
+          {workout?.status === "completed" && !sessionActive && (
+            <button
+              onClick={handleCopyAsTemplate}
+              disabled={sessionBusy}
+              title="Copy exercises as a new draft for today"
+              className="group flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary/70 hover:bg-primary/12 hover:border-primary/50 hover:text-primary active:scale-95 transition-all duration-200 disabled:opacity-40"
+            >
+              <Dumbbell
+                className="h-3 w-3 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0"
+              />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                Template
+              </span>
+            </button>
+          )}
+
           {hasMultipleSessions && (
             <button
               onClick={() => setShowSessionSelector(!showSessionSelector)}
@@ -336,18 +387,41 @@ export function WorkoutLogger() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {sessionActive ? (
             <Button size="sm" variant="destructive" onClick={handleFinishWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
               Stop
             </Button>
+          ) : workout?.status === "draft" ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => workout && handleDeleteSession(workout.id, workout.status)}
+                disabled={sessionBusy}
+                className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
+              </Button>
+              <Button size="sm" onClick={handleStartWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
+                Start
+              </Button>
+            </>
           ) : workout && workout.status !== "completed" ? (
             <Button size="sm" onClick={handleStartWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
               Start
             </Button>
           ) : workout?.status === "completed" ? (
-            <Button size="sm" onClick={handleSaveAndPush} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs bg-primary/90 hover:bg-primary">
-              Save Edit
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleArchiveWorkout}
+              disabled={sessionBusy}
+              className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Archive className="h-3.5 w-3.5 mr-1.5" />
+              Archive
             </Button>
           ) : null}
         </div>
@@ -392,20 +466,31 @@ export function WorkoutLogger() {
               const isSelected = item.id === activeWorkoutId;
               const dur = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
               return (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => {
-                    setActiveWorkoutId(item.id);
-                    setShowSessionSelector(false);
-                  }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors",
-                    isSelected ? "bg-accent/75 text-foreground" : "hover:bg-card text-muted-foreground"
+                    "flex w-full items-center rounded-xl transition-colors",
+                    isSelected ? "bg-accent/75 text-foreground" : "hover:bg-card/60 text-muted-foreground"
                   )}
                 >
-                  <span>{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted"}</span>
-                  <span className="text-xs">{item.status === "completed" ? formatDurationLong(dur) : item.status}</span>
-                </button>
+                  <button
+                    onClick={() => {
+                      setActiveWorkoutId(item.id);
+                      setShowSessionSelector(false);
+                    }}
+                    className="flex flex-1 items-center justify-between px-3 py-2 text-sm"
+                  >
+                    <span>{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted"}</span>
+                    <span className="text-xs">{item.status === "completed" ? formatDurationLong(dur) : item.status}</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSession(item.id, item.status)}
+                    title="Delete session"
+                    className="shrink-0 p-2 mr-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -449,27 +534,56 @@ export function WorkoutLogger() {
       {workout ? (
         <div className="space-y-2">
           {workoutExercises && workoutExercises.length > 0 ? (
-            workoutExercises.map((item) => {
-              const exercise = exerciseMap?.get(item.exerciseId);
-              if (!exercise) return null;
-              return (
-                <WorkoutExerciseCard
-                  key={item.id}
-                  workoutExerciseId={item.id}
-                  title={exercise.name}
-                  exercise={exercise}
-                  muscleMap={muscleMap}
-                  onDelete={!item.completedAt ? () => handleDeleteWorkoutExercise(item.id) : undefined}
-                  onStart={() => handleStartExercise(item.id)}
-                  onFinish={() => handleFinishExercise(item.id)}
-                  startedAt={item.startedAt}
-                  completedAt={item.completedAt}
-                  isActive={activeExerciseId === item.id}
-                  isSessionActive={sessionActive}
-                  allowEdit={workout?.status === "completed" || sessionActive}
-                />
-              );
-            })
+            workout.status === "completed" ? (
+              /* 2-column grid for completed workouts */
+              <div className="grid grid-cols-2 gap-2">
+                {workoutExercises.map((item) => {
+                  const exercise = exerciseMap?.get(item.exerciseId);
+                  if (!exercise) return null;
+                  return (
+                    <WorkoutExerciseCard
+                      key={item.id}
+                      workoutExerciseId={item.id}
+                      title={exercise.name}
+                      exercise={exercise}
+                      muscleMap={muscleMap}
+                      onDelete={undefined}
+                      onStart={() => handleStartExercise(item.id)}
+                      onFinish={() => handleFinishExercise(item.id)}
+                      startedAt={item.startedAt}
+                      completedAt={item.completedAt}
+                      isActive={activeExerciseId === item.id}
+                      isSessionActive={sessionActive}
+                      allowEdit={true}
+                      isInGrid={true}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              workoutExercises.map((item) => {
+                const exercise = exerciseMap?.get(item.exerciseId);
+                if (!exercise) return null;
+                return (
+                  <WorkoutExerciseCard
+                    key={item.id}
+                    workoutExerciseId={item.id}
+                    title={exercise.name}
+                    exercise={exercise}
+                    muscleMap={muscleMap}
+                    onDelete={!item.completedAt ? () => handleDeleteWorkoutExercise(item.id) : undefined}
+                    onStart={() => handleStartExercise(item.id)}
+                    onFinish={() => handleFinishExercise(item.id)}
+                    startedAt={item.startedAt}
+                    completedAt={item.completedAt}
+                    isActive={activeExerciseId === item.id}
+                    isSessionActive={sessionActive}
+                    allowEdit={workout?.status === "completed" || sessionActive}
+                    isInGrid={false}
+                  />
+                );
+              })
+            )
           ) : (
             <Card className="border-dashed border-border/50">
               <CardContent className="pt-5">
@@ -478,7 +592,7 @@ export function WorkoutLogger() {
             </Card>
           )}
 
-          {/* ── Phase 2: Inline Exercise Picker (always at bottom) ── */}
+          {/* ── Inline Exercise Picker (always at bottom) ── */}
           <InlineExercisePicker
             exercises={exercises ?? []}
             onAdd={handleQuickAddExercise}
@@ -499,7 +613,7 @@ export function WorkoutLogger() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   INLINE EXERCISE PICKER (Phase 2)
+   INLINE EXERCISE PICKER
    ═══════════════════════════════════════════════════════════════════ */
 
 function InlineExercisePicker({
@@ -573,7 +687,7 @@ function InlineExercisePicker({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   EXERCISE CARD (Phase 1 + 3 + 5)
+   EXERCISE CARD
    ═══════════════════════════════════════════════════════════════════ */
 
 function WorkoutExerciseCard({
@@ -585,7 +699,8 @@ function WorkoutExerciseCard({
   startedAt,
   completedAt,
   isActive,
-  allowEdit
+  allowEdit,
+  isInGrid
 }: {
   workoutExerciseId: string;
   title: string;
@@ -599,6 +714,7 @@ function WorkoutExerciseCard({
   isActive: boolean;
   isSessionActive: boolean;
   allowEdit?: boolean;
+  isInGrid?: boolean;
 }) {
   const sets = useLiveQuery(
     () => db.setEntries.where("workoutExerciseId").equals(workoutExerciseId).sortBy("setNumber"),
@@ -626,6 +742,8 @@ function WorkoutExerciseCard({
   const [elapsed, setElapsed] = useState(() => computeElapsed(startedAt));
   const durationSeconds = computeDurationSeconds(startedAt, completedAt);
   const [expanded, setExpanded] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [showAddConfirm, setShowAddConfirm] = useState<{ reps: number; weight: number } | null>(null);
 
   useEffect(() => {
     if (!isTimerActive) {
@@ -667,63 +785,156 @@ function WorkoutExerciseCard({
     await renumberSets(workoutExerciseId);
   }
 
-  /* ── Phase 1: Collapsed finished exercise ── */
+  /* ── Completed (finished) exercise card ── */
   if (isFinished && !isActive) {
     const summary = summarizeSets(sets ?? []);
-    if (!expanded) {
-      return (
-        <button
-          onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
-        >
-          <Check className="h-4 w-4 shrink-0 text-success" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{title}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {formatSetsInline(sets ?? [])} · {formatDurationLong(durationSeconds)}
-            </p>
-          </div>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        </button>
-      );
-    }
-    // Expanded collapsed view
+
     return (
-      <div className="rounded-[1.2rem] border border-border/50 bg-card/70 overflow-hidden">
-        <button
-          onClick={() => setExpanded(false)}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
-        >
-          <Check className="h-4 w-4 shrink-0 text-success" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{title}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {formatDurationLong(durationSeconds)} · {summary.totalReps} reps · {summary.totalVolume}kg vol
-            </p>
-          </div>
-          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        </button>
-        <div className="px-4 pb-3 space-y-2">
-          {(sets ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {(sets ?? []).map((setEntry) => (
-                allowEdit ? (
-                  <SetChip
-                    key={setEntry.id}
-                    setEntry={setEntry}
-                    onUpdate={updateSet}
-                    onDelete={deleteSet}
-                  />
-                ) : (
-                  <span key={setEntry.id} className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs">
-                    <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
-                    <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
-                  </span>
-                )
-              ))}
+      <div className={cn("transition-all duration-200", isInGrid && expanded && "col-span-2")}>
+        {/* Add-set confirmation modal */}
+        <Modal
+          isOpen={!!showAddConfirm}
+          onClose={() => setShowAddConfirm(null)}
+          title="Save to local database?"
+          description={showAddConfirm ? `Add: ${showAddConfirm.reps} reps × ${showAddConfirm.weight}kg` : ""}
+          footer={
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setShowAddConfirm(null)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!showAddConfirm) return;
+                await addSetToWorkoutExercise(workoutExerciseId, {
+                  reps: showAddConfirm.reps,
+                  weight: showAddConfirm.weight,
+                  notes: undefined
+                });
+                setShowAddConfirm(null);
+              }}>
+                <Check className="h-3.5 w-3.5 mr-1.5" /> Confirm
+              </Button>
             </div>
-          )}
-        </div>
+          }
+        >
+          <p className="text-sm text-muted-foreground px-1">This will be saved to your local database.</p>
+        </Modal>
+
+        {!expanded ? (
+          /* ── Collapsed tile ── */
+          <button
+            onClick={() => setExpanded(true)}
+            className="group flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80 active:bg-card/90"
+          >
+            <Check className="h-4 w-4 shrink-0 text-success" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{title}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {formatSetsInline(sets ?? [])} · {formatDurationRounded(durationSeconds)}
+              </p>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {allowEdit && (
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); setEditMode(true); setExpanded(true); }}
+                  className="rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 active:bg-primary/20 transition-colors"
+                >
+                  <PenLine className="h-3 w-3" />
+                </span>
+              )}
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </button>
+        ) : (
+          /* ── Expanded view ── */
+          <div className="rounded-[1.2rem] border border-border/50 bg-card/70 overflow-hidden animate-in slide-in-from-top-1 duration-150">
+            {/* Expanded header */}
+            <button
+              onClick={() => { setExpanded(false); setEditMode(false); }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
+            >
+              <Check className="h-4 w-4 shrink-0 text-success" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{title}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {formatDurationLong(durationSeconds)} · {summary.totalReps} reps · {summary.totalVolume}kg vol
+                </p>
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {allowEdit && (
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
+                    className={cn(
+                      "rounded-full p-1.5 transition-colors",
+                      editMode
+                        ? "text-primary bg-primary/10"
+                        : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    )}
+                  >
+                    <PenLine className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            </button>
+
+            {/* Set chips */}
+            <div className="px-4 pb-3 space-y-2">
+              {(sets ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {(sets ?? []).map((setEntry) => (
+                    editMode ? (
+                      <SetChip
+                        key={setEntry.id}
+                        setEntry={setEntry}
+                        onUpdate={updateSet}
+                        onDelete={deleteSet}
+                        requireConfirm
+                      />
+                    ) : (
+                      <span
+                        key={setEntry.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs"
+                      >
+                        <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+                        <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
+
+              {/* Add set form — only in editMode */}
+              {editMode && (
+                <div className="flex items-center gap-2 pt-2 mt-1 border-t border-border/30">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value)}
+                    className="h-8 w-14 text-center text-xs"
+                    placeholder="Reps"
+                  />
+                  <span className="text-xs text-muted-foreground">×</span>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    className="h-8 w-16 text-center text-xs"
+                    placeholder="kg"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddConfirm({ reps: Number(reps) || 0, weight: Number(weight) || 0 })}
+                    className="h-8 rounded-full px-3 text-xs ml-auto"
+                  >
+                    + Add
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -772,7 +983,7 @@ function WorkoutExerciseCard({
             </Badge>
           )}
           {isFinished && allowEdit && (
-            <Badge variant="outline" className="px-2 py-0 text-[10px]">Completed</Badge>
+            <Badge variant="outline" className="px-2 py-0 text-[10px]">Done</Badge>
           )}
           {sets && sets.length > 0 && (
             <span className="text-[10px] text-muted-foreground">{sets.length} set{sets.length === 1 ? "" : "s"}</span>
@@ -797,7 +1008,7 @@ function WorkoutExerciseCard({
         </div>
       </div>
 
-      {/* ── Phase 5: Compact set chips ── */}
+      {/* Compact set chips */}
       <div className="px-4 py-3 space-y-2">
         {(sets ?? []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -807,12 +1018,13 @@ function WorkoutExerciseCard({
                 setEntry={setEntry}
                 onUpdate={updateSet}
                 onDelete={deleteSet}
+                requireConfirm={false}
               />
             ))}
           </div>
         )}
 
-        {/* ── Phase 3: Smart Quick Add ── */}
+        {/* Smart Quick Add */}
         <div className="flex items-center gap-2 pt-1">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <Input
@@ -848,58 +1060,95 @@ function WorkoutExerciseCard({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SET CHIP (Phase 5 — compact pill instead of full card)
+   SET CHIP
    ═══════════════════════════════════════════════════════════════════ */
 
 function SetChip({
   setEntry,
   onUpdate,
-  onDelete
+  onDelete,
+  requireConfirm
 }: {
   setEntry: SetEntry;
   onUpdate: (setEntry: SetEntry, patch: Partial<SetEntry>) => void;
   onDelete: (id: string) => void;
+  requireConfirm?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [editReps, setEditReps] = useState(String(setEntry.reps));
   const [editWeight, setEditWeight] = useState(String(setEntry.weight));
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleConfirmSave = () => {
+    onUpdate(setEntry, { reps: Number(editReps) || 0, weight: Number(editWeight) || 0 });
+    setShowConfirm(false);
+    setEditing(false);
+  };
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/30 px-2 py-1.5 animate-in zoom-in-95 duration-100">
-        <span className="text-[10px] font-semibold text-primary/70 w-4">#{setEntry.setNumber}</span>
-        <Input
-          type="number"
-          inputMode="numeric"
-          value={editReps}
-          onChange={(e) => setEditReps(e.target.value)}
-          className="h-7 w-12 text-center text-xs p-0"
-          autoFocus
-        />
-        <span className="text-[10px] text-muted-foreground">×</span>
-        <Input
-          type="number"
-          inputMode="decimal"
-          value={editWeight}
-          onChange={(e) => setEditWeight(e.target.value)}
-          className="h-7 w-14 text-center text-xs p-0"
-        />
-        <button
-          onClick={() => {
-            onUpdate(setEntry, { reps: Number(editReps) || 0, weight: Number(editWeight) || 0 });
-            setEditing(false);
-          }}
-          className="text-success hover:text-success/80 p-0.5"
+      <>
+        <Modal
+          isOpen={showConfirm}
+          onClose={() => setShowConfirm(false)}
+          title="Save changes?"
+          description="This will update the set in your local database."
+          footer={
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setShowConfirm(false)}>Cancel</Button>
+              <Button onClick={handleConfirmSave}>
+                <Check className="h-3.5 w-3.5 mr-1.5" /> Save
+              </Button>
+            </div>
+          }
         >
-          <Check className="h-3 w-3" />
-        </button>
-        <button
-          onClick={() => onDelete(setEntry.id)}
-          className="text-muted-foreground hover:text-destructive p-0.5"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
-      </div>
+          <div className="rounded-xl border border-border/50 bg-muted/30 px-4 py-3">
+            <p className="text-sm">
+              Set <span className="font-semibold text-primary">#{setEntry.setNumber}</span>:{" "}
+              <span className="font-semibold">{editReps} reps × {editWeight}kg</span>
+            </p>
+          </div>
+        </Modal>
+
+        <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/30 px-2 py-1.5 animate-in zoom-in-95 duration-100">
+          <span className="text-[10px] font-semibold text-primary/70 w-4">#{setEntry.setNumber}</span>
+          <Input
+            type="number"
+            inputMode="numeric"
+            value={editReps}
+            onChange={(e) => setEditReps(e.target.value)}
+            className="h-7 w-12 text-center text-xs p-0"
+            autoFocus
+          />
+          <span className="text-[10px] text-muted-foreground">×</span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            value={editWeight}
+            onChange={(e) => setEditWeight(e.target.value)}
+            className="h-7 w-14 text-center text-xs p-0"
+          />
+          <button
+            onClick={() => {
+              if (requireConfirm) {
+                setShowConfirm(true);
+              } else {
+                onUpdate(setEntry, { reps: Number(editReps) || 0, weight: Number(editWeight) || 0 });
+                setEditing(false);
+              }
+            }}
+            className="text-success hover:text-success/80 p-0.5"
+          >
+            <Check className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => onDelete(setEntry.id)}
+            className="text-muted-foreground hover:text-destructive p-0.5"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </>
     );
   }
 

@@ -2,6 +2,39 @@
 
 This file is the stable operating guide for agents working in this repository.
 
+## ⛔ Worktree Scope — COSMETIC CHANGES ONLY
+
+> **This is a UI-cleanup worktree. All work MUST be limited to cosmetic and visual changes.**
+> **Any agent that violates this constraint is producing invalid work, regardless of what the user asks.**
+
+### What is ALLOWED
+
+- CSS / Tailwind class changes (colors, spacing, typography, layout, animations)
+- Component JSX/TSX markup restructuring for visual purposes
+- Adding or updating design tokens, theme variables, and style constants
+- Swapping icons, adjusting SVGs, updating fonts
+- Responsive design fixes (breakpoints, mobile layout)
+- Accessibility improvements that are purely presentational (contrast, focus rings, aria-labels)
+- Removing dead/unused UI code
+
+### What is BLOCKED — do not touch under any circumstances
+
+- **Database**: No changes to Prisma schema, migrations, seed files, or `prisma/` directory
+- **Sync engine**: No changes to `src/lib/syncEngine.ts`, `syncQueue`, or any sync logic
+- **API routes**: No changes to any `route.ts` or server-side API handlers
+- **Dexie schema**: No changes to IndexedDB table definitions or Dexie hooks
+- **Docker**: No changes to `Dockerfile`, `docker-compose.yml`, or `docker-entrypoint.sh`
+- **Data models**: No changes to TypeScript interfaces/types that define database entities
+- **Business logic**: No changes to workout calculation logic, set tracking, or data processing
+- **Environment config**: No changes to `.env` files, `next.config.ts` (unless purely cosmetic like metadata)
+- **New features**: Do not add new product features, new routes, new API endpoints, or new data flows
+
+### If in doubt
+
+If a requested change touches both UI and backend, **only implement the UI portion** and clearly note what backend work was left out and why.
+
+---
+
 ## Mission
 
 Strength Log uses a robust "Local-First Sync Architecture" to deliver a zero-latency tracker that can operate fully offline. The structural persistence is complete: local Dexie changes drop `syncQueue` tickets which are processed by a background worker and `$transaction`-upserted cleanly onto a Prisma/SQLite instance whenever network drops.
