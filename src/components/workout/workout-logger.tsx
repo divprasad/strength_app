@@ -260,6 +260,15 @@ export function WorkoutLogger() {
     clearActiveWorkout();
   };
 
+  const handleDeleteSession = async (workoutId: string, status: string) => {
+    if (status !== "draft") {
+      const confirmed = window.confirm("Delete this session permanently? This cannot be undone.");
+      if (!confirmed) return;
+    }
+    await deleteWorkout(workoutId);
+    if (workoutId === activeWorkoutId) clearActiveWorkout();
+  };
+
   const handleUpdateTime = async (time: string) => {
     if (!workout || !time) return;
     const [hours, minutes] = time.split(":").map(Number);
@@ -383,6 +392,22 @@ export function WorkoutLogger() {
             <Button size="sm" variant="destructive" onClick={handleFinishWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
               Stop
             </Button>
+          ) : workout?.status === "draft" ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => workout && handleDeleteSession(workout.id, workout.status)}
+                disabled={sessionBusy}
+                className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
+              </Button>
+              <Button size="sm" onClick={handleStartWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
+                Start
+              </Button>
+            </>
           ) : workout && workout.status !== "completed" ? (
             <Button size="sm" onClick={handleStartWorkout} disabled={sessionBusy} className="h-8 rounded-full px-3 text-xs">
               Start
@@ -441,20 +466,31 @@ export function WorkoutLogger() {
               const isSelected = item.id === activeWorkoutId;
               const dur = computeDurationSeconds(item.sessionStartedAt, item.sessionEndedAt);
               return (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => {
-                    setActiveWorkoutId(item.id);
-                    setShowSessionSelector(false);
-                  }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors",
-                    isSelected ? "bg-accent/75 text-foreground" : "hover:bg-card text-muted-foreground"
+                    "flex w-full items-center rounded-xl transition-colors",
+                    isSelected ? "bg-accent/75 text-foreground" : "hover:bg-card/60 text-muted-foreground"
                   )}
                 >
-                  <span>{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted"}</span>
-                  <span className="text-xs">{item.status === "completed" ? formatDurationLong(dur) : item.status}</span>
-                </button>
+                  <button
+                    onClick={() => {
+                      setActiveWorkoutId(item.id);
+                      setShowSessionSelector(false);
+                    }}
+                    className="flex flex-1 items-center justify-between px-3 py-2 text-sm"
+                  >
+                    <span>{item.sessionStartedAt ? formatTimeOfDay(item.sessionStartedAt) : "Unstarted"}</span>
+                    <span className="text-xs">{item.status === "completed" ? formatDurationLong(dur) : item.status}</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSession(item.id, item.status)}
+                    title="Delete session"
+                    className="shrink-0 p-2 mr-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               );
             })}
           </div>
