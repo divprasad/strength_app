@@ -27,9 +27,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto max-w-6xl px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center justify-between gap-4 rounded-[1.7rem] border border-white/55 bg-card/90 px-4 py-3 shadow-[0_20px_60px_-32px_hsl(var(--foreground)/0.45)] ring-1 ring-black/5 md:px-5">
             <div className="min-w-0">
-              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-primary/80">Training System</p>
               <p className="text-xl font-semibold tracking-[-0.04em] md:text-2xl">{APP_NAME}</p>
-              <p className="truncate text-xs text-muted-foreground md:text-sm">Fast local workout logging for repeatable sessions</p>
+              <p className="text-xs font-medium text-muted-foreground/70 md:text-sm">get jackd</p>
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               <ThemeToggle />

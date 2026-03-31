@@ -3,7 +3,7 @@
 import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { getWeeklyMetrics, get30DaySummary } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
@@ -56,65 +56,140 @@ export function Dashboard() {
   const recentWorkout = recent?.[0];
   const dailyVolumes = (metrics?.perDay ?? []).map(d => d.volume);
 
+  /* ── Press-and-hold CTA state ── */
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdCompleteRef = useRef(false);
+
+  const HOLD_DURATION_MS = 800; // total hold time
+  const TICK_MS = 16; // ~60fps
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+
+  const startHold = useCallback(() => {
+    holdCompleteRef.current = false;
+    setIsHolding(true);
+    setHoldProgress(0);
+    const startTime = Date.now();
+    holdTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
+      setHoldProgress(progress);
+      if (progress >= 1 && !holdCompleteRef.current) {
+        holdCompleteRef.current = true;
+        clearInterval(holdTimerRef.current!);
+        holdTimerRef.current = null;
+        router.push("/workouts");
+      }
+    }, TICK_MS);
+  }, [router, clearHoldTimer]);
+
+  const cancelHold = useCallback(() => {
+    clearHoldTimer();
+    setIsHolding(false);
+    setHoldProgress(0);
+  }, [clearHoldTimer]);
+
+  // Cleanup on unmount
+  useEffect(() => () => clearHoldTimer(), [clearHoldTimer]);
+
   return (
     <div className="space-y-4">
       {/* ── Part A: Compact Dashboard Header ── */}
       <div className="rounded-[1.6rem] border border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-accent/10 px-5 py-5 shadow-[0_16px_48px_-24px_hsl(var(--foreground)/0.35)]">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-[-0.04em]">
-                {format(new Date(), "EEEE")}
-              </h1>
-              <span className="text-sm text-muted-foreground">{format(new Date(), "MMM d")}</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {recentWorkout
-                ? `Last session ${formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}`
-                : "No sessions logged yet — start your first workout."}
-            </p>
-          </div>
-          <Button
-            className="h-11 rounded-full px-6 shadow-[0_8px_20px_-8px_hsl(var(--primary)/0.5)]"
-            onClick={() => router.push("/workouts")}
+        {/* ── Date heading with press-and-hold CTA ── */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div
+            className={cn(
+              "relative select-none rounded-2xl px-4 py-3 transition-all duration-200 cursor-pointer overflow-hidden",
+              isHovering || isHolding
+                ? "bg-primary/8 border border-primary/20 shadow-[0_4px_16px_-6px_hsl(var(--primary)/0.2)]"
+                : "border border-transparent"
+            )}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => { setIsHovering(false); cancelHold(); }}
+            onMouseDown={startHold}
+            onMouseUp={cancelHold}
+            onTouchStart={startHold}
+            onTouchEnd={cancelHold}
+            onTouchCancel={cancelHold}
+            onContextMenu={(e) => e.preventDefault()}
           >
-            Start logging
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            {/* Fill progress bar */}
+            {isHolding && (
+              <div
+                className="absolute inset-0 bg-primary/12 transition-none"
+                style={{ width: `${holdProgress * 100}%` }}
+              />
+            )}
+            <div className="relative z-10">
+              <h1 className="text-2xl font-semibold tracking-[-0.04em]">
+                {format(new Date(), "EEEE")}{" "}
+                <span className="text-sm font-normal text-muted-foreground">{format(new Date(), "MMM d")}</span>
+              </h1>
+              {(isHovering || isHolding) && (
+                <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-primary/70 animate-in fade-in duration-150">
+                  <ArrowRight className="h-3 w-3" />
+                  {isHolding ? "hold to log…" : `Log ${format(new Date(), "EEE, MMM d")}`}
+                </p>
+              )}
+            </div>
+          </div>
+          {recentWorkout && (
+            <span className="mt-3 shrink-0 text-xs text-muted-foreground/70">
+              last sesh {formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}
+            </span>
+          )}
         </div>
 
-        {/* Weekly Heatmap Strip */}
-        <div className="mt-4 grid grid-cols-7 gap-2">
+        {/* Weekly Calendar with Inverted Volume Bars */}
+        <div className="grid grid-cols-7 gap-2">
           {(metrics?.perDay ?? []).map((day) => {
             const maxVol = Math.max(...dailyVolumes, 1);
             const intensity = day.volume / maxVol;
             const isToday = day.date === todayIso;
+            const barHeight = day.volume > 0 ? Math.max(6, intensity * 28) : 0;
             return (
               <div
                 key={day.date}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-xl px-1.5 py-2 transition-colors",
+                  "flex flex-col items-center rounded-xl px-1 py-1.5 transition-colors",
                   isToday ? "bg-accent/50 ring-1 ring-primary/20" : "bg-background/40"
                 )}
               >
+                {/* Day label */}
                 <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                   {format(parseISO(day.date), "EEE")}
                 </span>
-                <div
-                  className={cn(
-                    "h-2 w-full max-w-[28px] rounded-full transition-all",
-                    day.volume > 0
-                      ? intensity > 0.6
-                        ? "bg-primary"
-                        : intensity > 0.3
-                          ? "bg-primary/60"
-                          : "bg-primary/30"
-                      : "bg-muted-foreground/10"
+                {/* Inverted bar — grows downward */}
+                <div className="mt-1 flex w-full justify-center" style={{ minHeight: "32px" }}>
+                  {barHeight > 0 ? (
+                    <div
+                      className={cn(
+                        "w-full max-w-[22px] rounded-b-md transition-all",
+                        intensity > 0.6
+                          ? "bg-primary"
+                          : intensity > 0.3
+                            ? "bg-primary/60"
+                            : "bg-primary/30"
+                      )}
+                      style={{ height: `${barHeight}px` }}
+                    />
+                  ) : (
+                    <div className="w-full max-w-[22px] h-[3px] rounded-full bg-muted-foreground/10 mt-0" />
                   )}
-                />
+                </div>
+                {/* Volume label */}
                 {day.volume > 0 && (
-                  <span className="text-[9px] font-medium text-primary/70 tabular-nums">
-                    {Math.round(day.volume)}
+                  <span className="mt-1 text-[9px] font-medium text-primary/70 tabular-nums">
+                    {Math.round(day.volume).toLocaleString()}
                   </span>
                 )}
               </div>
@@ -124,23 +199,12 @@ export function Dashboard() {
       </div>
 
       {/* ── Part B: Consolidated Stats Strip ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="rounded-[1.3rem] border border-border/50 bg-card/80 px-4 py-3.5 shadow-[0_12px_32px_-20px_hsl(var(--foreground)/0.25)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Volume</p>
-          <div className="mt-1 flex items-end gap-3">
-            <p className="text-2xl font-semibold tracking-[-0.04em] tabular-nums">
-              {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
-            </p>
-            {dailyVolumes.length > 0 && (
-              <MiniSparkline values={dailyVolumes} className="text-primary/60 mb-1" />
-            )}
-          </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">this week</p>
-        </div>
-
-        <div className="rounded-[1.3rem] border border-border/50 bg-card/80 px-4 py-3.5 shadow-[0_12px_32px_-20px_hsl(var(--foreground)/0.25)]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Days Active</p>
-          <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] tabular-nums">{workoutsThisWeek}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] tabular-nums">
+            {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
+          </p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">this week</p>
         </div>
 
@@ -163,21 +227,18 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ── 30-Day Trend ── */}
+      {/* ── Past 4 Weeks Overview ── */}
       {summary30 && (
-        <div className="flex items-center gap-4 rounded-[1.2rem] border border-border/40 bg-card/60 px-4 py-3">
-          <div className="flex-1 min-w-0">
+        <div className="rounded-[1.2rem] border border-border/40 bg-card/60 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Past 4 weeks overview</p>
+          <div className="flex items-center justify-between gap-4">
             <p className="text-xs font-medium text-foreground">
               {summary30.completedCount} sessions · {summary30.totalVolume.toLocaleString()}kg
-              <span className="text-muted-foreground"> past 30 days</span>
             </p>
-          </div>
-          {summary30.weeklyVolumes && summary30.weeklyVolumes.some(v => v > 0) && (
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-muted-foreground">4-wk</span>
+            {summary30.weeklyVolumes && summary30.weeklyVolumes.some(v => v > 0) && (
               <MiniSparkline values={summary30.weeklyVolumes} className="text-muted-foreground" />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

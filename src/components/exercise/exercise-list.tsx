@@ -2,36 +2,83 @@
 
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { format, parseISO } from "date-fns";
 import { db } from "@/lib/db";
-import { createExercise, deleteExercise } from "@/lib/repository";
+import { createExercise } from "@/lib/repository";
 import type { Exercise } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
+
 import { Modal } from "@/components/ui/modal";
 import { ExerciseForm } from "@/components/exercise/exercise-form";
+
+import { Edit2, Trophy } from "lucide-react";
+
+/* ── 1RM helper (Epley formula) ── */
+function estimate1RM(weight: number, reps: number): number {
+  if (reps <= 0 || weight <= 0) return 0;
+  if (reps === 1) return weight;
+  return Math.round(weight * (1 + reps / 30));
+}
+
+/* ── Per-exercise 1RM lookup ── */
+function useExerciseBests(exercises: Exercise[] | undefined) {
+  return useLiveQuery(async () => {
+    if (!exercises || exercises.length === 0) return {};
+
+    const bests: Record<string, { estimated1RM: number; weight: number; reps: number; date: string }> = {};
+
+    // Get all workoutExercises with their workout dates
+    const allWE = await db.workoutExercises.toArray();
+    const workoutCache: Record<string, string> = {};
+
+    for (const we of allWE) {
+      const exerciseId = we.exerciseId;
+      if (!exercises.some(e => e.id === exerciseId)) continue;
+
+      // Get sets for this workoutExercise
+      const sets = await db.setEntries
+        .where("workoutExerciseId")
+        .equals(we.id)
+        .toArray();
+
+      for (const set of sets) {
+        if (set.weight <= 0 || set.reps <= 0) continue;
+        const e1rm = estimate1RM(set.weight, set.reps);
+
+        if (!bests[exerciseId] || e1rm > bests[exerciseId].estimated1RM) {
+          // Lazy-load workout date
+          if (!workoutCache[we.workoutId]) {
+            const workout = await db.workouts.get(we.workoutId);
+            workoutCache[we.workoutId] = workout?.date ?? "";
+          }
+
+          bests[exerciseId] = {
+            estimated1RM: e1rm,
+            weight: set.weight,
+            reps: set.reps,
+            date: workoutCache[we.workoutId]
+          };
+        }
+      }
+    }
+
+    return bests;
+  }, [exercises]);
+}
 
 export function ExerciseList() {
   const muscles = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
+  const bests = useExerciseBests(exercises);
+
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const filteredExercises = (exercises ?? []).filter((ex) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      ex.name.toLowerCase().includes(q) ||
-      ex.category?.toLowerCase().includes(q) ||
-      ex.equipment?.toLowerCase().includes(q)
-    );
-  });
-
-  const exerciseCount = filteredExercises.length;
+  const filteredExercises = exercises ?? [];
 
   function handleOpenCreate() {
     setEditing(null);
@@ -79,89 +126,106 @@ export function ExerciseList() {
     }
   }
 
-  async function handleDelete(exerciseId: string) {
-    if (!confirm("Are you sure you want to delete this exercise?")) return;
-    try {
-      setError(null);
-      await deleteExercise(exerciseId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete exercise.");
-    }
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="relative flex-1 w-full max-w-sm">
-          <Input 
-            placeholder="Search exercises..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-background"
-          />
-        </div>
-        <Button onClick={handleOpenCreate} className="shrink-0 w-full sm:w-auto">
-          + New Exercise
-        </Button>
-      </div>
+    <div className="space-y-3">
+      <Button onClick={handleOpenCreate} className="w-full rounded-xl">
+        + New Exercise
+      </Button>
 
-      <Card className="overflow-hidden border-none shadow-none bg-transparent">
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between mb-3 px-1 text-sm text-muted-foreground font-medium">
-            <span>{exerciseCount} exercise{exerciseCount === 1 ? "" : "s"} found</span>
-          </div>
-          
-          {filteredExercises.length > 0 ? (
-            <ul className="space-y-2">
-              {filteredExercises.map((exercise) => (
-                <li
-                  key={exercise.id}
-                  className="rounded-2xl border border-border/60 bg-card/60 hover:bg-card/80 transition-colors p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between group"
-                >
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <p className="font-semibold tracking-tight text-foreground truncate">{exercise.name}</p>
-                    <div className="flex flex-wrap gap-1.5 items-center">
+      {filteredExercises.length > 0 ? (
+        <ul className="grid gap-2">
+          {filteredExercises.map((exercise) => {
+            const best = bests?.[exercise.id];
+            const primaryMuscles = exercise.primaryMuscleIds
+              ?.map(id => muscles?.find(m => m.id === id))
+              .filter(Boolean);
+
+            return (
+              <li
+                key={exercise.id}
+                className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.15)] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  {/* Left: Name + meta */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold tracking-tight text-foreground truncate">
+                        {exercise.name}
+                      </p>
+                      <button
+                        onClick={() => handleOpenEdit(exercise)}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted"
+                        title="Edit exercise"
+                      >
+                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {exercise.category && (
-                        <Badge className="bg-primary/10 text-primary border-transparent px-2 py-0 text-[10px] uppercase font-bold tracking-wider">{exercise.category}</Badge>
+                        <Badge className="bg-primary/10 text-primary border-transparent px-2 py-0 text-[10px] uppercase font-bold tracking-wider">
+                          {exercise.category}
+                        </Badge>
                       )}
                       {exercise.equipment && exercise.equipment.trim() !== "" && (
-                        <Badge variant="outline" className="border-border/50 text-muted-foreground px-2 py-0 text-[10px] font-normal italic">
+                        <Badge variant="outline" className="border-border/50 text-muted-foreground px-2 py-0 text-[10px] font-normal">
                           {exercise.equipment}
                         </Badge>
                       )}
-                      <div className="flex flex-wrap gap-1 border-l border-border/40 pl-2 ml-1">
-                        {exercise.primaryMuscleIds?.map(id => {
-                          const muscle = muscles?.find(m => m.id === id);
-                          return muscle ? (
-                            <span key={id} className="text-[11px] font-medium text-muted-foreground bg-muted/50 px-1.5 rounded-md">
+                      {primaryMuscles && primaryMuscles.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {primaryMuscles.map(muscle => muscle && (
+                            <span
+                              key={muscle.id}
+                              className="text-[10px] font-medium text-muted-foreground/80 bg-muted/40 px-1.5 py-0.5 rounded-md"
+                            >
                               {muscle.name}
                             </span>
-                          ) : null;
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2 w-full sm:w-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <Button size="sm" variant="secondary" className="flex-1 sm:flex-none" onClick={() => handleOpenEdit(exercise)}>
-                      Edit
-                    </Button>
-                    <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" onClick={() => handleDelete(exercise.id)}>
-                      Delete
-                    </Button>
+
+                  {/* Right: 1RM display */}
+                  <div className="shrink-0 text-right">
+                    {best ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Trophy className="h-3 w-3 text-amber-500/70" />
+                          <span className="text-lg font-bold tabular-nums tracking-tight text-foreground">
+                            {best.estimated1RM}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-medium">kg</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/60 tabular-nums">
+                          {best.weight}×{best.reps}
+                          {best.date && (
+                            <span className="ml-1">
+                              · {format(parseISO(best.date), "MMM d")}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/40 italic">no data</span>
+                    )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Card className="border-dashed bg-transparent border-border/60 shadow-none">
-               <EmptyState 
-                title={searchQuery ? "No matching exercises" : "No exercises yet"} 
-                description={searchQuery ? "Try adjusting your search terms." : "Create your first custom movement to start logging."} 
-              />
-            </Card>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <Card className="border-dashed bg-transparent border-border/60 shadow-none">
+          <CardContent className="pt-5">
+            <EmptyState 
+              title="No exercises yet"
+              description="Create your first custom movement to start logging."
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Modal 
         isOpen={isModalOpen}

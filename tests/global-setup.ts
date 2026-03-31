@@ -6,20 +6,34 @@ const TEST_DB = path.resolve(__dirname, "../prisma/dev_test.db");
 
 export default async function globalSetup() {
   // 1. Wipe any stale test database from a previous run
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-    console.log("[E2E Setup] Removed stale dev_test.db");
+  const filesToDelete = [
+    TEST_DB,
+    `${TEST_DB}-wal`,
+    `${TEST_DB}-shm`,
+    `${TEST_DB}-journal`,
+  ];
+  let cleaned = false;
+  for (const file of filesToDelete) {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      cleaned = true;
+    }
   }
+  if (cleaned) {
+    console.log("[E2E Setup] Removed stale dev_test.db files");
+  }
+
+  const absDbUrl = `file:${TEST_DB}`;
 
   // 2. Run migrations to create the schema
   execSync("npx prisma migrate deploy --schema prisma/schema.prisma", {
-    env: { ...process.env, DATABASE_URL: `file:./prisma/dev_test.db` },
+    env: { ...process.env, DATABASE_URL: absDbUrl },
     stdio: "inherit",
   });
 
   // 3. Seed reference data (muscles + exercises) — no workouts
   execSync("npx tsx prisma/seed.ts", {
-    env: { ...process.env, DATABASE_URL: `file:./prisma/dev_test.db` },
+    env: { ...process.env, DATABASE_URL: absDbUrl },
     stdio: "inherit",
   });
 
