@@ -5,12 +5,12 @@ import { ExerciseList } from "@/components/exercise/exercise-list";
 import { MuscleManager } from "@/components/muscle/muscle-manager";
 import { cn } from "@/lib/utils";
 
-export default function ExercisesPage() {
+export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState<"exercises" | "muscles">("exercises");
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-semibold tracking-[-0.04em]">Exercises</h1>
+      <h1 className="text-2xl font-semibold tracking-[-0.04em]">Library</h1>
 
       <div className="flex gap-2">
         <button
@@ -22,7 +22,7 @@ export default function ExercisesPage() {
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           )}
         >
-          Exercise Library
+          Exercises
         </button>
         <button
           onClick={() => setActiveTab("muscles")}
@@ -33,7 +33,7 @@ export default function ExercisesPage() {
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           )}
         >
-          Muscle Taxonomy
+          Muscles
         </button>
       </div>
 

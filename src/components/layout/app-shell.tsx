@@ -12,7 +12,7 @@ import { CommandPalette } from "@/components/layout/command-palette";
 const desktopLinks = [
   { href: "/", label: "Dashboard" },
   { href: "/workouts", label: "Workout Logger" },
-  { href: "/exercises", label: "Exercises" },
+  { href: "/exercises", label: "Library" },
   { href: "/history", label: "History" },
   { href: "/analytics", label: "Analytics" },
   { href: "/settings", label: "Settings" }
