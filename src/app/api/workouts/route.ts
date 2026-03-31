@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { WorkoutBundle } from "@/types/domain";
+import { fileTimestamp } from "@/lib/utils";
 import fs from "fs/promises";
 import path from "path";
 
@@ -22,15 +23,28 @@ export async function POST(request: NextRequest) {
 
   // Auto-Backup Mechanism
   try {
-    const lastWorkout = await prisma.workout.findFirst({
-      orderBy: { date: "desc" },
-    });
+    const [lastWorkout, totalWorkouts] = await Promise.all([
+      prisma.workout.findFirst({ orderBy: { date: "desc" } }),
+      prisma.workout.count(),
+    ]);
     const lastWorkoutDate = lastWorkout ? lastWorkout.date : "none";
-    const timestamp = new Date().toISOString().split(".")[0].replace(/:/g, "-") + "-Z";
-    const backupFilename = `db_backup_${timestamp}_lastworkout_${lastWorkoutDate}.db`;
+
+    // Compute volume of the last workout (reps × weight across all its sets)
+    let lastWorkoutVolume = 0;
+    if (lastWorkout) {
+      const sets = await prisma.setEntry.findMany({
+        where: { workoutExercise: { workoutId: lastWorkout.id } },
+        select: { reps: true, weight: true },
+      });
+      lastWorkoutVolume = Math.round(
+        sets.reduce((sum, s) => sum + (s.reps ?? 0) * (s.weight ?? 0), 0)
+      );
+    }
+
+    const backupFilename = `db_backup_${fileTimestamp()}_no${totalWorkouts}_${lastWorkoutDate}_${lastWorkoutVolume}kg.db`;
     
-    // The workspace convention lists prisma/dev.db as the standard database location
-    const sourceDbPath = path.join(process.cwd(), "prisma", "dev.db");
+    // The workspace convention lists prisma/strength_dairy.db as the standard database location
+    const sourceDbPath = path.join(process.cwd(), "prisma", "strength_dairy.db");
     
     // Ensure the backups directory exists
     const backupDir = path.join(process.cwd(), "backups");
@@ -43,7 +57,7 @@ export async function POST(request: NextRequest) {
     await fs.copyFile(sourceDbPath, backupPath);
     console.log(`[API Backup] Created auto-backup: ${backupFilename}`);
   } catch (backupError) {
-    console.log("[API Backup] Skipping auto-backup (ensure dev.db exists):", backupError);
+    console.log("[API Backup] Skipping auto-backup (ensure strength_dairy.db exists):", backupError);
   }
 
   try {

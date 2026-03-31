@@ -24,31 +24,29 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-const ThemeScript = () => (
-  <script
-    dangerouslySetInnerHTML={{
-      __html: `
-        (function() {
-          try {
-            const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            const palette = localStorage.getItem('palette') || '0';
-            document.documentElement.classList.add(theme);
-            document.documentElement.setAttribute('data-palette', palette);
-          } catch (e) {}
-        })()
-      `,
-    }}
-  />
-);
-
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <ThemeScript />
+        <script
+          id="theme-script"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                  const palette = localStorage.getItem('palette') || '0';
+                  document.documentElement.classList.add(theme);
+                  document.documentElement.setAttribute('data-palette', palette);
+                } catch (e) {}
+              })()
+            `,
+          }}
+        />
         <link rel="apple-touch-icon" href="/icon-512.svg" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <ThemeProvider>
           <AppShell>
             <BootstrapGate>{children}</BootstrapGate>

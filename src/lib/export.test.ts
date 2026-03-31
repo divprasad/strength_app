@@ -74,9 +74,9 @@ describe("export helpers", () => {
   it("returns a CSV document for each export section", () => {
     expect(Object.keys(payloadToCsvMap(payload)).sort()).toEqual([
       "exercises",
-      "muscle_groups",
-      "set_entries",
-      "workout_exercises",
+      "muscleGroups",
+      "setEntries",
+      "workoutExercises",
       "workouts"
     ]);
   });
@@ -84,9 +84,9 @@ describe("export helpers", () => {
   it("escapes commas, quotes, and newlines in CSV output", () => {
     const csvMap = payloadToCsvMap(payload);
 
-    expect(csvMap.muscle_groups).toContain('"Chest, ""Upper"""');
+    expect(csvMap.muscleGroups).toContain('"Chest, ""Upper"""');
     expect(csvMap.exercises).toContain('"Line 1\nLine 2"');
     expect(csvMap.workouts).toContain('"Felt ""strong"""');
-    expect(csvMap.set_entries).toContain("Paused, controlled");
+    expect(csvMap.setEntries).toContain("Paused, controlled");
   });
 });

@@ -19,7 +19,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function MuscleManager() {
-  const muscles = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
+  const muscles = useLiveQuery(() => db.muscleGroups.orderBy("name").toArray(), []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
@@ -29,7 +29,7 @@ export function MuscleManager() {
   });
 
   async function onSubmit(values: FormValues) {
-    const duplicate = await db.muscles.where("name").equalsIgnoreCase(values.name).first();
+    const duplicate = await db.muscleGroups.where("name").equalsIgnoreCase(values.name).first();
     if (duplicate) {
       form.setError("name", { message: "Muscle group already exists." });
       return;
@@ -41,14 +41,14 @@ export function MuscleManager() {
   async function saveEdit(id: string) {
     const normalized = editingName.trim();
     if (!normalized) return;
-    const duplicate = await db.muscles
+    const duplicate = await db.muscleGroups
       .where("name")
       .equalsIgnoreCase(normalized)
       .and((m) => m.id !== id)
       .first();
     if (duplicate) return;
 
-    await db.muscles.update(id, { name: normalized, updatedAt: nowIso() });
+    await db.muscleGroups.update(id, { name: normalized, updatedAt: nowIso() });
     setEditingId(null);
     setEditingName("");
   }

@@ -22,7 +22,7 @@ export async function runIntegrityAudit(): Promise<IntegrityAuditReport> {
     db.workoutExercises.toArray(),
     db.setEntries.toArray(),
     db.exercises.toArray(),
-    db.muscles.toArray(),
+    db.muscleGroups.toArray(),
     db.settings.get("default")
   ]);
 
@@ -186,7 +186,7 @@ export async function runIntegrityAudit(): Promise<IntegrityAuditReport> {
 export async function healDatabase(): Promise<{ healedCount: number }> {
   const [exercises, muscles, workoutExercises, setEntries] = await Promise.all([
     db.exercises.toArray(),
-    db.muscles.toArray(),
+    db.muscleGroups.toArray(),
     db.workoutExercises.toArray(),
     db.setEntries.toArray()
   ]);

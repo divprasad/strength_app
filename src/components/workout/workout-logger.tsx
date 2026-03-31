@@ -92,7 +92,7 @@ export function WorkoutLogger() {
     const data = await db.exercises.toArray();
     return new Map(data.map((exercise) => [exercise.id, exercise]));
   }, []);
-  const muscleGroups = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
+  const muscleGroups = useLiveQuery(() => db.muscleGroups.orderBy("name").toArray(), []);
   const muscleMap = useMemo(() => {
     const map = new Map<string, MuscleGroup>();
     (muscleGroups ?? []).forEach((muscle) => map.set(muscle.id, muscle));

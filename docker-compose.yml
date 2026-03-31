@@ -8,16 +8,16 @@ services:
     volumes:
       # Named volume: survives container teardown and rebuilds.
       # Maps to /app/prisma inside the container, which is where
-      # process.cwd()/prisma/dev.db resolves — matching the backup
+      # process.cwd()/prisma/strength_dairy.db resolves — matching the backup
       # path logic in src/app/api/workouts/route.ts.
       - db-data:/app/prisma
       # Safe backup location mapped directly to your Mac
       - ./backups:/app/backups
     environment:
       - NODE_ENV=production
-      # file:./dev.db is relative to the schema location (/app/prisma),
-      # so the full resolved path is /app/prisma/dev.db
-      - DATABASE_URL=file:./dev.db
+      # file:./strength_dairy.db is relative to the schema location (/app/prisma),
+      # so the full resolved path is /app/prisma/strength_dairy.db
+      - DATABASE_URL=file:./strength_dairy.db
 
 volumes:
   db-data:

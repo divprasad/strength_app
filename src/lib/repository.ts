@@ -199,7 +199,7 @@ export async function createMuscleGroup(name: string): Promise<MuscleGroup> {
     createdAt: now,
     updatedAt: now
   };
-  await db.muscles.put(muscle);
+  await db.muscleGroups.put(muscle);
   return muscle;
 }
 
@@ -244,7 +244,7 @@ export async function deleteMuscleGroup(muscleId: string): Promise<void> {
   if (await isMuscleGroupReferenced(muscleId)) {
     throw new Error("Cannot delete this muscle group because it is referenced by an exercise.");
   }
-  await db.muscles.delete(muscleId);
+  await db.muscleGroups.delete(muscleId);
 }
 
 export async function enqueueSync(workoutId: string, action: "upsert" | "delete" = "upsert"): Promise<void> {
@@ -340,7 +340,7 @@ export async function finishActiveWorkoutExercise(workoutId: string): Promise<vo
 }
 
 export async function syncAllMuscles(): Promise<void> {
-  const muscles = await db.muscles.toArray();
+  const muscles = await db.muscleGroups.toArray();
   const response = await fetch("/api/muscles", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -393,7 +393,7 @@ export async function syncAllWorkouts(): Promise<void> {
 
 export async function checkServerSyncStatus(): Promise<boolean> {
   const [localMuscles, localExercises, localWorkouts] = await Promise.all([
-    db.muscles.toArray(),
+    db.muscleGroups.toArray(),
     db.exercises.toArray(),
     db.workouts.toArray()
   ]);

@@ -70,7 +70,7 @@ function useExerciseBests(exercises: Exercise[] | undefined) {
 }
 
 export function ExerciseList() {
-  const muscles = useLiveQuery(() => db.muscles.orderBy("name").toArray(), []);
+  const muscles = useLiveQuery(() => db.muscleGroups.orderBy("name").toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const bests = useExerciseBests(exercises);
 

@@ -7,7 +7,7 @@ import { payloadToCsvMap, payloadToJson } from "@/lib/export";
 import { runIntegrityAudit, healDatabase } from "@/lib/integrity-audit";
 import { normalizeWorkoutExerciseOrder, syncEverythingToServer, checkServerSyncStatus } from "@/lib/repository";
 import { bootstrapFromServer } from "@/lib/sync";
-import { nowIso, triggerDownload } from "@/lib/utils";
+import { nowIso, fileTimestamp, triggerDownload } from "@/lib/utils";
 import type { ExportPayload, IntegrityAuditReport } from "@/types/domain";
 import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 
 async function buildPayload(): Promise<ExportPayload> {
   const [muscleGroups, exercises, workouts, workoutExercises, setEntries, settings] = await Promise.all([
-    db.muscles.toArray(),
+    db.muscleGroups.toArray(),
     db.exercises.toArray(),
     db.workouts.toArray(),
     db.workoutExercises.toArray(),
@@ -46,17 +46,35 @@ export function ExportPanel() {
 
   async function exportJson() {
     const payload = await buildPayload();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    triggerDownload(`strength-export-${timestamp}.json`, payloadToJson(payload), "application/json");
+
+    // Derive filename metadata from the payload
+    const total = payload.workouts.length;
+    const lastWorkout = [...payload.workouts].sort((a, b) => a.date < b.date ? 1 : -1)[0];
+    const lastDate = lastWorkout?.date ?? "none";
+
+    // Sum reps × weight for all sets belonging to the last workout
+    const lastWeIds = new Set(
+      payload.workoutExercises
+        .filter((we) => we.workoutId === lastWorkout?.id)
+        .map((we) => we.id)
+    );
+    const lastVolume = Math.round(
+      payload.setEntries
+        .filter((s) => lastWeIds.has(s.workoutExerciseId))
+        .reduce((sum, s) => sum + (s.reps ?? 0) * (s.weight ?? 0), 0)
+    );
+
+    const filename = `strength-export_${fileTimestamp()}_no${total}_${lastDate}_${lastVolume}kg.json`;
+    triggerDownload(filename, payloadToJson(payload), "application/json");
     setStatus("JSON export downloaded.");
   }
 
   async function exportCsv() {
     const payload = await buildPayload();
     const csvMap = payloadToCsvMap(payload);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const ts = fileTimestamp();
     for (const [name, csv] of Object.entries(csvMap)) {
-      triggerDownload(`${name}-${timestamp}.csv`, csv, "text/csv;charset=utf-8");
+      triggerDownload(`${name}-${ts}.csv`, csv, "text/csv;charset=utf-8");
     }
     setStatus("CSV export downloaded as separate tables.");
   }
@@ -86,15 +104,15 @@ export function ExportPanel() {
 
       // 2. Clear and replace atomically
       setStatus("Replacing local data...");
-      await db.transaction("rw", [db.muscles, db.exercises, db.workouts, db.workoutExercises, db.setEntries, db.settings], async () => {
-        await db.muscles.clear();
+      await db.transaction("rw", [db.muscleGroups, db.exercises, db.workouts, db.workoutExercises, db.setEntries, db.settings], async () => {
+        await db.muscleGroups.clear();
         await db.exercises.clear();
         await db.workouts.clear();
         await db.workoutExercises.clear();
         await db.setEntries.clear();
         await db.settings.clear();
 
-        await db.muscles.bulkPut(payload.muscleGroups);
+        await db.muscleGroups.bulkPut(payload.muscleGroups);
         await db.exercises.bulkPut(payload.exercises);
         await db.workouts.bulkPut(
           payload.workouts.map((workout) => {
@@ -168,7 +186,7 @@ export function ExportPanel() {
     setLoading(true);
     setStatus("Resetting and pulling from server...");
     try {
-      await db.muscles.clear();
+      await db.muscleGroups.clear();
       await db.exercises.clear();
       await db.workouts.clear();
       await db.workoutExercises.clear();

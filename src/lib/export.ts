@@ -7,7 +7,7 @@ export function payloadToJson(payload: ExportPayload): string {
 
 export function payloadToCsvMap(payload: ExportPayload): Record<string, string> {
   return {
-    muscle_groups: toCsv(
+    muscleGroups: toCsv(
       ["id", "name", "createdAt", "updatedAt"],
       payload.muscleGroups.map((m) => [m.id, m.name, m.createdAt, m.updatedAt])
     ),
@@ -39,11 +39,11 @@ export function payloadToCsvMap(payload: ExportPayload): Record<string, string> 
       ["id", "date", "status", "notes", "createdAt", "updatedAt"],
       payload.workouts.map((w) => [w.id, w.date, w.status, w.notes ?? "", w.createdAt, w.updatedAt])
     ),
-    workout_exercises: toCsv(
+    workoutExercises: toCsv(
       ["id", "workoutId", "exerciseId", "orderIndex", "createdAt"],
       payload.workoutExercises.map((we) => [we.id, we.workoutId, we.exerciseId, we.orderIndex, we.createdAt])
     ),
-    set_entries: toCsv(
+    setEntries: toCsv(
       ["id", "workoutExerciseId", "setNumber", "reps", "weight", "notes", "createdAt", "updatedAt"],
       payload.setEntries.map((s) => [s.id, s.workoutExerciseId, s.setNumber, s.reps, s.weight, s.notes ?? "", s.createdAt, s.updatedAt])
     )

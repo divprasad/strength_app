@@ -9,7 +9,7 @@ export async function bootstrapMuscles(): Promise<void> {
   const response = await fetch(MUSCLE_API_PATH);
   if (!response.ok) throw new Error("Failed to fetch muscles");
   const { muscles } = await response.json();
-  await db.muscles.bulkPut(muscles);
+  await db.muscleGroups.bulkPut(muscles);
 }
 
 export async function bootstrapExercises(): Promise<void> {
@@ -54,9 +54,9 @@ export async function bootstrapFromServer(): Promise<void> {
   //    (e.g. workouts without their exercise definitions).
   await db.transaction(
     "rw",
-    [db.muscles, db.exercises, db.workouts, db.workoutExercises, db.setEntries],
+    [db.muscleGroups, db.exercises, db.workouts, db.workoutExercises, db.setEntries],
     async () => {
-      await db.muscles.bulkPut(muscles);
+      await db.muscleGroups.bulkPut(muscles);
       await db.exercises.bulkPut(exercises);
 
       if (!serverWorkouts || serverWorkouts.length === 0) return;
