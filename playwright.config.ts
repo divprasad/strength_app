@@ -13,12 +13,15 @@ export default defineConfig({
   },
   webServer: {
     // Spin up Next.js pointed at the isolated test database
-    command: "DATABASE_URL=file:./prisma/dev_test.db npm run dev -- --hostname 127.0.0.1 --port 3200",
+    command: "DATABASE_URL=file:./dev_test.db npm run dev -- --hostname 127.0.0.1 --port 3200",
     url: "http://127.0.0.1:3200",
     reuseExistingServer: false, // Always use fresh server with the test DB
     timeout: 120000,
+    stdout: "pipe",
+    stderr: "pipe",
     env: {
-      DATABASE_URL: "file:./prisma/dev_test.db",
+      DATABASE_URL: "file:./dev_test.db",
+      TEST_DATABASE_URL: "file:./dev_test.db",
     },
   },
   projects: [

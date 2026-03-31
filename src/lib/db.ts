@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@/lib/constants";
-import { createId, createStableId, localDateIso, nowIso } from "@/lib/utils";
+import { createStableId, nowIso } from "@/lib/utils";
 import type { AppSettings, Exercise, MuscleGroup, SetEntry, SyncJob, Workout, WorkoutExercise } from "@/types/domain";
 
 function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
@@ -10,7 +10,7 @@ function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "co
 }
 
 class StrengthDatabase extends Dexie {
-  muscles!: EntityTable<MuscleGroup, "id">;
+  muscleGroups!: EntityTable<MuscleGroup, "id">;
   exercises!: EntityTable<Exercise, "id">;
   workouts!: EntityTable<Workout, "id">;
   workoutExercises!: EntityTable<WorkoutExercise, "id">;
@@ -82,6 +82,32 @@ class StrengthDatabase extends Dexie {
         syncQueue: "id, status, createdAt"
       });
 
+    this.version(7)
+      .stores({
+        muscleGroups: "id, name, updatedAt", // renamed from muscles
+        muscles: null, // explicitly drop the old store
+        exercises: "id, name, updatedAt",
+        workouts: "id, date, name, status, updatedAt, userId",
+        workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+        setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+        settings: "id",
+        syncQueue: "id, status, createdAt"
+      })
+      .upgrade(async (tx) => {
+        // Copy all rows from the old 'muscles' store into 'muscleGroups'.
+        const rows = await tx.table("muscles").toArray();
+        if (rows.length > 0) {
+          await tx.table("muscleGroups").bulkPut(rows);
+        }
+      });
+
+    this.muscleGroups = this.table("muscleGroups");
+    this.exercises = this.table("exercises");
+    this.workouts = this.table("workouts");
+    this.workoutExercises = this.table("workoutExercises");
+    this.setEntries = this.table("setEntries");
+    this.settings = this.table("settings");
+    this.syncQueue = this.table("syncQueue");
     this.on("populate", async () => {
       await seedDatabase(this);
     });
@@ -109,12 +135,26 @@ async function bootstrapIfNeeded(): Promise<void> {
 }
 
 async function seedDatabase(database: StrengthDatabase): Promise<void> {
-  await database.transaction("rw", [database.settings], async () => {
+  const now = nowIso();
+  await database.transaction("rw", [database.muscleGroups, database.settings], async () => {
     await database.settings.clear();
     await database.settings.put({
       id: "default",
       volumePrimaryMultiplier: DEFAULT_VOLUME_CONFIG.primary,
       volumeSecondaryMultiplier: DEFAULT_VOLUME_CONFIG.secondary
     });
+
+    // Seed default muscle groups (stable IDs ensure idempotency)
+    const existingCount = await database.muscleGroups.count();
+    if (existingCount === 0) {
+      for (const name of DEFAULT_MUSCLE_GROUPS) {
+        await database.muscleGroups.put({
+          id: createStableId("muscle", name),
+          name,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
   });
 }

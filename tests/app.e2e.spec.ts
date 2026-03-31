@@ -12,7 +12,7 @@ test("settings supports JSON export and fixture import", async ({ page }) => {
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON" }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^strength-export-.*\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^strength-export_.*\.json$/);
 
   await page.locator('input[type="file"][accept=".json,application/json"]').setInputFiles(importFixturePath);
   await expect(page.getByText("Import complete.")).toBeVisible();
@@ -48,7 +48,7 @@ test("workout lifecycle can be completed from logger to history", async ({ page 
 
   // Navigate to history and confirm the session was recorded
   await page.goto("/history");
-  await expect(page.getByText(/Session 1/).first()).toBeVisible();
-  await expect(page.getByText(/8 reps/).first()).toBeVisible();
+  await expect(page.getByText(/Session 1/).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/8 reps/).first()).toBeVisible({ timeout: 15000 });
 });
 

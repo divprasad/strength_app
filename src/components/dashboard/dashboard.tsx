@@ -40,7 +40,7 @@ export function Dashboard() {
 
   const metrics = useLiveQuery(() => getWeeklyMetrics(todayIso), [todayIso]);
   const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().filter(w => w.status !== "archived").limit(5).toArray(), []);
-  const muscles = useLiveQuery(() => db.muscles.toArray(), []);
+  const muscles = useLiveQuery(() => db.muscleGroups.toArray(), []);
   const summary30 = useLiveQuery(() => get30DaySummary(), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
