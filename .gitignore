@@ -43,6 +43,8 @@ pnpm-debug.log*
 /prisma/dev_pwa.db-journal
 /prisma/dev.db
 /prisma/dev.db-journal
+/prisma/strength_dairy.db*
+/strength_dairy.db*
 /dev_palette.db*
 /prisma/dev_palette.db*
 prisma/*.backup-*
