@@ -6,8 +6,8 @@
 #   2. builder — generate Prisma client + next build (standalone)
 #   3. runner  — lean production image (~180 MB on M1)
 #
-# The database lives in a Docker volume mounted at /app/prisma/dev.db,
-# matching the path that process.cwd() + '/prisma/dev.db' resolves to
+# The database lives in a Docker volume mounted at /app/prisma/strength_dairy.db,
+# matching the path that process.cwd() + '/prisma/strength_dairy.db' resolves to
 # in the API route backup logic.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -80,10 +80,10 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # /app/prisma is the volume mount point — nextjs user needs write access to it at runtime
-# (ownership of dev.db itself is fixed by the entrypoint as root before dropping privileges)
+# (ownership of strength_dairy.db itself is fixed by the entrypoint as root before dropping privileges)
 RUN mkdir -p /app/prisma && chown nextjs:nodejs /app/prisma
 
-# Run entrypoint as root so it can fix dev.db ownership; it drops to nextjs via su-exec
+# Run entrypoint as root so it can fix strength_dairy.db ownership; it drops to nextjs via su-exec
 # USER nextjs  ← intentionally removed; privilege drop happens in docker-entrypoint.sh
 
 EXPOSE 3000
@@ -91,6 +91,6 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # DATABASE_URL points into /app/prisma (the volume mount)
-ENV DATABASE_URL="file:./dev.db"
+ENV DATABASE_URL="file:./strength_dairy.db"
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

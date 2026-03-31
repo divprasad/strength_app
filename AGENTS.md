@@ -32,7 +32,7 @@ The app is now a fully installable **PWA** (via Serwist) and is **Docker-deploya
 
 - **Stable IDs**: Use `createStableId` in `src/lib/utils.ts` for any lookup or seed data (Exercises, MuscleGroups). Never use random UUIDs for data that must match across the client-server boundary.
 - **SyncQueue Protocol**: Never write direct network `fetch` calls from React components for mutation state. All writes must go to Dexie, and subsequently call `enqueueSync(workoutId)`. The engine handles the network traffic to `route.ts`.
-- **Prisma Alignment**: Ensure the database location is consistent. The standard is `prisma/dev.db`.
+- **Prisma Alignment**: Ensure the database location is consistent. The standard is `prisma/strength_dairy.db`.
 - When changing persistence logic, explain:
   - what the source of truth is before the change
   - what the source of truth will be after the change

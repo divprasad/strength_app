@@ -38,6 +38,11 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Filesystem-safe UTC timestamp for filenames: `2026-03-30T20-08-21Z` */
+export function fileTimestamp(date: Date = new Date()): string {
+  return date.toISOString().split(".")[0].replace(/:/g, "-") + "Z";
+}
+
 export function localDateIso(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
