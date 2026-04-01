@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Search } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -104,8 +104,33 @@ export function WorkoutLogger() {
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSessionSelector, setShowSessionSelector] = useState(false);
+
+  // Month history strip — all workouts in the past 30 days
+  const today = localDateIso(new Date());
+  const monthWorkouts = useLiveQuery(async () => {
+    const start = localDateIso(subDays(new Date(), 29));
+    return db.workouts
+      .where("date")
+      .between(start, today, true, true)
+      .filter((w) => w.status === "completed" || w.status === "active")
+      .toArray();
+  }, [today]);
+
+  // Map date -> workouts for quick lookup
+  const monthWorkoutMap = useMemo(() => {
+    const map = new Map<string, Workout[]>();
+    (monthWorkouts ?? []).forEach((w) => {
+      const arr = map.get(w.date) ?? [];
+      arr.push(w);
+      map.set(w.date, arr);
+    });
+    return map;
+  }, [monthWorkouts]);
+
+  // For the selected history day, show a popover with muscles + copy-template button
+  const [historyPopoverDate, setHistoryPopoverDate] = useState<string | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
 
   useEffect(() => {
     setSessionActive(workout?.status === "active");
@@ -198,15 +223,6 @@ export function WorkoutLogger() {
     }
   }
 
-  async function handleCreateWorkout() {
-    setSessionBusy(true);
-    try {
-      const created = await createWorkoutForDate(selectedDate);
-      setActiveWorkoutId(created.id);
-    } finally {
-      setSessionBusy(false);
-    }
-  }
 
   async function handleStartWorkout() {
     if (!workout?.id) return;
@@ -235,20 +251,46 @@ export function WorkoutLogger() {
     if (!activeWorkoutId || !workoutExercises) return;
     setSessionBusy(true);
     try {
-      const today = localDateIso(new Date());
+      const todayStr = localDateIso(new Date());
       // Remove any existing draft workouts on today to prevent accumulation
-      const todayWorkouts = await listWorkoutsByDate(today);
+      const todayWorkouts = await listWorkoutsByDate(todayStr);
       for (const w of todayWorkouts) {
         if (w.status === "draft") await deleteWorkout(w.id);
       }
-      const newWorkout = await createWorkoutForDate(today);
+      const newWorkout = await createWorkoutForDate(todayStr);
       for (const we of workoutExercises) {
         await addExerciseToWorkout(newWorkout.id, we.exerciseId);
       }
-      setSelectedDate(today);
+      setSelectedDate(todayStr);
       setActiveWorkoutId(newWorkout.id);
     } finally {
       setSessionBusy(false);
+    }
+  };
+
+  // Copy a past workout (by workoutId) as template for today
+  const handleCopyHistoryAsTemplate = async (workoutId: string) => {
+    setCopyBusy(true);
+    try {
+      const todayStr = localDateIso(new Date());
+      const sourceExercises = await db.workoutExercises
+        .where("workoutId")
+        .equals(workoutId)
+        .sortBy("orderIndex");
+      // Remove any existing draft workouts on today to prevent accumulation
+      const todayWorkouts = await listWorkoutsByDate(todayStr);
+      for (const w of todayWorkouts) {
+        if (w.status === "draft") await deleteWorkout(w.id);
+      }
+      const newWorkout = await createWorkoutForDate(todayStr);
+      for (const we of sourceExercises) {
+        await addExerciseToWorkout(newWorkout.id, we.exerciseId);
+      }
+      setSelectedDate(todayStr);
+      setActiveWorkoutId(newWorkout.id);
+      setHistoryPopoverDate(null);
+    } finally {
+      setCopyBusy(false);
     }
   };
 
@@ -340,15 +382,26 @@ export function WorkoutLogger() {
 
   return (
     <div className="space-y-3">
+      {/* ── Month History Strip ── */}
+      <MonthHistoryStrip
+        today={today}
+        monthWorkoutMap={monthWorkoutMap}
+        exerciseMap={exerciseMap ?? new Map()}
+        muscleMap={muscleMap}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        historyPopoverDate={historyPopoverDate}
+        onSetHistoryPopoverDate={setHistoryPopoverDate}
+        onCopyAsTemplate={handleCopyHistoryAsTemplate}
+        copyBusy={copyBusy}
+      />
+
       {/* ── Compact Header Bar ── */}
       <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border border-border/60 bg-card/90 px-4 py-3 shadow-[0_12px_36px_-24px_hsl(var(--foreground)/0.3)]">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <button
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            className="text-sm font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
-          >
+          <span className="text-sm font-semibold tracking-tight text-foreground">
             {formatLocalDate(selectedDate, "EEE, MMM d")}
-          </button>
+          </span>
           <div className="h-4 w-px bg-border/50" />
           <Badge
             className={cn(
@@ -428,37 +481,6 @@ export function WorkoutLogger() {
           ) : null}
         </div>
       </div>
-
-      {/* Collapsible Date Picker */}
-      {showDatePicker && (
-        <div className="rounded-[1.2rem] border border-border/60 bg-card/90 p-3 animate-in slide-in-from-top-1 duration-150">
-          <div className="flex items-center gap-3">
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value || localDateIso(new Date()));
-                setShowDatePicker(false);
-              }}
-              className="h-9 max-w-[180px] text-sm"
-            />
-            {workout?.status === "completed" && workout.sessionStartedAt && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">Start time:</span>
-                <Input
-                  type="time"
-                  defaultValue={formatTimeOfDay(workout.sessionStartedAt).split(" ")[0]}
-                  onBlur={(e) => handleUpdateTime(e.target.value)}
-                  className="h-9 w-[100px] text-sm"
-                />
-              </div>
-            )}
-            <Button size="sm" variant="secondary" onClick={handleCreateWorkout} disabled={sessionBusy} className="h-8 text-xs rounded-full">
-              New Session
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Collapsible Session Selector */}
       {showSessionSelector && workouts && workouts.length > 1 && (
@@ -602,12 +624,17 @@ export function WorkoutLogger() {
           />
         </div>
       ) : (
-        /* No workout — show a single CTA */
+        /* No workout — only allow starting on today */
         <div className="flex flex-col items-center gap-4 rounded-[1.8rem] border border-dashed border-border/50 bg-card/60 px-6 py-12">
           <p className="text-sm text-muted-foreground">No workout for {formatLocalDate(selectedDate, "EEEE, MMM d")}</p>
-          <Button onClick={handleCreateAndStart} disabled={sessionBusy} className="rounded-full px-6">
-            Start Workout
-          </Button>
+          {selectedDate === today && (
+            <Button onClick={handleCreateAndStart} disabled={sessionBusy} className="rounded-full px-6">
+              Start Workout
+            </Button>
+          )}
+          {selectedDate !== today && (
+            <p className="text-xs text-muted-foreground/60">Select a past workout above to use it as today&apos;s template</p>
+          )}
         </div>
       )}
     </div>
@@ -1210,5 +1237,247 @@ function SetChip({
       <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
       <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
     </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONTH HISTORY STRIP
+   ═══════════════════════════════════════════════════════════════════ */
+
+type MonthHistoryStripProps = {
+  today: string;
+  monthWorkoutMap: Map<string, Workout[]>;
+  exerciseMap: Map<string, Exercise>;
+  muscleMap: Map<string, MuscleGroup>;
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  historyPopoverDate: string | null;
+  onSetHistoryPopoverDate: (date: string | null) => void;
+  onCopyAsTemplate: (workoutId: string) => void;
+  copyBusy: boolean;
+};
+
+function MonthHistoryStrip({
+  today,
+  monthWorkoutMap,
+  exerciseMap,
+  muscleMap,
+  selectedDate,
+  onSelectDate,
+  historyPopoverDate,
+  onSetHistoryPopoverDate,
+  onCopyAsTemplate,
+  copyBusy,
+}: MonthHistoryStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const todayRef = useRef<HTMLButtonElement>(null);
+
+  // Build the 30-day range (oldest → today)
+  const days = useMemo(() => {
+    const end = new Date();
+    const start = subDays(end, 29);
+    return eachDayOfInterval({ start, end });
+  }, []);
+
+  // Scroll today into view on mount
+  useEffect(() => {
+    todayRef.current?.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
+  }, []);
+
+  // Get top-5 muscles (by exercise frequency) for a given date's workouts
+  function getTopMuscles(dateStr: string): string[] {
+    const workoutsOnDay = monthWorkoutMap.get(dateStr) ?? [];
+    // We'll compute this in the popover so keep it async-friendly via a separate hook
+    return [];
+  }
+
+  const hasWorkout = (dateStr: string) => (monthWorkoutMap.get(dateStr)?.length ?? 0) > 0;
+  const isToday = (dateStr: string) => dateStr === today;
+  const isPast = (dateStr: string) => isBefore(new Date(dateStr), startOfDay(new Date()));
+
+  return (
+    <div className="relative">
+      {/* Strip container */}
+      <div
+        ref={scrollRef}
+        className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 px-0.5"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {days.map((day) => {
+          const dateStr = localDateIso(day);
+          const dayLabel = format(day, "d");
+          const weekLabel = format(day, "EEE");
+          const hasW = hasWorkout(dateStr);
+          const isTodayCell = isToday(dateStr);
+          const isSelected = dateStr === selectedDate;
+          const isPopoverOpen = historyPopoverDate === dateStr;
+
+          return (
+            <div key={dateStr} className="relative flex-shrink-0">
+              <button
+                ref={isTodayCell ? todayRef : undefined}
+                onClick={() => {
+                  onSelectDate(dateStr);
+                  if (hasW && !isTodayCell) {
+                    onSetHistoryPopoverDate(isPopoverOpen ? null : dateStr);
+                  } else {
+                    onSetHistoryPopoverDate(null);
+                  }
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 rounded-2xl px-2 py-2 transition-all duration-200 min-w-[44px]",
+                  isTodayCell
+                    ? "bg-primary text-primary-foreground shadow-[0_4px_12px_-4px_hsl(var(--primary)/0.5)]"
+                    : isSelected
+                      ? "bg-accent text-foreground"
+                      : hasW
+                        ? "bg-card/80 hover:bg-card border border-border/40 hover:border-primary/30"
+                        : "hover:bg-muted/50 text-muted-foreground"
+                )}
+              >
+                <span className={cn(
+                  "text-[10px] font-medium",
+                  isTodayCell ? "text-primary-foreground/70" : "text-muted-foreground"
+                )}>
+                  {weekLabel}
+                </span>
+                <span className={cn(
+                  "text-sm font-bold leading-none",
+                  isTodayCell ? "text-primary-foreground" : hasW ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {dayLabel}
+                </span>
+                {/* Workout dot */}
+                <div className="h-1.5 w-1.5 rounded-full mt-0.5">
+                  {hasW && (
+                    <div className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      isTodayCell ? "bg-primary-foreground/60" : "bg-primary/60"
+                    )} />
+                  )}
+                </div>
+              </button>
+
+              {/* Popover for past workout days */}
+              {isPopoverOpen && hasW && !isTodayCell && (
+                <WorkoutHistoryPopover
+                  dateStr={dateStr}
+                  workouts={monthWorkoutMap.get(dateStr) ?? []}
+                  exerciseMap={exerciseMap}
+                  muscleMap={muscleMap}
+                  onCopyAsTemplate={onCopyAsTemplate}
+                  onClose={() => onSetHistoryPopoverDate(null)}
+                  copyBusy={copyBusy}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Workout History Popover ── */
+
+function WorkoutHistoryPopover({
+  dateStr,
+  workouts,
+  exerciseMap,
+  muscleMap,
+  onCopyAsTemplate,
+  onClose,
+  copyBusy,
+}: {
+  dateStr: string;
+  workouts: Workout[];
+  exerciseMap: Map<string, Exercise>;
+  muscleMap: Map<string, MuscleGroup>;
+  onCopyAsTemplate: (workoutId: string) => void;
+  onClose: () => void;
+  copyBusy: boolean;
+}) {
+  // Use the first/most-recent completed workout
+  const workout = workouts.find((w) => w.status === "completed") ?? workouts[0];
+
+  const workoutExercises = useLiveQuery(
+    () => db.workoutExercises.where("workoutId").equals(workout.id).sortBy("orderIndex"),
+    [workout.id]
+  );
+
+  // Compute top-5 muscles by frequency (count of exercises targeting each muscle)
+  const topMuscles = useMemo(() => {
+    if (!workoutExercises) return [];
+    const freq = new Map<string, number>();
+    workoutExercises.forEach((we) => {
+      const ex = exerciseMap.get(we.exerciseId);
+      if (!ex) return;
+      const ids = [...ex.primaryMuscleIds, ...ex.secondaryMuscleIds];
+      ids.forEach((id) => freq.set(id, (freq.get(id) ?? 0) + 1));
+    });
+    return Array.from(freq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id]) => muscleMap.get(id)?.name ?? id);
+  }, [workoutExercises, exerciseMap, muscleMap]);
+
+  const exerciseCount = workoutExercises?.length ?? 0;
+  const dateLabel = formatLocalDate(dateStr, "EEE, MMM d");
+
+  return (
+    <div
+      className="absolute left-1/2 top-full mt-2 z-50 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card shadow-[0_16px_40px_-12px_hsl(var(--foreground)/0.25)] animate-in zoom-in-95 slide-in-from-top-2 duration-150"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="px-4 pt-3 pb-2 border-b border-border/40">
+        <p className="text-xs font-semibold text-foreground">{dateLabel}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {exerciseCount} exercise{exerciseCount !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {/* Top muscles */}
+      {topMuscles.length > 0 && (
+        <div className="px-4 py-2.5">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Top muscles</p>
+          <div className="flex flex-wrap gap-1.5">
+            {topMuscles.map((m, i) => (
+              <span
+                key={m}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium border",
+                  i === 0
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : i === 1
+                      ? "bg-primary/7 text-primary/80 border-primary/15"
+                      : "bg-muted/60 text-muted-foreground border-border/40"
+                )}
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      <div className="px-3 pb-3">
+        <button
+          onClick={() => onCopyAsTemplate(workout.id)}
+          disabled={copyBusy}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50"
+        >
+          <Dumbbell className="h-3.5 w-3.5" />
+          Use as today&apos;s template
+        </button>
+        <button
+          onClick={onClose}
+          className="mt-1.5 w-full rounded-xl px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted/50 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
   );
 }

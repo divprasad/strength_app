@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { format, parseISO } from "date-fns";
+import { differenceInCalendarDays, differenceInCalendarWeeks, format, parseISO } from "date-fns";
 import { db } from "@/lib/db";
 import { createExercise } from "@/lib/repository";
 import type { Exercise } from "@/types/domain";
@@ -10,11 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-
 import { Modal } from "@/components/ui/modal";
 import { ExerciseForm } from "@/components/exercise/exercise-form";
-
-import { Edit2, Trophy } from "lucide-react";
+import { Edit2, Plus, Trophy } from "lucide-react";
 
 /* ── 1RM helper (Epley formula) ── */
 function estimate1RM(weight: number, reps: number): number {
@@ -23,14 +21,26 @@ function estimate1RM(weight: number, reps: number): number {
   return Math.round(weight * (1 + reps / 30));
 }
 
-/* ── Per-exercise 1RM lookup ── */
+/* ── Relative "last seen" label ── */
+function relativeTime(dateStr: string): string {
+  const today = new Date();
+  const date = parseISO(dateStr);
+  const days = differenceInCalendarDays(today, date);
+  if (days === 0) return "today";
+  if (days === 1) return "1d ago";
+  if (days < 14) return `${days}d ago`;
+  const weeks = differenceInCalendarWeeks(today, date);
+  if (weeks < 52) return `${weeks}w ago`;
+  return `${Math.floor(weeks / 52)}y ago`;
+}
+
+/* ── Per-exercise 1RM + last-seen lookup ── */
 function useExerciseBests(exercises: Exercise[] | undefined) {
   return useLiveQuery(async () => {
     if (!exercises || exercises.length === 0) return {};
 
     const bests: Record<string, { estimated1RM: number; weight: number; reps: number; date: string }> = {};
 
-    // Get all workoutExercises with their workout dates
     const allWE = await db.workoutExercises.toArray();
     const workoutCache: Record<string, string> = {};
 
@@ -38,7 +48,6 @@ function useExerciseBests(exercises: Exercise[] | undefined) {
       const exerciseId = we.exerciseId;
       if (!exercises.some(e => e.id === exerciseId)) continue;
 
-      // Get sets for this workoutExercise
       const sets = await db.setEntries
         .where("workoutExerciseId")
         .equals(we.id)
@@ -49,12 +58,10 @@ function useExerciseBests(exercises: Exercise[] | undefined) {
         const e1rm = estimate1RM(set.weight, set.reps);
 
         if (!bests[exerciseId] || e1rm > bests[exerciseId].estimated1RM) {
-          // Lazy-load workout date
           if (!workoutCache[we.workoutId]) {
             const workout = await db.workouts.get(we.workoutId);
             workoutCache[we.workoutId] = workout?.date ?? "";
           }
-
           bests[exerciseId] = {
             estimated1RM: e1rm,
             weight: set.weight,
@@ -69,10 +76,42 @@ function useExerciseBests(exercises: Exercise[] | undefined) {
   }, [exercises]);
 }
 
+/* ── Last-seen date per exercise ── */
+function useLastSeen(exercises: Exercise[] | undefined) {
+  return useLiveQuery(async () => {
+    if (!exercises || exercises.length === 0) return {};
+
+    const lastSeen: Record<string, string> = {};
+
+    const allWE = await db.workoutExercises.toArray();
+    const workoutDateCache: Record<string, string> = {};
+
+    for (const we of allWE) {
+      const exerciseId = we.exerciseId;
+      if (!exercises.some(e => e.id === exerciseId)) continue;
+
+      if (!workoutDateCache[we.workoutId]) {
+        const workout = await db.workouts.get(we.workoutId);
+        workoutDateCache[we.workoutId] = workout?.date ?? "";
+      }
+
+      const date = workoutDateCache[we.workoutId];
+      if (!date) continue;
+
+      if (!lastSeen[exerciseId] || date > lastSeen[exerciseId]) {
+        lastSeen[exerciseId] = date;
+      }
+    }
+
+    return lastSeen;
+  }, [exercises]);
+}
+
 export function ExerciseList() {
   const muscles = useLiveQuery(() => db.muscleGroups.orderBy("name").toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const bests = useExerciseBests(exercises);
+  const lastSeen = useLastSeen(exercises);
 
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -128,14 +167,12 @@ export function ExerciseList() {
 
   return (
     <div className="space-y-3">
-      <Button onClick={handleOpenCreate} className="w-full rounded-xl">
-        + New Exercise
-      </Button>
 
       {filteredExercises.length > 0 ? (
         <ul className="grid gap-2">
           {filteredExercises.map((exercise) => {
             const best = bests?.[exercise.id];
+            const seenDate = lastSeen?.[exercise.id];
             const primaryMuscles = exercise.primaryMuscleIds
               ?.map(id => muscles?.find(m => m.id === id))
               .filter(Boolean);
@@ -148,10 +185,16 @@ export function ExerciseList() {
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: Name + meta */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold tracking-tight text-foreground truncate">
                         {exercise.name}
                       </p>
+                      {/* Last seen chip */}
+                      {seenDate && (
+                        <span className="text-[10px] font-medium text-muted-foreground/60 tabular-nums shrink-0">
+                          {relativeTime(seenDate)}
+                        </span>
+                      )}
                       <button
                         onClick={() => handleOpenEdit(exercise)}
                         className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted"
@@ -226,6 +269,20 @@ export function ExerciseList() {
           </CardContent>
         </Card>
       )}
+
+      {/* Add exercise — below the list, matching muscle manager style */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleOpenCreate}
+          className="flex flex-1 items-center gap-2 rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card/80 transition-all text-left"
+        >
+          Add exercise...
+        </button>
+        <Button onClick={handleOpenCreate} size="sm" className="shrink-0 rounded-xl px-4">
+          <Plus className="h-4 w-4 mr-1" />
+          Add
+        </Button>
+      </div>
 
       <Modal 
         isOpen={isModalOpen}
