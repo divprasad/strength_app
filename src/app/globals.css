@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Elevation system ── */
+/* Use these instead of one-off shadow-[...] values */
+@layer utilities {
+  .shadow-e1 { box-shadow: 0 4px 16px -8px hsl(var(--foreground) / 0.12); }   /* chips, tags, subtle lift */
+  .shadow-e2 { box-shadow: 0 12px 32px -16px hsl(var(--foreground) / 0.22); } /* cards, list rows */
+  .shadow-e3 { box-shadow: 0 24px 60px -32px hsl(var(--foreground) / 0.38); } /* page hero, header, modals */
+}
+
+
 /* Theme Base Definitions */
 :root {
   --radius: 1.2rem;

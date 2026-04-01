@@ -180,7 +180,7 @@ export function ExerciseList() {
             return (
               <li
                 key={exercise.id}
-                className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.15)] p-4"
+                className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.15)] px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: Name + meta */}
@@ -264,7 +264,7 @@ export function ExerciseList() {
           <CardContent className="pt-5">
             <EmptyState 
               title="No exercises yet"
-              description="Create your first custom movement to start logging."
+              description="Create one to start logging."
             />
           </CardContent>
         </Card>
@@ -288,7 +288,7 @@ export function ExerciseList() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editing ? `Edit ${editing.name}` : "Create Exercise"}
-        description="Define how movements are grouped and tracked so logging and analytics stay consistent."
+        description="Set up category, equipment, and target muscles."
       >
         {muscles ? (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 pb-2 -mr-2">

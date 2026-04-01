@@ -14,7 +14,7 @@ export function PageIntro({ eyebrow, title, description, action, meta, className
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[1.9rem] border border-white/50 bg-card/88 px-5 py-5 shadow-[0_24px_70px_-42px_hsl(var(--foreground)/0.48)] ring-1 ring-black/5 md:px-7 md:py-6",
+        "relative overflow-hidden rounded-3xl border border-white/50 bg-card/88 px-5 py-5 shadow-e3 ring-1 ring-black/5 md:px-7 md:py-6",
         className
       )}
     >

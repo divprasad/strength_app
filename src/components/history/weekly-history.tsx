@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeDurationSeconds, formatDurationLong, formatTimeOfDay } from "@/lib/time";
+import { collapseSetGroups, formatCollapsedSets } from "@/lib/format-sets";
 
 export function WeeklyHistory() {
   const [anchorDate, setAnchorDate] = useState(localDateIso(new Date()));
@@ -50,9 +51,8 @@ export function WeeklyHistory() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Training Archive"
         title="History"
-        description="Browse completed sessions by week, drill into each workout, and review set-level detail without changing the underlying logging flow."
+        description="Past sessions by week."
         action={
           <>
             <Button size="sm" variant="ghost" onClick={() => setAnchorDate(localDateIso(subWeeks(parseISO(anchorDate), 1)))}>
@@ -76,7 +76,6 @@ export function WeeklyHistory() {
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle>Week View</CardTitle>
-          <CardDescription>Tap a day to load the recorded sessions for that date.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-2">
@@ -107,7 +106,6 @@ export function WeeklyHistory() {
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle>{format(parseISO(selectedDate), "EEEE, MMM d")}</CardTitle>
-          <CardDescription>Sessions are ordered by their recorded start time for the selected day.</CardDescription>
         </CardHeader>
         <CardContent>
           {workoutsForDate && workoutsForDate.length > 0 ? (
@@ -115,7 +113,7 @@ export function WeeklyHistory() {
               {workoutsForDate.map((entry, index) => {
                 const durationSeconds = computeDurationSeconds(entry.workout.sessionStartedAt, entry.workout.sessionEndedAt);
                 return (
-                  <div key={entry.workout.id} className="overflow-hidden rounded-[1.4rem] border border-border/60 bg-background/55 p-4 shadow-[0_12px_36px_-32px_hsl(var(--foreground)/0.5)]">
+                  <div key={entry.workout.id} className="overflow-hidden rounded-2xl border border-border/60 bg-background/55 p-4 shadow-e2">
                     <div className="flex items-center justify-between border-b border-border/50 pb-3">
                       <div className="flex items-center gap-3">
                         <span className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-primary/70">Session {index + 1}</span>
@@ -140,17 +138,11 @@ export function WeeklyHistory() {
                                 <span className="text-[10px] tabular-nums text-muted-foreground">{formatDurationLong(exerciseDuration)}</span>
                               </div>
                               
-                              <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                                {exerciseEntry.sets.map((setEntry) => (
-                                  <li
-                                    key={setEntry.id}
-                                    className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-1.5 text-xs text-muted-foreground"
-                                  >
-                                    <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
-                                    <span>{setEntry.reps} reps × {setEntry.weight}kg</span>
-                                  </li>
-                                ))}
-                              </ul>
+                              <div className="mt-1">
+                                <p className="text-xs text-muted-foreground">
+                                  {formatCollapsedSets(collapseSetGroups(exerciseEntry.sets))}
+                                </p>
+                              </div>
                             </div>
                           );
                         })
@@ -163,7 +155,7 @@ export function WeeklyHistory() {
               })}
             </div>
           ) : (
-            <EmptyState title="No workout on this day" description="Tap another day to browse your history." />
+            <EmptyState title="Rest day" description="No workout logged." />
           )}
         </CardContent>
       </Card>
