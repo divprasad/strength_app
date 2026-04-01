@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
 import { getWorkoutBundle } from "@/lib/repository";
 import { ArrowRight, Check, ChevronDown, ChevronUp, Edit2, Flame } from "lucide-react";
+import { collapseSetGroups, formatCollapsedSets } from "@/lib/format-sets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,7 +104,7 @@ export function Dashboard() {
   return (
     <div className="space-y-4">
       {/* ── Part A: Compact Dashboard Header ── */}
-      <div className="rounded-[1.6rem] border border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-accent/10 px-5 py-5 shadow-[0_16px_48px_-24px_hsl(var(--foreground)/0.35)]">
+      <div className="rounded-3xl border border-border/60 bg-gradient-to-br from-card/95 via-card/90 to-accent/10 px-5 py-5 shadow-e3">
         {/* ── Date heading with press-and-hold CTA ── */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div
@@ -144,7 +145,7 @@ export function Dashboard() {
           </div>
           {recentWorkout && (
             <span className="mt-3 shrink-0 text-xs text-muted-foreground/70">
-              last sesh {formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}
+              Last workout: {formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}
             </span>
           )}
         </div>
@@ -200,15 +201,15 @@ export function Dashboard() {
 
       {/* ── Part B: Consolidated Stats Strip ── */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[1.3rem] border border-border/50 bg-card/80 px-4 py-3.5 shadow-[0_12px_32px_-20px_hsl(var(--foreground)/0.25)]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Volume</p>
+        <div className="rounded-2xl border border-border/50 bg-card/80 px-4 py-3.5 shadow-e2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Weekly Volume</p>
           <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] tabular-nums">
-            {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
+            {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}<span className="ml-1 text-sm font-normal text-muted-foreground">kg</span>
           </p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">this week</p>
         </div>
 
-        <div className="rounded-[1.3rem] border border-border/50 bg-card/80 px-4 py-3.5 shadow-[0_12px_32px_-20px_hsl(var(--foreground)/0.25)]">
+        <div className="rounded-2xl border border-border/50 bg-card/80 px-4 py-3.5 shadow-e2">
           <div className="flex items-center gap-1.5">
             <Flame className="h-3 w-3 text-muted-foreground" />
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Focus</p>
@@ -229,8 +230,8 @@ export function Dashboard() {
 
       {/* ── Past 4 Weeks Overview ── */}
       {summary30 && (
-        <div className="rounded-[1.2rem] border border-border/40 bg-card/60 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Past 4 weeks overview</p>
+        <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Last 4 weeks</p>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs font-medium text-foreground">
               {summary30.completedCount} sessions · {summary30.totalVolume.toLocaleString()}kg
@@ -260,8 +261,8 @@ export function Dashboard() {
           <Card className="border-dashed border-border/50">
             <CardContent className="pt-5">
               <EmptyState
-                title="No workout history yet"
-                description="Log your first workout to start building momentum."
+                title="No workouts yet"
+                description="Start logging to build your history."
                 action={
                   <Button className="rounded-full px-5" onClick={() => router.push("/workouts")}>
                     Start logging
@@ -285,7 +286,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
 
   if (!bundle) {
     return (
-      <div className="h-12 animate-pulse rounded-[1.2rem] border border-border/40 bg-card/40" />
+      <div className="h-12 animate-pulse rounded-2xl border border-border/40 bg-card/40" />
     );
   }
 
@@ -316,7 +317,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
     return (
       <button
         onClick={() => setExpanded(true)}
-        className="flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
+        className="flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80"
       >
         <Check className="h-4 w-4 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
@@ -331,7 +332,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
   }
 
   return (
-    <div className="rounded-[1.2rem] border border-border/50 bg-card/70 overflow-hidden">
+    <div className="rounded-2xl border border-border/50 bg-card/70 overflow-hidden">
       <button
         onClick={() => setExpanded(false)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
@@ -353,12 +354,9 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium truncate">{item.exercise.name}</p>
                 <div className="flex flex-wrap gap-1 mt-0.5">
-                  {item.sets.map((s) => (
-                    <span key={s.id} className="inline-flex items-center gap-1 rounded-full border border-border/40 bg-background/50 px-2 py-0.5 text-[10px] text-muted-foreground">
-                      <span className="font-semibold text-primary/60">#{s.setNumber}</span>
-                      {s.reps}×{s.weight}kg
-                    </span>
-                  ))}
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatCollapsedSets(collapseSetGroups(item.sets))}
+                  </span>
                 </div>
               </div>
               <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{formatDurationLong(exerciseDuration)}</span>

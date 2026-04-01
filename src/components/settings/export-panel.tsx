@@ -162,7 +162,7 @@ export function ExportPanel() {
       }
 
       const confirmed = window.confirm(
-        "Changes detected! Are you sure you want to sync all local data to the server? This will push all muscle groups, exercises, and workouts to the SQL database."
+        "Push all local data to the server? This will overwrite server data with your current local state."
       );
       if (!confirmed) return;
 
@@ -179,7 +179,7 @@ export function ExportPanel() {
 
   async function handleResetFromServer() {
     const confirmed = window.confirm(
-      "This will WIPE all your local data on THIS device and replace it with data from the server. Are you sure? ^_^"
+      "Replace all local data with server data? This cannot be undone."
     );
     if (!confirmed) return;
 
@@ -234,24 +234,15 @@ export function ExportPanel() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Backup & Integrity"
         title="Settings"
-        description="Export or replace local data, then run an integrity audit to make sure the training log still looks structurally sound."
-        action={
-          <Button onClick={runAudit} disabled={auditLoading}>
-            {auditLoading ? "Running..." : "Run Check"}
-          </Button>
-        }
+        description="Backup, restore, and sync your data."
         meta={
-          <>
-            <Badge className="bg-accent px-3 py-1 text-accent-foreground">Local-first data tools</Badge>
-            {auditReport ? <Badge>{auditReport.ok ? "Healthy" : `${auditReport.summary.total} issue${auditReport.summary.total === 1 ? "" : "s"}`}</Badge> : null}
-          </>
+          auditReport ? <Badge>{auditReport.ok ? "✓ Healthy" : `${auditReport.summary.total} issue${auditReport.summary.total === 1 ? "" : "s"}`}</Badge> : null
         }
       />
 
       {status ? (
-        <div className="rounded-[1.3rem] border border-border/70 bg-card/82 px-4 py-3 text-sm text-muted-foreground shadow-[0_18px_40px_-34px_hsl(var(--foreground)/0.42)]">
+        <div className="rounded-2xl border border-border/70 bg-card/82 px-4 py-3 text-sm text-muted-foreground shadow-e2">
           {status}
         </div>
       ) : null}
@@ -260,13 +251,11 @@ export function ExportPanel() {
         <Card className="overflow-hidden">
           <CardHeader className="pb-4">
           <CardTitle>Export Data</CardTitle>
-          <CardDescription>
-            Export includes exercises, muscles, workouts, workout exercises, set entries, and settings.
-          </CardDescription>
+          <CardDescription>Full export of all your training data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-[1.25rem] border border-border/70 bg-background/55 p-4">
-            <p className="text-sm text-muted-foreground">Use JSON for full restore workflows. CSV exports each table separately for inspection or spreadsheet use.</p>
+          <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+            <p className="text-sm text-muted-foreground">JSON for backup and restore. CSV for spreadsheets.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={exportJson}>Export JSON</Button>
@@ -280,15 +269,15 @@ export function ExportPanel() {
         <Card className="overflow-hidden">
           <CardHeader className="pb-4">
           <CardTitle>Import & Sync</CardTitle>
-          <CardDescription>Upload a JSON export to replace your entire local database state.</CardDescription>
+          <CardDescription>Restore from a JSON backup or sync with the server.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input type="file" accept=".json,application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
-            Push to Database Server
+            Push to Server
           </Button>
-          <Button onClick={handleResetFromServer} disabled={loading} variant="ghost" className="w-full">
-            Pull from Database Server
+          <Button onClick={handleResetFromServer} disabled={loading} variant="secondary" className="w-full">
+            Pull from Server
           </Button>
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -302,14 +291,21 @@ export function ExportPanel() {
 
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
-          <CardTitle>Integrity Report</CardTitle>
-          <CardDescription>Runs a read-only audit of local IndexedDB data and reports structural issues.</CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Integrity Report</CardTitle>
+              <CardDescription>Check local data for structural issues.</CardDescription>
+            </div>
+            <Button size="sm" onClick={runAudit} disabled={auditLoading} className="shrink-0">
+              {auditLoading ? "Running..." : "Run Check"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {auditError ? <p className="text-sm text-destructive">{auditError}</p> : null}
           {auditReport ? (
             <div className="space-y-3">
-              <div className="rounded-[1.2rem] border border-border/70 bg-background/55 p-4">
+              <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
@@ -355,7 +351,7 @@ export function ExportPanel() {
               ) : null}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Run a check to inspect the local database.</p>
+            <p className="text-sm text-muted-foreground">Run a check to inspect your data.</p>
           )}
         </CardContent>
       </Card>

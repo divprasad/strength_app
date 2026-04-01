@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Search } from "lucide-react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useSearchParams, useRouter } from "next/navigation";
+import { StepperInput } from "@/components/ui/stepper-input";
 import { db } from "@/lib/db";
 import {
   addExerciseToWorkout,
@@ -218,7 +220,7 @@ export function WorkoutLogger() {
 
   const handleFinishWorkout = async () => {
     if (!activeWorkoutId) return;
-    const confirmed = window.confirm("Finish this workout? This will save the session to the server.");
+    const confirmed = window.confirm("End workout and save?");
     if (!confirmed) return;
     try {
       await finishWorkoutSession(activeWorkoutId);
@@ -253,7 +255,7 @@ export function WorkoutLogger() {
   const handleArchiveWorkout = async () => {
     if (!activeWorkoutId) return;
     const confirmed = window.confirm(
-      "Archive this workout? It will be hidden from your history and analytics, but can be restored from Settings."
+      "Archive this workout? It will be hidden from history but can be restored in Settings."
     );
     if (!confirmed) return;
     await archiveWorkout(activeWorkoutId);
@@ -262,7 +264,7 @@ export function WorkoutLogger() {
 
   const handleDeleteSession = async (workoutId: string, status: string) => {
     if (status !== "draft") {
-      const confirmed = window.confirm("Delete this session permanently? This cannot be undone.");
+      const confirmed = window.confirm("Delete this session? This cannot be undone.");
       if (!confirmed) return;
     }
     await deleteWorkout(workoutId);
@@ -506,8 +508,8 @@ export function WorkoutLogger() {
           url.searchParams.delete("id");
           router.replace(url.pathname + url.search);
         }}
-        title="Edit Workout Session?"
-        description="Jump back into this session to make changes."
+        title="Edit Session?"
+        description="Resume editing this session."
         footer={
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => {
@@ -587,7 +589,7 @@ export function WorkoutLogger() {
           ) : (
             <Card className="border-dashed border-border/50">
               <CardContent className="pt-5">
-                <EmptyState title="No exercises yet" description="Pick an exercise below to start tracking." />
+                <EmptyState title="No exercises yet" description="Add one below to start." />
               </CardContent>
             </Card>
           )}
@@ -634,55 +636,68 @@ function InlineExercisePicker({
     return exercises.filter(e => e.name.toLowerCase().includes(lower));
   }, [exercises, filter]);
 
-  if (!open) {
-    return (
+  function close() {
+    setOpen(false);
+    setFilter("");
+  }
+
+  return (
+    <>
+      {/* Trigger — same visual as before */}
       <button
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-[1.2rem] border border-dashed border-border/50 bg-card/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card/70 hover:text-foreground disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 bg-card/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card/70 hover:text-foreground disabled:opacity-50"
       >
         <Plus className="h-4 w-4" />
         Add Exercise
       </button>
-    );
-  }
 
-  return (
-    <div className="rounded-[1.2rem] border border-primary/20 bg-card/90 p-3 shadow-[0_8px_24px_-12px_hsl(var(--primary)/0.2)] animate-in zoom-in-95 duration-150">
-      <Input
-        autoFocus
-        placeholder="Search exercises..."
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="h-9 text-sm mb-2"
-      />
-      <div className="max-h-[200px] overflow-y-auto space-y-0.5">
-        {filtered.length > 0 ? (
-          filtered.map((exercise) => (
-            <button
-              key={exercise.id}
-              onClick={() => {
-                onAdd(exercise.id);
-                setOpen(false);
-                setFilter("");
-              }}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-left transition-colors hover:bg-accent/50"
-            >
-              <span className="font-medium">{exercise.name}</span>
-              <span className="text-[10px] text-muted-foreground">{exercise.category}</span>
-            </button>
-          ))
-        ) : (
-          <p className="px-3 py-2 text-xs text-muted-foreground">No exercises found</p>
-        )}
-      </div>
-      <button
-        onClick={() => { setOpen(false); setFilter(""); }}
-        className="mt-2 w-full rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
-      >
-        Cancel
-      </button>
-    </div>
+      {/* Bottom sheet */}
+      <BottomSheet isOpen={open} onClose={close} title="Add Exercise">
+        {/* Search */}
+        <div className="sticky top-0 border-b border-border/50 bg-card/98 px-4 pb-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search exercises..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+            />
+          </div>
+        </div>
+
+        {/* Exercise list */}
+        <div className="px-2 py-2">
+          {filtered.length > 0 ? (
+            <ul className="space-y-0.5">
+              {filtered.map((exercise) => (
+                <li key={exercise.id}>
+                  <button
+                    onClick={() => { onAdd(exercise.id); close(); }}
+                    className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent"
+                  >
+                    <span className="font-medium text-sm">{exercise.name}</span>
+                    <span className="ml-3 shrink-0 rounded-full border border-border/40 bg-muted/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      {exercise.category}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              No exercises found for &ldquo;{filter}&rdquo;
+            </p>
+          )}
+          {/* Bottom padding for safe area */}
+          <div className="h-6" />
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 
@@ -693,6 +708,7 @@ function InlineExercisePicker({
 function WorkoutExerciseCard({
   workoutExerciseId,
   title,
+  exercise,
   onDelete,
   onStart,
   onFinish,
@@ -726,16 +742,40 @@ function WorkoutExerciseCard({
     return sets[sets.length - 1];
   }, [sets]);
 
-  // Phase 3: Smart pre-fill from last set
+  // Phase 3: Smart pre-fill from last set in this session
   const [reps, setReps] = useState("8");
   const [weight, setWeight] = useState("20");
 
+  // Smart pre-fill: most recent set from a PREVIOUS session of this exercise
+  const prevSessionSet = useLiveQuery(async () => {
+    const allWEs = await db.workoutExercises
+      .where("exerciseId")
+      .equals(exercise.id)
+      .filter((we) => we.id !== workoutExerciseId)
+      .toArray();
+    if (allWEs.length === 0) return null;
+    const prevSets = await db.setEntries
+      .where("workoutExerciseId")
+      .anyOf(allWEs.map((we) => we.id))
+      .sortBy("createdAt");
+    return prevSets.length > 0 ? prevSets[prevSets.length - 1] : null;
+  }, [exercise.id, workoutExerciseId]);
+
+  // Pre-fill from current session's last set
   useEffect(() => {
     if (lastSet) {
       setReps(String(lastSet.reps));
       setWeight(String(lastSet.weight));
     }
   }, [lastSet]);
+
+  // Pre-fill from previous session — only when no sets logged yet in current session
+  useEffect(() => {
+    if (prevSessionSet && !lastSet) {
+      setReps(String(prevSessionSet.reps));
+      setWeight(String(prevSessionSet.weight));
+    }
+  }, [prevSessionSet, lastSet]);
 
   const isFinished = Boolean(completedAt);
   const isTimerActive = isActive && !isFinished && Boolean(startedAt);
@@ -795,8 +835,8 @@ function WorkoutExerciseCard({
         <Modal
           isOpen={!!showAddConfirm}
           onClose={() => setShowAddConfirm(null)}
-          title="Save to local database?"
-          description={showAddConfirm ? `Add: ${showAddConfirm.reps} reps × ${showAddConfirm.weight}kg` : ""}
+          title="Add set?"
+          description={showAddConfirm ? `${showAddConfirm.reps} reps × ${showAddConfirm.weight} kg` : ""}
           footer={
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setShowAddConfirm(null)}>Cancel</Button>
@@ -814,7 +854,7 @@ function WorkoutExerciseCard({
             </div>
           }
         >
-          <p className="text-sm text-muted-foreground px-1">This will be saved to your local database.</p>
+           <p className="text-sm text-muted-foreground px-1">This will be added to the set log.</p>
         </Modal>
 
         {!expanded ? (
@@ -905,28 +945,30 @@ function WorkoutExerciseCard({
 
               {/* Add set form — only in editMode */}
               {editMode && (
-                <div className="flex items-center gap-2 pt-2 mt-1 border-t border-border/30">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
+                <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/30">
+                  <StepperInput
                     value={reps}
-                    onChange={(e) => setReps(e.target.value)}
-                    className="h-8 w-14 text-center text-xs"
-                    placeholder="Reps"
+                    onChange={setReps}
+                    step={1}
+                    min={0}
+                    label="reps"
+                    inputMode="numeric"
+                    size="sm"
                   />
                   <span className="text-xs text-muted-foreground">×</span>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
+                  <StepperInput
                     value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="h-8 w-16 text-center text-xs"
-                    placeholder="kg"
+                    onChange={setWeight}
+                    step={2.5}
+                    min={0}
+                    label="kg"
+                    inputMode="decimal"
+                    size="sm"
                   />
                   <Button
                     size="sm"
                     onClick={() => setShowAddConfirm({ reps: Number(reps) || 0, weight: Number(weight) || 0 })}
-                    className="h-8 rounded-full px-3 text-xs ml-auto"
+                    className="h-8 rounded-full px-3 text-xs ml-auto self-start mt-0.5"
                   >
                     + Add
                   </Button>
@@ -1025,34 +1067,38 @@ function WorkoutExerciseCard({
         )}
 
         {/* Smart Quick Add */}
-        <div className="flex items-center gap-2 pt-1">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <Input
-              type="number"
-              inputMode="numeric"
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <StepperInput
               value={reps}
-              onChange={(e) => setReps(e.target.value)}
-              className="h-10 w-16 text-center text-sm font-medium"
-              placeholder="Reps"
+              onChange={setReps}
+              step={1}
+              min={0}
+              label="reps"
+              inputMode="numeric"
+              size="md"
             />
-            <span className="text-xs text-muted-foreground">×</span>
-            <Input
-              type="number"
-              inputMode="decimal"
+            <span className="text-xs text-muted-foreground mb-3">×</span>
+            <StepperInput
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="h-10 w-20 text-center text-sm font-medium"
-              placeholder="kg"
+              onChange={setWeight}
+              step={2.5}
+              min={0}
+              label="kg"
+              inputMode="decimal"
+              size="md"
             />
           </div>
-          <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm shrink-0">
-            Log
-          </Button>
-          {lastSet && (
-            <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm shrink-0" title="Repeat last set">
-              <RotateCcw className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 self-start mt-0.5">
+            <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm shrink-0">
+              Log
             </Button>
-          )}
+            {lastSet && (
+              <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm shrink-0" title="Repeat last set">
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1092,7 +1138,7 @@ function SetChip({
           isOpen={showConfirm}
           onClose={() => setShowConfirm(false)}
           title="Save changes?"
-          description="This will update the set in your local database."
+          description="Update this set?"
           footer={
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setShowConfirm(false)}>Cancel</Button>

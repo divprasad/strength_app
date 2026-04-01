@@ -11,8 +11,7 @@ import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 
 /** Resolve a CSS custom property like "--primary" to a concrete color string. */
 function resolveCssColor(varName: string): string {
@@ -131,12 +130,11 @@ export function AnalyticsView() {
   return (
     <div className="space-y-6">
       <PageIntro
-        eyebrow="Performance Readout"
         title="Analytics"
-        description="Track weekly workload, spot which muscles and exercises are carrying the most volume, and review progress without changing how anything is logged."
+        description="Weekly volume and progress."
         meta={
           <>
-            <Badge className="bg-accent px-3 py-1 text-accent-foreground">Weekly volume {Math.round(metrics?.totalVolume ?? 0)}</Badge>
+            <Badge className="bg-accent px-3 py-1 text-accent-foreground">{Math.round(metrics?.totalVolume ?? 0).toLocaleString()} kg this week</Badge>
             <Badge>{activeDays} active day{activeDays === 1 ? "" : "s"}</Badge>
           </>
         }
@@ -148,12 +146,10 @@ export function AnalyticsView() {
             <CardDescription className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
               Weekly Total
             </CardDescription>
-            <CardTitle className="text-3xl">{Math.round(metrics?.totalVolume ?? 0)}</CardTitle>
+            <CardTitle className="text-3xl">{Math.round(metrics?.totalVolume ?? 0).toLocaleString()} <span className="text-lg font-normal text-muted-foreground">kg</span></CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Formula: set volume = reps × weight. Primary muscles count 100%, secondary muscles count 50%.
-            </p>
+            <p className="text-sm text-muted-foreground">Reps × weight per set.</p>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
@@ -164,7 +160,7 @@ export function AnalyticsView() {
             <CardTitle className="text-3xl">{muscleRows.length}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Top eight muscles by weighted volume are shown in the weekly chart.</p>
+            <p className="text-sm text-muted-foreground">By weighted volume this week.</p>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
@@ -175,7 +171,7 @@ export function AnalyticsView() {
             <CardTitle className="text-2xl">{topExercise}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Highest-volume exercise across the current weekly window.</p>
+            <p className="text-sm text-muted-foreground">Highest volume this week.</p>
           </CardContent>
         </Card>
       </div>
@@ -183,8 +179,7 @@ export function AnalyticsView() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle>Volume by Muscle (Week)</CardTitle>
-            <CardDescription>Weighted weekly muscle distribution for the current training window.</CardDescription>
+            <CardTitle>Volume by Muscle</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0">
             {muscleRows.length > 0 ? (
@@ -200,15 +195,14 @@ export function AnalyticsView() {
                 )}
               </MeasuredChart>
             ) : (
-              <EmptyState title="No muscle volume yet" description="Log sets to populate analytics." />
+              <EmptyState title="No muscle volume yet" description="Log workouts to see data." />
             )}
           </CardContent>
         </Card>
 
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle>Volume by Exercise (Week)</CardTitle>
-            <CardDescription>See which individual movements are driving the most work this week.</CardDescription>
+            <CardTitle>Volume by Exercise</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0">
             {exerciseRows.length > 0 ? (
@@ -224,7 +218,7 @@ export function AnalyticsView() {
                 )}
               </MeasuredChart>
             ) : (
-              <EmptyState title="No exercise volume yet" description="Log a workout to see this chart." />
+              <EmptyState title="No exercise volume yet" description="Log workouts to see data." />
             )}
           </CardContent>
         </Card>
@@ -233,19 +227,16 @@ export function AnalyticsView() {
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <CardTitle>Exercise Progress</CardTitle>
-          <CardDescription>Pick an exercise to review max weight and estimated one-rep max over time.</CardDescription>
+          <CardDescription>Track max weight and estimated 1RM over time.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="rounded-[1.2rem] border border-border/70 bg-background/55 p-4">
-            <Label htmlFor="exercise-progress">Choose Exercise</Label>
-            <Select id="exercise-progress" value={exerciseId} onChange={(e) => setExerciseId(e.target.value)}>
-              <option value="">Select exercise</option>
-              {(exercises ?? []).map((exercise) => (
-                <option key={exercise.id} value={exercise.id}>
-                  {exercise.name}
-                </option>
-              ))}
-            </Select>
+          <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+            <Combobox
+              options={(exercises ?? []).map((e) => ({ value: e.id, label: e.name }))}
+              value={exerciseId}
+              onChange={setExerciseId}
+              placeholder="Search exercises..."
+            />
           </div>
 
           {exerciseId && progress && progress.length > 0 ? (
@@ -282,7 +273,7 @@ export function AnalyticsView() {
               </div>
             </div>
           ) : (
-            <EmptyState title="No progress data" description="Select an exercise with logged sets over time." />
+            <EmptyState title="No progress data" description="Log workouts to see data." />
           )}
         </CardContent>
       </Card>
