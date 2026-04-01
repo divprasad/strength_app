@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { subDays, eachDayOfInterval, isBefore, startOfDay, format } from "date-fns";
 import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Search } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useSearchParams, useRouter } from "next/navigation";
