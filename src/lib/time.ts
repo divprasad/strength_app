@@ -21,6 +21,14 @@ export function formatDurationLong(totalSeconds: number) {
   return parts.join(" ");
 }
 
+export function formatDurationRounded(totalSeconds: number): string {
+  const minutes = Math.round(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
 export function formatTimeOfDay(iso?: string) {
   if (!iso) return "—";
   const parsed = parseISO(iso);

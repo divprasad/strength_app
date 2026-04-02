@@ -15,10 +15,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
-import { computeDurationSeconds, formatDurationLong, formatTimeOfDay } from "@/lib/time";
+import { computeDurationSeconds, formatDurationLong, formatDurationRounded, formatTimeOfDay } from "@/lib/time";
 import type { Workout, MuscleGroup } from "@/types/domain";
 
 /* ─── helpers ─── */
+
+function formatRelativeShort(iso: string): string {
+  const dist = formatDistanceToNowStrict(parseISO(iso));
+  return dist
+    .replace(/ years?/, "y")
+    .replace(/ months?/, "mo")
+    .replace(/ weeks?/, "w")
+    .replace(/ days?/, "d")
+    .replace(/ hours?/, "h")
+    .replace(/ minutes?/, "m")
+    .replace(/ seconds?/, "s") + " ago";
+}
 
 function MiniSparkline({ values, className }: { values: number[]; className?: string }) {
   const max = Math.max(...values, 1);
@@ -109,7 +121,7 @@ export function Dashboard() {
         <div className="flex items-start justify-between gap-3 mb-4">
           <div
             className={cn(
-              "relative select-none rounded-2xl px-4 py-3 transition-all duration-200 cursor-pointer overflow-hidden",
+              "relative select-none rounded-2xl px-4 py-3 transition-all duration-150 cursor-pointer overflow-hidden active:scale-[0.98]",
               isHovering || isHolding
                 ? "bg-primary/8 border border-primary/20 shadow-[0_4px_16px_-6px_hsl(var(--primary)/0.2)]"
                 : "border border-transparent"
@@ -145,7 +157,7 @@ export function Dashboard() {
           </div>
           {recentWorkout && (
             <span className="mt-3 shrink-0 text-xs text-muted-foreground/70">
-              Last workout: {formatDistanceToNowStrict(parseISO(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt), { addSuffix: true })}
+              Last: {formatRelativeShort(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt)}
             </span>
           )}
         </div>
@@ -321,12 +333,17 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
       >
         <Check className="h-4 w-4 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {formatDurationLong(durationSeconds)} · {topMusclesStr || "No muscles"} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium truncate">{dateStr}</p>
+            <div className="flex flex-col items-end shrink-0">
+              <span className="text-xs text-muted-foreground">{timeStr}</span>
+              <ChevronDown className="h-2.5 w-2.5 text-muted-foreground mt-0.5" />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {formatDurationRounded(durationSeconds)} · {topMusclesStr || "No muscles"} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg
           </p>
         </div>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       </button>
     );
   }
@@ -339,12 +356,17 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
       >
         <Check className="h-4 w-4 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {formatDurationLong(durationSeconds)} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg vol
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium truncate">{dateStr}</p>
+            <div className="flex flex-col items-end shrink-0">
+              <span className="text-xs text-muted-foreground">{timeStr}</span>
+              <ChevronUp className="h-2.5 w-2.5 text-muted-foreground mt-0.5" />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {formatDurationRounded(durationSeconds)} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg vol
           </p>
         </div>
-        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       </button>
       <div className="border-t border-border/30 px-4 py-3 space-y-2">
         {bundle.items.map((item) => {
