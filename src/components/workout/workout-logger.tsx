@@ -469,16 +469,17 @@ export function WorkoutLogger() {
               Start
             </Button>
           ) : workout?.status === "completed" ? (
-            <Button
-              size="icon"
-              variant="ghost"
+            <button
               onClick={handleArchiveWorkout}
               disabled={sessionBusy}
               title="Archive workout"
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              className="group flex items-center gap-1.5 rounded-full border border-border/30 bg-transparent px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive active:scale-95 transition-all duration-200 disabled:opacity-40"
             >
-              <Archive className="h-3.5 w-3.5" />
-            </Button>
+              <Archive className="h-3 w-3 transition-transform duration-300 group-hover:scale-110" />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                Archive
+              </span>
+            </button>
           ) : null}
         </div>
       </div>
