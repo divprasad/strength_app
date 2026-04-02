@@ -470,14 +470,14 @@ export function WorkoutLogger() {
             </Button>
           ) : workout?.status === "completed" ? (
             <Button
-              size="sm"
+              size="icon"
               variant="ghost"
               onClick={handleArchiveWorkout}
               disabled={sessionBusy}
-              className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Archive workout"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             >
-              <Archive className="h-3.5 w-3.5 mr-1.5" />
-              Archive
+              <Archive className="h-3.5 w-3.5" />
             </Button>
           ) : null}
         </div>
@@ -560,8 +560,8 @@ export function WorkoutLogger() {
         <div className="space-y-2">
           {workoutExercises && workoutExercises.length > 0 ? (
             workout.status === "completed" ? (
-              /* 2-column grid for completed workouts */
-              <div className="grid grid-cols-2 gap-2">
+              /* Single column for completed workouts */
+              <div className="space-y-2">
                 {workoutExercises.map((item) => {
                   const exercise = exerciseMap?.get(item.exerciseId);
                   if (!exercise) return null;
@@ -580,7 +580,7 @@ export function WorkoutLogger() {
                       isActive={activeExerciseId === item.id}
                       isSessionActive={sessionActive}
                       allowEdit={true}
-                      isInGrid={true}
+                      isInGrid={false}
                     />
                   );
                 })}
@@ -1061,6 +1061,21 @@ function WorkoutExerciseCard({
         </div>
         <div className="flex items-center gap-1.5">
           {isActive && (
+            <span
+              role="button"
+              title="Toggle edit mode"
+              onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
+              className={cn(
+                "rounded-full p-1.5 transition-colors cursor-pointer",
+                editMode
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+              )}
+            >
+              <PenLine className="h-3 w-3" />
+            </span>
+          )}
+          {isActive && (
             <Button size="sm" variant="secondary" onClick={onFinish} className="h-7 rounded-full px-3 text-[11px]">
               Finish
             </Button>
@@ -1083,13 +1098,23 @@ function WorkoutExerciseCard({
         {(sets ?? []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {(sets ?? []).map((setEntry) => (
-              <SetChip
-                key={setEntry.id}
-                setEntry={setEntry}
-                onUpdate={updateSet}
-                onDelete={deleteSet}
-                requireConfirm={false}
-              />
+              editMode ? (
+                <SetChip
+                  key={setEntry.id}
+                  setEntry={setEntry}
+                  onUpdate={updateSet}
+                  onDelete={deleteSet}
+                  requireConfirm={false}
+                />
+              ) : (
+                <span
+                  key={setEntry.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs"
+                >
+                  <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+                  <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+                </span>
+              )
             ))}
           </div>
         )}

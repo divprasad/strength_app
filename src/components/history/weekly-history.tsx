@@ -3,13 +3,16 @@
 import { addWeeks, eachDayOfInterval, endOfWeek, format, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
-import { localDateIso } from "@/lib/utils";
+import { cn, localDateIso } from "@/lib/utils";
+import { addExerciseToWorkout, createWorkoutForDate, deleteWorkout, listWorkoutsByDate } from "@/lib/repository";
+import { useUiStore } from "@/lib/store";
 import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeDurationSeconds, formatDurationLong, formatTimeOfDay } from "@/lib/time";
 import { collapseSetGroups, formatCollapsedSets } from "@/lib/format-sets";
@@ -17,6 +20,35 @@ import { collapseSetGroups, formatCollapsedSets } from "@/lib/format-sets";
 export function WeeklyHistory() {
   const [anchorDate, setAnchorDate] = useState(localDateIso(new Date()));
   const [selectedDate, setSelectedDate] = useState(localDateIso(new Date()));
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+
+  const router = useRouter();
+  const setStoreSelectedDate = useUiStore((s) => s.setSelectedDate);
+  const setActiveWorkoutId = useUiStore((s) => s.setActiveWorkoutId);
+
+  async function handleCopyAsTemplate(workoutId: string) {
+    setCopyingId(workoutId);
+    try {
+      const todayStr = localDateIso(new Date());
+      const sourceExercises = await db.workoutExercises
+        .where("workoutId")
+        .equals(workoutId)
+        .sortBy("orderIndex");
+      const todayWorkouts = await listWorkoutsByDate(todayStr);
+      for (const w of todayWorkouts) {
+        if (w.status === "draft") await deleteWorkout(w.id);
+      }
+      const newWorkout = await createWorkoutForDate(todayStr);
+      for (const we of sourceExercises) {
+        await addExerciseToWorkout(newWorkout.id, we.exerciseId);
+      }
+      setStoreSelectedDate(todayStr);
+      setActiveWorkoutId(newWorkout.id);
+      router.push("/workouts");
+    } finally {
+      setCopyingId(null);
+    }
+  }
 
   const weekStart = startOfWeek(parseISO(anchorDate), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(parseISO(anchorDate), { weekStartsOn: 1 });
@@ -122,6 +154,15 @@ export function WeeklyHistory() {
                           {formatTimeOfDay(entry.workout.sessionStartedAt)} · {formatDurationLong(durationSeconds)}
                         </span>
                       </div>
+                      <button
+                        onClick={() => handleCopyAsTemplate(entry.workout.id)}
+                        disabled={copyingId !== null}
+                        title="Copy as today's template"
+                        className="flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary/70 hover:bg-primary/12 hover:border-primary/50 hover:text-primary active:scale-95 transition-all duration-200 disabled:opacity-40"
+                      >
+                        <Dumbbell className={cn("h-3 w-3", copyingId === entry.workout.id && "animate-pulse")} />
+                        Template
+                      </button>
                     </div>
                     
                     <div className="mt-4 space-y-4">
