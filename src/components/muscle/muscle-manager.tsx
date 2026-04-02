@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createMuscleGroup } from "@/lib/repository";
-import { nowIso } from "@/lib/utils";
+import { cn, nowIso } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit2, Plus } from "lucide-react";
@@ -36,6 +36,7 @@ export function MuscleManager() {
   const exercises = useLiveQuery(() => db.exercises.toArray(), []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   const exerciseCountByMuscle = useMemo(() => {
     const map = new Map<string, number>();
@@ -98,16 +99,23 @@ export function MuscleManager() {
 
   async function saveEdit(id: string) {
     const normalized = editingName.trim();
-    if (!normalized) return;
+    if (!normalized) {
+      setEditError("Name cannot be empty");
+      return;
+    }
     const duplicate = await db.muscleGroups
       .where("name")
       .equalsIgnoreCase(normalized)
       .and((m) => m.id !== id)
       .first();
-    if (duplicate) return;
+    if (duplicate) {
+      setEditError("Muscle group already exists");
+      return;
+    }
     await db.muscleGroups.update(id, { name: normalized, updatedAt: nowIso() });
     setEditingId(null);
     setEditingName("");
+    setEditError(null);
   }
 
   const muscleCount = muscles?.length ?? 0;
@@ -120,152 +128,111 @@ export function MuscleManager() {
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-xs text-muted-foreground px-1">
-        {muscleCount} muscle group{muscleCount === 1 ? "" : "s"}
-      </p>
+    <div className="space-y-5">
+      {/* Add form — moved to top */}
+      <div>
+        <form className="flex gap-2" onSubmit={form.handleSubmit(onSubmit)}>
+          <Input
+            placeholder="Add muscle group..."
+            {...form.register("name")}
+            className="flex-1 rounded-xl bg-background/80 border-border/50 shadow-sm"
+          />
+          <Button type="submit" size="sm" className="shrink-0 rounded-xl px-4 h-10">
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        </form>
+        {form.formState.errors.name?.message ? (
+          <p className="text-sm text-destructive mt-1.5 px-1">{form.formState.errors.name.message}</p>
+        ) : null}
+      </div>
 
-      {/* 2-column grid */}
-      <ul className="grid grid-cols-2 gap-2">
-        {(muscles ?? []).map((muscle) => {
-          const exerciseCount = exerciseCountByMuscle.get(muscle.id) ?? 0;
-          const seenDate = lastSeenByMuscle?.get(muscle.id);
+      <div>
+        <p className="text-xs text-muted-foreground px-1 mb-3">
+          {muscleCount} muscle group{muscleCount === 1 ? "" : "s"}
+        </p>
 
-          return (
-            <li
-              key={muscle.id}
-              className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all p-3.5"
-            >
-              {editingId === muscle.id ? (
-                <div className="flex flex-col gap-2">
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className="h-8 w-full rounded-lg text-sm"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); saveEdit(muscle.id); }
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                  />
-                  <div className="flex gap-1.5">
-                    <Button size="sm" className="h-7 flex-1 rounded-lg text-xs" onClick={() => saveEdit(muscle.id)}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 rounded-lg px-2 text-xs" onClick={() => setEditingId(null)}>
-                      ✕
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground leading-tight">{muscle.name}</p>
-                    <div className="flex flex-wrap items-center gap-1 mt-1">
-                      {exerciseCount > 0 ? (
-                        <span className="text-[10px] text-muted-foreground/60">
-                          {exerciseCount} ex
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground/40 italic">no exercises</span>
-                      )}
-                      {seenDate && (
-                        <>
-                          <span className="text-[10px] text-muted-foreground/40">·</span>
-                          <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-                            {relativeTime(seenDate)}
-                          </span>
-                        </>
-                      )}
+        {/* 2-column grid */}
+        <ul className="grid grid-cols-2 gap-2">
+          {(muscles ?? []).map((muscle) => {
+            const exerciseCount = exerciseCountByMuscle.get(muscle.id) ?? 0;
+            const seenDate = lastSeenByMuscle?.get(muscle.id);
+            const isUnused = exerciseCount === 0;
+
+            return (
+              <li
+                key={muscle.id}
+                className={cn(
+                  "group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all p-3.5",
+                  isUnused && "opacity-60"
+                )}
+              >
+                {editingId === muscle.id ? (
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      value={editingName}
+                      onChange={(e) => {
+                        setEditingName(e.target.value);
+                        setEditError(null);
+                      }}
+                      className={cn("h-8 w-full rounded-lg text-sm", editError && "border-destructive")}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); saveEdit(muscle.id); }
+                        if (e.key === "Escape") { setEditingId(null); setEditError(null); }
+                      }}
+                    />
+                    {editError && (
+                      <p className="text-[10px] text-destructive leading-none -mt-1">{editError}</p>
+                    )}
+                    <div className="flex gap-1.5">
+                      <Button size="sm" className="h-7 flex-1 rounded-lg text-xs" onClick={() => saveEdit(muscle.id)}>
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 rounded-lg px-2 text-xs" onClick={() => { setEditingId(null); setEditError(null); }}>
+                        ✕
+                      </Button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditingId(muscle.id);
-                      setEditingName(muscle.name);
-                    }}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted"
-                    title="Edit muscle group"
-                  >
-                    <Edit2 className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-
-      {/* Add form — below the list */}
-      <form className="flex gap-2" onSubmit={form.handleSubmit(onSubmit)}>
-        <Input
-          placeholder="Add muscle group..."
-          {...form.register("name")}
-          className="flex-1 rounded-xl bg-background/80 border-border/50"
-        />
-        <Button type="submit" size="sm" className="shrink-0 rounded-xl px-4">
-          <Plus className="h-4 w-4 mr-1" />
-          Add
-        </Button>
-      </form>
-      {form.formState.errors.name ? (
-        <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
-      ) : null}
-
-      <p className="text-xs text-muted-foreground px-1">
-        {muscleCount} muscle group{muscleCount === 1 ? "" : "s"}
-      </p>
-
-      <div className="grid grid-cols-2 gap-2">
-        {(muscles ?? []).map((muscle) => {
-          const count = exerciseCount(muscle.id);
-          return (
-            <div
-              key={muscle.id}
-              className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all px-4 py-3"
-            >
-              {editingId === muscle.id ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className="h-8 flex-1 rounded-lg text-sm"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); saveEdit(muscle.id); }
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                  />
-                  <Button size="sm" className="h-8 rounded-lg px-3 text-xs" onClick={() => saveEdit(muscle.id)}>
-                    Save
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs" onClick={() => setEditingId(null)}>
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{muscle.name}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {count} exercise{count === 1 ? "" : "s"}
-                    </p>
+                ) : (
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-tight">{muscle.name}</p>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {exerciseCount > 0 ? (
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {exerciseCount} ex
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/40 italic">no exercises</span>
+                        )}
+                        {seenDate && (
+                          <>
+                            <span className="text-[10px] text-muted-foreground/40">·</span>
+                            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                              {relativeTime(seenDate)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingId(muscle.id);
+                        setEditingName(muscle.name);
+                        setEditError(null);
+                      }}
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted -mr-1 -mt-1"
+                      title="Edit muscle group"
+                    >
+                      <Edit2 className="h-3 w-3 text-muted-foreground" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditingId(muscle.id);
-                      setEditingName(muscle.name);
-                    }}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted mt-0.5"
-                    title="Edit muscle group"
-                  >
-                    <Edit2 className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );
