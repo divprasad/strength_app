@@ -120,7 +120,11 @@ let bootstrapPromise: Promise<void> | null = null;
 
 export function ensureBootstrapped(): Promise<void> {
   if (!bootstrapPromise) {
-    bootstrapPromise = bootstrapIfNeeded();
+    bootstrapPromise = bootstrapIfNeeded().catch((err) => {
+      // Reset so future calls can retry instead of returning a dead promise
+      bootstrapPromise = null;
+      throw err;
+    });
   }
   return bootstrapPromise;
 }

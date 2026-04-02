@@ -1,89 +1,187 @@
 # AGENTS.md
 
 This file is the stable operating guide for agents working in this repository.
-
-## ⛔ Worktree Scope — COSMETIC CHANGES ONLY
-
-> **This is a UI-cleanup worktree. All work MUST be limited to cosmetic and visual changes.**
-> **Any agent that violates this constraint is producing invalid work, regardless of what the user asks.**
-
-### What is ALLOWED
-
-- CSS / Tailwind class changes (colors, spacing, typography, layout, animations)
-- Component JSX/TSX markup restructuring for visual purposes
-- Adding or updating design tokens, theme variables, and style constants
-- Swapping icons, adjusting SVGs, updating fonts
-- Responsive design fixes (breakpoints, mobile layout)
-- Accessibility improvements that are purely presentational (contrast, focus rings, aria-labels)
-- Removing dead/unused UI code
-
-### What is BLOCKED — do not touch under any circumstances
-
-- **Database**: No changes to Prisma schema, migrations, seed files, or `prisma/` directory
-- **Sync engine**: No changes to `src/lib/syncEngine.ts`, `syncQueue`, or any sync logic
-- **API routes**: No changes to any `route.ts` or server-side API handlers
-- **Dexie schema**: No changes to IndexedDB table definitions or Dexie hooks
-- **Docker**: No changes to `Dockerfile`, `docker-compose.yml`, or `docker-entrypoint.sh`
-- **Data models**: No changes to TypeScript interfaces/types that define database entities
-- **Business logic**: No changes to workout calculation logic, set tracking, or data processing
-- **Environment config**: No changes to `.env` files, `next.config.ts` (unless purely cosmetic like metadata)
-- **New features**: Do not add new product features, new routes, new API endpoints, or new data flows
-
-### If in doubt
-
-If a requested change touches both UI and backend, **only implement the UI portion** and clearly note what backend work was left out and why.
+This is the **main branch** — all layers of the stack are in scope.
 
 ---
 
 ## Mission
 
-Strength Log uses a robust "Local-First Sync Architecture" to deliver a zero-latency tracker that can operate fully offline. The structural persistence is complete: local Dexie changes drop `syncQueue` tickets which are processed by a background worker and `$transaction`-upserted cleanly onto a Prisma/SQLite instance whenever network drops.
+Strength Log is a mobile-first, local-first workout tracker built on Next.js.
+It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactions and asynchronously syncs mutations to a Prisma/SQLite backend via a background `syncQueue`. The app is a fully installable **PWA** (Serwist) and is **Docker-deployable** for self-hosted local-network hosting.
 
-The app is now a fully installable **PWA** (via Serwist) and is **Docker-deployable** for self-hosted local-network hosting. The immediate priority for agents is **Phase 3: Production Hardening** — sync status visibility, Docker smoke testing, test coverage expansion, and bundle optimization.
+---
+
+## Architecture overview
+
+```
+┌─────────────────────────────────────────────────┐
+│  React UI  (Next.js App Router + Tailwind)      │
+│  └─ useLiveQuery() reads from Dexie reactively  │
+├─────────────────────────────────────────────────┤
+│  Repository layer  (src/lib/repository.ts)      │
+│  └─ All writes go to Dexie → enqueueSync()      │
+├─────────────────────────────────────────────────┤
+│  Sync Engine  (src/lib/syncEngine.ts)           │
+│  └─ Drains syncQueue → POST /api/workouts       │
+│  └─ Auto-triggers on `online` event             │
+├─────────────────────────────────────────────────┤
+│  API Routes  (src/app/api/**/route.ts)          │
+│  └─ Prisma $transaction upserts to SQLite       │
+│  └─ Auto-backup on every workout sync           │
+├─────────────────────────────────────────────────┤
+│  SQLite  (prisma/dev.db)                        │
+│  └─ Final persistent ledger                     │
+└─────────────────────────────────────────────────┘
+```
+
+### Key data flow rules
+
+1. **All mutations go through Dexie first.** Components never call `fetch()` for writes. The repository writes to IndexedDB, then calls `enqueueSync(workoutId)`.
+2. **The sync engine is the only network writer.** `syncEngine.ts` drains the `syncQueue` table and POSTs `WorkoutBundle` payloads to the API. Failed jobs get `status: "failed"` and increment `retryCount`.
+3. **Bootstrap pulls server → client.** On app load, `bootstrapFromServer()` fetches muscles, exercises, and workouts from the API and bulk-puts them into Dexie in a single atomic transaction. If the server is unreachable, the app falls back to local seed data.
+4. **Garbage collection is server-side.** When a workout sync arrives, the API route diffs incoming exercise/set IDs against existing rows and deletes orphans within the same `$transaction`. This prevents zombie rows from regenerating on the next pull.
+
+---
 
 ## Current project state
 
-- The UI and core product flows work. Most computations act on IndexedDB.
-- **PWA Complete:** The app is installable to any phone's home screen via Serwist service workers with precached bundles and offline-first runtime caching.
-- **Docker Complete:** A multi-stage `Dockerfile` + `docker-compose.yml` produces a lean ~180 MB image with named volume persistence, auto-migrations, and conditional seeding.
-- **Background Sync Works:** `src/lib/syncEngine.ts` handles pushing all `WorkoutBundle` entities.
-- **Garbage Collection Works:** Orphaned local sets deleted from the app correctly cause cascading deletions on the Prisma backend, so zombie data does not regenerate when pulling from the DB.
-- **Auto Backups Work:** Pushing data automatically triggers a `fs.copyFile` backup of the SQLite database in the `/prisma/` folder in case corruption pushes upstream.
-- **Reference Docs:** Four fundamental HTML documents mapping out the tech stack and meta processes exist natively in `/docs/`. Read them first if you are altering data structures.
+| Area | Status | Notes |
+|------|--------|-------|
+| Core workout loop | ✅ Stable | Create → start → log sets → finish → history |
+| PWA | ✅ Complete | Serwist service worker, precaching, offline-first caching |
+| Docker | ✅ Complete | Multi-stage build, ~180 MB image, named volume persistence |
+| Sync engine | ✅ Working | Background queue with retry; `online` event auto-trigger |
+| Cascading delete | ✅ Working | Server-side orphan cleanup within `$transaction` |
+| Auto backups | ✅ Working | `fs.copyFile` of SQLite DB on every sync POST |
+| Bootstrap gate | ✅ Hardened | 30s server timeout, 10s local timeout, 45s hard deadline |
+| Integrity audit | ✅ Implemented | `integrity-audit.ts` with `healDatabase()` auto-fixer |
+| Command palette | ✅ Implemented | `Cmd+K` global navigation and quick actions |
+| Analytics | ✅ Present | Weekly volume, muscle distribution via Recharts |
+| Export/Import | ✅ Present | JSON export, server bootstrap pull from Settings |
+| CI | ✅ Active | `lint`, `typecheck`, `test:unit`, `build` on push; E2E manual |
+
+### Known areas needing attention
+
+- **Multi-user support** — currently single-user (`DEFAULT_USER_ID`). Auth and user separation are not yet implemented.
+- **Sync status UI** — no visible indicator of pending/failed sync jobs for the user.
+- **E2E test coverage** — only one spec file exists (`app.e2e.spec.ts`); critical flows need more coverage.
+- **Bundle size** — no active optimization pass has been done.
+
+---
+
+## File map (key files)
+
+| Path | Purpose |
+|------|---------|
+| `src/lib/db.ts` | Dexie schema (7 versions), `ensureBootstrapped()`, seed logic |
+| `src/lib/repository.ts` | All domain operations (CRUD, sync enqueue, session lifecycle) |
+| `src/lib/syncEngine.ts` | Background sync queue processor |
+| `src/lib/sync.ts` | Server → client bootstrap (muscles, exercises, workouts) |
+| `src/lib/integrity-audit.ts` | Data consistency checker + auto-healer |
+| `src/lib/analytics.ts` | Volume/frequency computations for the analytics page |
+| `src/types/domain.ts` | Canonical TypeScript types for all domain entities |
+| `src/hooks/use-db-bootstrap.ts` | Client-side bootstrap lifecycle with timeout safety nets |
+| `src/components/layout/bootstrap-gate.tsx` | Renders loading screen until DB is ready |
+| `src/components/layout/command-palette.tsx` | Global `Cmd+K` command palette |
+| `src/components/layout/app-shell.tsx` | Top-level app shell with navigation |
+| `src/app/api/workouts/route.ts` | Workout bundle upsert/delete with garbage collection |
+| `src/app/api/muscles/route.ts` | Muscle group CRUD |
+| `src/app/api/exercises/route.ts` | Exercise CRUD |
+| `prisma/schema.prisma` | Server-side SQLite schema |
+| `prisma/seed.ts` | Initial Prisma seed data |
+
+---
 
 ## Stable working rules
 
-1. Plan first.
-2. If there are meaningful implementation tradeoffs, present short choices and recommend one.
-3. Move slowly and iterate one feature or one stability improvement at a time.
-4. After each change, check that nothing broke (especially UI state binding).
-5. Prefer correctness and data integrity over speed.
-6. Do not make broad architecture changes silently.
-7. Do not revert user changes unless the user explicitly asks for it.
+1. **Plan first.** If there are meaningful implementation tradeoffs, present short choices and recommend one.
+2. **Iterate one thing at a time.** Don't combine unrelated changes in a single pass.
+3. **After each change, verify nothing broke** — especially UI state binding and sync integrity.
+4. **Prefer correctness and data integrity over speed.**
+5. **Do not make broad architecture changes silently.** Explain what you're changing and why.
+6. **Do not revert user changes** unless the user explicitly asks for it.
 
-## execution guidance for future agents
+---
 
-- **Stable IDs**: Use `createStableId` in `src/lib/utils.ts` for any lookup or seed data (Exercises, MuscleGroups). Never use random UUIDs for data that must match across the client-server boundary.
-- **SyncQueue Protocol**: Never write direct network `fetch` calls from React components for mutation state. All writes must go to Dexie, and subsequently call `enqueueSync(workoutId)`. The engine handles the network traffic to `route.ts`.
-- **Prisma Alignment**: Ensure the database location is consistent. The standard is `prisma/strength_dairy.db`.
-- When changing persistence logic, explain:
-  - what the source of truth is before the change
-  - what the source of truth will be after the change
-  - how existing workout data is protected
+## Execution guidance
+
+### IDs and data identity
+
+- **Stable IDs** — Use `createStableId()` in `src/lib/utils.ts` for any lookup or seed data (exercises, muscle groups). These must match across the client-server boundary. Never use random UUIDs for seed data.
+- **Runtime IDs** — Use `createId(prefix)` for user-created entities (workouts, sets, workout exercises). These are random and unique.
+
+### Sync protocol
+
+- **Never write direct `fetch()` from components.** All mutations go through the repository layer → Dexie → `enqueueSync()`.
+- **The sync engine handles network traffic.** It reads from `syncQueue`, builds `WorkoutBundle` payloads, and POSTs to `/api/workouts`.
+- **Deletes are sync-aware.** `enqueueSync(workoutId, "delete")` queues a DELETE that the engine sends as `DELETE /api/workouts?id=...`.
+
+### Persistence changes
+
+When modifying anything related to data storage, explain:
+1. What the source of truth is **before** the change
+2. What the source of truth will be **after** the change
+3. How existing user data is protected
+
+### Database locations
+
+- **Development:** `prisma/dev.db` (set in `.env` as `DATABASE_URL`)
+- **Backup reference:** `prisma/strength_dairy.db` (auto-backup target in workout route)
+- **Test:** `prisma/dev_test.db` (set in `playwright.config.ts`)
+
+### Dexie schema versioning
+
+The Dexie database is at **version 7**. Versions jump (1 → 2 → 4 → 5 → 7) which is valid for Dexie. Key migrations:
+- v2: Added `status`, `userId` to workouts
+- v4: Added `name` to workouts, `type` to sets
+- v5: Added `syncQueue` table
+- v7: Renamed `muscles` → `muscleGroups` (with data migration)
+
+**To add a new version:** Increment from 7 (use 8, not 9). Always provide an `.upgrade()` callback if existing data needs transformation.
+
+### Bootstrap flow
+
+The app shows "Preparing local database…" until the bootstrap gate unlocks:
+1. `bootstrapFromServer()` pulls all server data (30s timeout)
+2. `ensureBootstrapped()` seeds local settings if needed (10s timeout)
+3. If both fail, a 45s hard deadline forces the UI to render anyway
+4. The cached promise in `ensureBootstrapped()` self-clears on rejection so retries work
+
+---
+
+## UI and design conventions
+
+- **Design system:** Tailwind CSS with CSS custom properties for theming (`globals.css`)
+- **Component library:** Custom primitives in `src/components/ui/` (Button, Card, Modal, BottomSheet, Combobox, StepperInput, etc.)
+- **Icons:** Lucide React
+- **Charts:** Recharts
+- **Forms:** React Hook Form + Zod validation
+- **State:** Zustand for global UI state (`src/lib/store.ts`); Dexie `useLiveQuery` for data
+- **Responsive:** Mobile-first with a bottom nav bar (`bottom-nav.tsx`)
+- **Theme:** Light/dark mode via `theme-provider.tsx`; user-selectable color palettes
+
+---
 
 ## Validation expectations
 
-After meaningful changes, run the relevant checks when possible:
+After meaningful changes, run the relevant checks:
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm run test:e2e`
-- `npm run build`
+```bash
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint
+npm run test:unit    # vitest run
+npm run build        # next build
+npm run test:e2e     # playwright (requires dev server running)
+```
 
-If a check cannot be run, say so clearly.
+If a check cannot be run, say so clearly and explain why.
+
+---
 
 ## Documentation expectations
 
 - Keep `README.md` current as the user-facing overview of the app.
-- Keep this `AGENTS.md` current as the stable execution guide for future agents.
-- If the roadmap changes, update both files in the same pass when appropriate.
+- Keep this `AGENTS.md` current as the stable execution guide for agents.
+- Reference docs in `/docs/` cover architecture decisions — update them if the architecture changes.
+- If the roadmap changes, update both `README.md` and `AGENTS.md` in the same pass.
