@@ -404,18 +404,23 @@ export function WorkoutLogger() {
             {formatLocalDate(selectedDate, "EEE, MMM d")}
           </span>
           <div className="h-4 w-px bg-border/50" />
-          <Badge
-            className={cn(
-              "px-2.5 py-0.5 text-[10px] font-semibold",
-              sessionActive
-                ? "bg-success/15 text-success border-success/20"
-                : workout?.status === "completed"
-                  ? "bg-primary/10 text-primary border-primary/20"
-                  : ""
-            )}
-          >
-            {sessionActive ? `● ${sessionSummary}` : sessionSummary}
-          </Badge>
+          {workout?.status === "completed" && !sessionActive ? (
+            <button className="group flex items-center gap-1.5 rounded-full border border-success/25 bg-success/5 px-2.5 py-1 text-[10px] font-medium text-success/70 hover:bg-success/12 hover:border-success/50 hover:text-success active:scale-95 transition-all duration-200">
+              <Check className="h-3 w-3 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6" />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[4rem]">
+                done
+              </span>
+            </button>
+          ) : (
+            <Badge
+              className={cn(
+                "px-2.5 py-0.5 text-[10px] font-semibold",
+                sessionActive ? "bg-success/15 text-success border-success/20" : ""
+              )}
+            >
+              {sessionActive ? `● ${sessionSummary}` : sessionSummary}
+            </Badge>
+          )}
 
           {/* Copy as Template — animated dumbbell, only on completed */}
           {workout?.status === "completed" && !sessionActive && (
