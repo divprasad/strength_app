@@ -135,71 +135,69 @@ export function WeeklyHistory() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle>{format(parseISO(selectedDate), "EEEE, MMM d")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {workoutsForDate && workoutsForDate.length > 0 ? (
-            <div className="space-y-3">
-              {workoutsForDate.map((entry, index) => {
-                const durationSeconds = computeDurationSeconds(entry.workout.sessionStartedAt, entry.workout.sessionEndedAt);
-                return (
-                  <div key={entry.workout.id} className="overflow-hidden rounded-2xl border border-border/60 bg-background/55 p-4 shadow-e2">
-                    <div className="flex items-center justify-between border-b border-border/50 pb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-primary/70">Session {index + 1}</span>
-                        <div className="h-4 w-px bg-border/50" />
-                        <span className="text-sm font-semibold tracking-tight">
-                          {formatTimeOfDay(entry.workout.sessionStartedAt)} · {formatDurationLong(durationSeconds)}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleCopyAsTemplate(entry.workout.id)}
-                        disabled={copyingId !== null}
-                        title="Copy as today's template"
-                        className="flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary/70 hover:bg-primary/12 hover:border-primary/50 hover:text-primary active:scale-95 transition-all duration-200 disabled:opacity-40"
-                      >
-                        <Dumbbell className={cn("h-3 w-3", copyingId === entry.workout.id && "animate-pulse")} />
-                        Template
-                      </button>
-                    </div>
-                    
-                    <div className="mt-4 space-y-4">
-                      {entry.items.length > 0 ? (
-                        entry.items.map((exerciseEntry) => {
-                          const exerciseDuration = computeDurationSeconds(
-                            exerciseEntry.item.startedAt,
-                            exerciseEntry.item.completedAt ?? entry.workout.sessionEndedAt
-                          );
-                          return (
-                            <div key={exerciseEntry.item.id} className="space-y-2">
-                              <div className="flex items-center justify-between gap-4">
-                                <p className="text-sm font-medium tracking-tight text-foreground">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
-                                <span className="text-[10px] tabular-nums text-muted-foreground">{formatDurationLong(exerciseDuration)}</span>
-                              </div>
-                              
-                              <div className="mt-1">
-                                <p className="text-xs text-muted-foreground">
-                                  {formatCollapsedSets(collapseSetGroups(exerciseEntry.sets))}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <p className="text-xs text-muted-foreground italic">No exercises recorded.</p>
-                      )}
-                    </div>
+      {workoutsForDate && workoutsForDate.length > 0 ? (
+        <div className="space-y-3">
+          {workoutsForDate.map((entry) => {
+            const durationSeconds = computeDurationSeconds(entry.workout.sessionStartedAt, entry.workout.sessionEndedAt);
+            const dayLabel = format(parseISO(selectedDate), "EEE d");
+            const timeLabel = formatTimeOfDay(entry.workout.sessionStartedAt);
+            return (
+              <Card key={entry.workout.id} className="overflow-hidden">
+                {/* Session card header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-semibold tracking-tight">{dayLabel}</span>
+                    <span className="text-muted-foreground/40 text-xs">·</span>
+                    <span className="text-sm font-semibold tracking-tight">{timeLabel}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums ml-1">{formatDurationLong(durationSeconds)}</span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
+                  <button
+                    onClick={() => handleCopyAsTemplate(entry.workout.id)}
+                    disabled={copyingId !== null}
+                    title="Copy as today's template"
+                    className="flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary/70 hover:bg-primary/12 hover:border-primary/50 hover:text-primary active:scale-95 transition-all duration-200 disabled:opacity-40"
+                  >
+                    <Dumbbell className={cn("h-3 w-3", copyingId === entry.workout.id && "animate-pulse")} />
+                    Template
+                  </button>
+                </div>
+
+                {/* Exercise list */}
+                <CardContent className="pt-4 space-y-4">
+                  {entry.items.length > 0 ? (
+                    entry.items.map((exerciseEntry) => {
+                      const exerciseDuration = computeDurationSeconds(
+                        exerciseEntry.item.startedAt,
+                        exerciseEntry.item.completedAt ?? entry.workout.sessionEndedAt
+                      );
+                      return (
+                        <div key={exerciseEntry.item.id} className="space-y-1">
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-sm font-medium tracking-tight text-foreground">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
+                            <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">{formatDurationLong(exerciseDuration)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCollapsedSets(collapseSetGroups(exerciseEntry.sets))}
+                          </p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">No exercises recorded.</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="overflow-hidden">
+          <CardContent className="pt-6">
             <EmptyState title="Rest day" description="No workout logged." />
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
     </div>
   );
 }
