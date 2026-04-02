@@ -333,12 +333,15 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
       >
         <Check className="h-4 w-4 shrink-0 text-success mt-0.5" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
+          <p className="text-sm font-medium truncate">{dateStr}</p>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
             {formatDurationRounded(durationSeconds)} · {topMusclesStr || "No muscles"} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg
           </p>
         </div>
-        <ChevronDown className="h-2.5 w-2.5 text-muted-foreground shrink-0 self-end mb-0.5" />
+        <div className="flex flex-col items-end shrink-0 gap-0.5">
+          <span className="text-xs text-muted-foreground">{timeStr}</span>
+          <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+        </div>
       </button>
     );
   }
@@ -351,12 +354,15 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
       >
         <Check className="h-4 w-4 shrink-0 text-success mt-0.5" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">{dateStr}{timeStr ? ` · ${timeStr}` : ""}</p>
+          <p className="text-sm font-medium truncate">{dateStr}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
             {formatDurationRounded(durationSeconds)} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg vol
           </p>
         </div>
-        <ChevronUp className="h-2.5 w-2.5 text-muted-foreground shrink-0 self-end mb-0.5" />
+        <div className="flex flex-col items-end shrink-0 gap-0.5">
+          <span className="text-xs text-muted-foreground">{timeStr}</span>
+          <ChevronUp className="h-2.5 w-2.5 text-muted-foreground" />
+        </div>
       </button>
       <div className="border-t border-border/30 px-4 py-3 space-y-2">
         {bundle.items.map((item) => {
