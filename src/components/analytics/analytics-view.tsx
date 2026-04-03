@@ -141,38 +141,27 @@ export function AnalyticsView() {
       />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
-              Weekly Total
-            </CardDescription>
-            <CardTitle className="text-3xl">{Math.round(metrics?.totalVolume ?? 0).toLocaleString()} <span className="text-lg font-normal text-muted-foreground">kg</span></CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Reps × weight per set.</p>
-          </CardContent>
+        <Card className="flex flex-col items-center justify-center p-5 text-center overflow-hidden">
+          <CardDescription className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
+            Weekly Total
+          </CardDescription>
+          <CardTitle className="text-3xl">
+            {Math.round(metrics?.totalVolume ?? 0).toLocaleString()} <span className="text-lg font-normal text-muted-foreground">kg</span>
+          </CardTitle>
         </Card>
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
-              Muscles Tracked
-            </CardDescription>
-            <CardTitle className="text-3xl">{muscleRows.length}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">By weighted volume this week.</p>
-          </CardContent>
+        
+        <Card className="flex flex-col items-center justify-center p-5 text-center overflow-hidden">
+          <CardDescription className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
+            Muscles Tracked
+          </CardDescription>
+          <CardTitle className="text-3xl">{muscleRows.length}</CardTitle>
         </Card>
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
-              Leading Exercise
-            </CardDescription>
-            <CardTitle className="text-2xl">{topExercise}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Highest volume this week.</p>
-          </CardContent>
+        
+        <Card className="flex flex-col items-center justify-center p-5 text-center overflow-hidden">
+          <CardDescription className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">
+            Leading Exercise
+          </CardDescription>
+          <CardTitle className="text-2xl">{topExercise}</CardTitle>
         </Card>
       </div>
 
@@ -230,7 +219,7 @@ export function AnalyticsView() {
           <CardDescription>Track max weight and estimated 1RM over time.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
             <Combobox
               options={(exercises ?? []).map((e) => ({ value: e.id, label: e.name }))}
               value={exerciseId}
@@ -242,7 +231,7 @@ export function AnalyticsView() {
           {exerciseId && progress && progress.length > 0 ? (
             <div className="space-y-4">
               <div className="grid gap-4 xl:grid-cols-2">
-                <div className="rounded-[1.25rem] border border-border/70 bg-background/55 p-4">
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                   <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">Max Weight</p>
                   <MeasuredChart height={256}>
                     {({ width, height }) => (
@@ -256,7 +245,7 @@ export function AnalyticsView() {
                     )}
                   </MeasuredChart>
                 </div>
-                <div className="rounded-[1.25rem] border border-border/70 bg-background/55 p-4">
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                   <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-primary/70">Estimated 1RM</p>
                   <MeasuredChart height={256}>
                     {({ width, height }) => (

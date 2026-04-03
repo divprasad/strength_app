@@ -18,6 +18,7 @@ export interface Exercise extends Timestamps {
   primaryMuscleIds: Id[];
   secondaryMuscleIds: Id[];
   notes?: string;
+  deletedAt?: string;
 }
 
 export interface Workout extends Timestamps {
@@ -58,6 +59,12 @@ export interface AppSettings {
   volumeSecondaryMultiplier: number;
   themePref?: "light" | "dark";
   paletteIdx?: number;
+  /** Gym membership fee per billing period (default: 48) */
+  gymFee?: number;
+  /** Billing period in days (default: 28) */
+  gymFeePeriodDays?: number;
+  /** Target cost per session in euros (default: 3) */
+  gymFeeTargetPerSession?: number;
 }
 
 export interface WorkoutBundle {

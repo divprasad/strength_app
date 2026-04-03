@@ -4,11 +4,11 @@ import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { getWeeklyMetrics, get30DaySummary } from "@/lib/analytics";
+import { getWeeklyMetrics, get28DaySummary } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
 import { getWorkoutBundle } from "@/lib/repository";
-import { ArrowRight, Check, ChevronDown, ChevronUp, Edit2, Flame } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronUp, Edit2, Flame, Trophy } from "lucide-react";
 import { collapseSetGroups, formatCollapsedSets } from "@/lib/format-sets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,8 @@ export function Dashboard() {
   const metrics = useLiveQuery(() => getWeeklyMetrics(todayIso), [todayIso]);
   const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().filter(w => w.status !== "archived").limit(5).toArray(), []);
   const muscles = useLiveQuery(() => db.muscleGroups.toArray(), []);
-  const summary30 = useLiveQuery(() => get30DaySummary(), []);
+  const summary28 = useLiveQuery(() => get28DaySummary(), []);
+  const settings = useLiveQuery(() => db.settings.get("default"), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
     .map(([muscleId, volume]) => {
@@ -240,19 +241,15 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ── Past 4 Weeks Overview ── */}
-      {summary30 && (
-        <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">Last 4 weeks</p>
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xs font-medium text-foreground">
-              {summary30.completedCount} sessions · {summary30.totalVolume.toLocaleString()}kg
-            </p>
-            {summary30.weeklyVolumes && summary30.weeklyVolumes.some(v => v > 0) && (
-              <MiniSparkline values={summary30.weeklyVolumes} className="text-muted-foreground" />
-            )}
-          </div>
-        </div>
+      {/* ── Gym Cost Per Session Card ── */}
+      {summary28 && (
+        <GymCostCard
+          sessionCount={summary28.completedCount}
+          totalVolume={summary28.totalVolume}
+          weeklyVolumes={summary28.weeklyVolumes}
+          gymFee={settings?.gymFee ?? 48}
+          targetCost={settings?.gymFeeTargetPerSession ?? 3}
+        />
       )}
 
       {/* ── Part C: Recent Workouts (Compact Collapsed Rows) ── */}
@@ -284,6 +281,141 @@ export function Dashboard() {
             </CardContent>
           </Card>
         )}
+      </div>
+    </div>
+  );
+}
+/* ─── Gym Cost Per Session Card ─── */
+
+interface GymCostCardProps {
+  sessionCount: number;
+  totalVolume: number;
+  weeklyVolumes: number[];
+  gymFee: number;
+  targetCost: number;
+}
+
+function GymCostCard({ sessionCount, totalVolume, weeklyVolumes, gymFee, targetCost }: GymCostCardProps) {
+  const sessionsNeeded = Math.ceil(gymFee / targetCost);
+  const costPerSession = sessionCount > 0 ? gymFee / sessionCount : gymFee;
+  const progress = Math.min(sessionCount / sessionsNeeded, 1);
+  const targetHit = costPerSession <= targetCost && sessionCount > 0;
+
+  // Color based on cost: green ≤ target, amber ≤ 2× target, red > 2× target
+  const costColor = targetHit
+    ? "hsl(152, 56%, 39%)"      // green
+    : costPerSession <= targetCost * 2
+      ? "hsl(38, 92%, 50%)"     // amber
+      : "hsl(0, 72%, 51%)";     // red
+
+  const costColorClass = targetHit
+    ? "text-success"
+    : costPerSession <= targetCost * 2
+      ? "text-amber-500"
+      : "text-destructive";
+
+  // SVG ring parameters
+  const size = 80;
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - progress);
+
+  return (
+    <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-card/90 to-card/70 px-5 py-4 shadow-e2 relative overflow-hidden">
+      {/* Subtle background glow when target hit */}
+      {targetHit && (
+        <div className="absolute inset-0 bg-success/5 animate-in fade-in duration-700" />
+      )}
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Last 4 weeks
+          </p>
+          {targetHit && (
+            <div className="flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 animate-in slide-in-from-right-2 duration-300">
+              <Trophy className="h-3 w-3 text-success" />
+              <span className="text-[10px] font-semibold text-success">Target hit!</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-5">
+          {/* Circular progress ring */}
+          <div className="relative shrink-0">
+            <svg width={size} height={size} className="-rotate-90">
+              {/* Background ring */}
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke="hsl(var(--border))"
+                strokeWidth={strokeWidth}
+              />
+              {/* Progress ring */}
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={costColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-700 ease-out"
+              />
+            </svg>
+            {/* Center text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={cn("text-lg font-bold tabular-nums tracking-[-0.03em]", costColorClass)}>
+                €{costPerSession.toFixed(costPerSession < 10 ? 2 : 0)}
+              </span>
+              <span className="text-[8px] font-medium text-muted-foreground uppercase tracking-wider">per session</span>
+            </div>
+          </div>
+
+          {/* Stats & progress */}
+          <div className="flex-1 min-w-0 space-y-2">
+            {/* Session count & volume */}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">
+                {sessionCount} session{sessionCount !== 1 ? "s" : ""}
+              </p>
+              <p className="text-[10px] text-muted-foreground tabular-nums">
+                {totalVolume.toLocaleString()}kg
+              </p>
+            </div>
+
+            {/* Mini sparkline */}
+            {weeklyVolumes.some(v => v > 0) && (
+              <MiniSparkline values={weeklyVolumes} className="text-muted-foreground" />
+            )}
+
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-muted-foreground">
+                  {targetHit ? "🎯 " : ""}{sessionCount}/{sessionsNeeded} sessions
+                </span>
+                <span className="text-[9px] text-muted-foreground tabular-nums">
+                  Target: €{targetCost.toFixed(2)}
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-border/60 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  style={{
+                    width: `${progress * 100}%`,
+                    backgroundColor: costColor,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

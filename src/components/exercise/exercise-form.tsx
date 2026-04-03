@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { nowIso } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
 
 const schema = z.object({
   name: z.string().trim().min(2),
@@ -27,9 +28,12 @@ interface ExerciseFormProps {
   initial?: Exercise;
   onSubmit: (payload: Omit<Exercise, "id" | "createdAt" | "updatedAt"> | Exercise) => Promise<void>;
   onCancel?: () => void;
+  onDelete?: () => void;
 }
 
-export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseFormProps) {
+export function ExerciseForm({ muscles, initial, onSubmit, onCancel, onDelete }: ExerciseFormProps) {
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
   const defaults: FormValues = useMemo(
     () => ({
       name: initial?.name ?? "",
@@ -182,13 +186,30 @@ export function ExerciseForm({ muscles, initial, onSubmit, onCancel }: ExerciseF
         <Textarea id="notes" placeholder="Optional cues" {...form.register("notes")} />
       </div>
 
-      <div className="flex gap-2">
-        <Button type="submit">{initial ? "Save Changes" : "Create Exercise"}</Button>
-        {onCancel ? (
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-        ) : null}
+      <div className="flex gap-2 justify-between mt-6">
+        <div className="flex gap-2">
+          <Button type="submit">{initial ? "Save Changes" : "Create Exercise"}</Button>
+          {onCancel ? (
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+        
+        {onDelete && (
+          <div>
+            {showConfirmDelete ? (
+              <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                <Button type="button" variant="destructive" onClick={onDelete}>Confirm Delete</Button>
+                <Button type="button" variant="ghost" onClick={() => setShowConfirmDelete(false)}>Cancel</Button>
+              </div>
+            ) : (
+              <Button type="button" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => setShowConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {form.formState.errors.root ? <p className="text-sm text-destructive">{form.formState.errors.root.message}</p> : null}
     </form>

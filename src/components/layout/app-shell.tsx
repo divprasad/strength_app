@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/lib/store";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
@@ -28,6 +29,7 @@ const allLinks = [...primaryLinks, ...overflowLinks];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const sessionActive = useUiStore((s) => s.sessionActive);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
 
@@ -49,13 +51,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     cn(
       "rounded-full border px-4 py-2 text-sm transition-colors whitespace-nowrap",
       pathname === href
-        ? "border-primary/20 bg-primary text-primary-foreground shadow-[0_14px_30px_-18px_hsl(var(--primary))]"
+        ? "border-primary/20 bg-primary text-primary-foreground shadow-e2"
         : "border-transparent bg-background/55 text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
     );
 
   return (
     <div className="min-h-screen pb-20 md:pb-6">
-      <header className="sticky top-0 z-30 border-b border-white/30 bg-background/72 backdrop-blur-xl">
+      <header
+        className={cn(
+          "sticky top-0 z-30 border-b border-white/30 bg-background/80 backdrop-blur-xl",
+          "transition-all duration-300 ease-in-out overflow-hidden",
+          sessionActive && pathname === "/workouts"
+            ? "max-h-0 opacity-0 pointer-events-none border-transparent"
+            : "max-h-32 opacity-100"
+        )}
+      >
         <div className="mx-auto max-w-6xl px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center justify-between gap-4 rounded-3xl border border-white/55 bg-card/90 px-4 py-3 shadow-e3 ring-1 ring-black/5 md:px-5">
             <div className="min-w-0">
@@ -106,7 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                   {/* Dropdown */}
                   {overflowOpen && (
-                    <div className="absolute right-0 top-full mt-2 min-w-[140px] overflow-hidden rounded-2xl border border-border/70 bg-card/98 shadow-e2 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute right-0 top-full mt-2 min-w-[140px] overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-e2 animate-in fade-in zoom-in-95 duration-150">
                       {overflowLinks.map((item) => (
                         <Link
                           key={item.href}

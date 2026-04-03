@@ -119,7 +119,7 @@ export function WeeklyHistory() {
                 <button
                   key={iso}
                   onClick={() => setSelectedDate(iso)}
-                  className={`rounded-[1.2rem] border px-2 py-3 text-center text-sm shadow-[inset_0_1px_0_hsl(0_0%_100%/0.45)] transition-colors ${
+                  className={`rounded-2xl border px-2 py-3 text-center text-sm shadow-e1 transition-colors ${
                     selected
                       ? "border-primary/20 bg-accent/80 text-foreground"
                       : "border-border/70 bg-background/55 hover:border-border hover:bg-card"

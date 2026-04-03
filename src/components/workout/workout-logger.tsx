@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { subDays, eachDayOfInterval, isBefore, startOfDay, format } from "date-fns";
-import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Search } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Play, Clock } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useSearchParams, useRouter } from "next/navigation";
 import { StepperInput } from "@/components/ui/stepper-input";
 import { db } from "@/lib/db";
@@ -24,7 +27,9 @@ import {
   updateWorkout,
   syncWorkoutToServer,
   archiveWorkout,
-  deleteWorkout
+  deleteWorkout,
+  moveWorkoutExercise,
+  updateExerciseTime
 } from "@/lib/repository";
 import { useUiStore } from "@/lib/store";
 import { formatLocalDate, localDateIso, nowIso } from "@/lib/utils";
@@ -35,8 +40,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
 
 /* ─── helpers ─── */
 
@@ -82,8 +85,9 @@ export function WorkoutLogger() {
   const setSelectedDate = useUiStore((s) => s.setSelectedDate);
   const setActiveWorkoutId = useUiStore((s) => s.setActiveWorkoutId);
   const clearActiveWorkout = useUiStore((s) => s.clearActiveWorkout);
+  const setSessionActiveGlobal = useUiStore((s) => s.setSessionActive);
 
-  const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
+  const exercises = useLiveQuery(() => db.exercises.orderBy("name").filter((e) => !e.deletedAt).toArray(), []);
   const workouts = useLiveQuery(() => listWorkoutsByDate(selectedDate), [selectedDate]);
   const workout = useLiveQuery(() => (activeWorkoutId ? getWorkoutById(activeWorkoutId) : Promise.resolve(null)), [activeWorkoutId]);
   const workoutExercises = useLiveQuery(
@@ -106,6 +110,7 @@ export function WorkoutLogger() {
   const [sessionElapsed, setSessionElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [showSessionSelector, setShowSessionSelector] = useState(false);
+  const [sessionEditMode, setSessionEditMode] = useState(false);
 
   // Month history strip — all workouts in the past 30 days
   const today = localDateIso(new Date());
@@ -133,9 +138,17 @@ export function WorkoutLogger() {
   const [historyPopoverDate, setHistoryPopoverDate] = useState<string | null>(null);
   const [copyBusy, setCopyBusy] = useState(false);
 
+  // Set of exercise IDs already added to this session — used to filter the picker
+  const doneExerciseIds = useMemo(
+    () => new Set((workoutExercises ?? []).map((we) => we.exerciseId)),
+    [workoutExercises]
+  );
+
   useEffect(() => {
-    setSessionActive(workout?.status === "active");
-  }, [workout?.status]);
+    const isActive = workout?.status === "active";
+    setSessionActive(isActive);
+    setSessionActiveGlobal(isActive);
+  }, [workout?.status, setSessionActiveGlobal]);
 
   useEffect(() => {
     if (!workouts) return;
@@ -143,6 +156,11 @@ export function WorkoutLogger() {
       clearActiveWorkout();
     }
   }, [activeWorkoutId, clearActiveWorkout, workouts]);
+
+  // Reset edit mode whenever the active workout changes
+  useEffect(() => {
+    setSessionEditMode(false);
+  }, [activeWorkoutId]);
 
   useEffect(() => {
     if (!workouts) return;
@@ -383,22 +401,29 @@ export function WorkoutLogger() {
 
   return (
     <div className="space-y-3">
-      {/* ── Month History Strip ── */}
-      <MonthHistoryStrip
-        today={today}
-        monthWorkoutMap={monthWorkoutMap}
-        exerciseMap={exerciseMap ?? new Map()}
-        muscleMap={muscleMap}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        historyPopoverDate={historyPopoverDate}
-        onSetHistoryPopoverDate={setHistoryPopoverDate}
-        onCopyAsTemplate={handleCopyHistoryAsTemplate}
-        copyBusy={copyBusy}
-      />
+      {/* ── Month History Strip — hidden during active session ── */}
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out overflow-hidden",
+          sessionActive ? "max-h-0 opacity-0 pointer-events-none" : "max-h-40 opacity-100"
+        )}
+      >
+        <MonthHistoryStrip
+          today={today}
+          monthWorkoutMap={monthWorkoutMap}
+          exerciseMap={exerciseMap ?? new Map()}
+          muscleMap={muscleMap}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          historyPopoverDate={historyPopoverDate}
+          onSetHistoryPopoverDate={setHistoryPopoverDate}
+          onCopyAsTemplate={handleCopyHistoryAsTemplate}
+          copyBusy={copyBusy}
+        />
+      </div>
 
       {/* ── Compact Header Bar ── */}
-      <div className="flex items-center justify-between gap-3 rounded-[1.4rem] border border-border/60 bg-card/90 px-4 py-3 shadow-[0_12px_36px_-24px_hsl(var(--foreground)/0.3)]">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/80 px-4 py-3 shadow-e2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="text-sm font-semibold tracking-tight text-foreground">
             {formatLocalDate(selectedDate, "EEE, MMM d")}
@@ -406,9 +431,12 @@ export function WorkoutLogger() {
           <div className="h-4 w-px bg-border/50" />
           {workout?.status === "completed" && !sessionActive ? (
             <button className="group flex items-center gap-1.5 rounded-full border border-success/25 bg-success/5 px-2.5 py-1 text-[10px] font-medium text-success/70 hover:bg-success/12 hover:border-success/50 hover:text-success active:scale-95 transition-all duration-200">
-              <Check className="h-3 w-3 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6" />
-              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[4rem]">
-                done
+              <Check
+                className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-rotate-12 "
+                strokeWidth={2.5}
+              />
+              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                completed
               </span>
             </button>
           ) : (
@@ -427,14 +455,15 @@ export function WorkoutLogger() {
             <button
               onClick={handleCopyAsTemplate}
               disabled={sessionBusy}
-              title="Copy exercises as a new draft for today"
+              title="Copy entire workout session as a new draft"
               className="group flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[10px] font-medium text-primary/70 hover:bg-primary/12 hover:border-primary/50 hover:text-primary active:scale-95 transition-all duration-200 disabled:opacity-40"
             >
               <Dumbbell
-                className="h-3 w-3 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0"
+                className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-rotate-12 group-active:rotate-0"
+                strokeWidth={2}
               />
               <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
-                Template
+                template
               </span>
             </button>
           )}
@@ -474,24 +503,31 @@ export function WorkoutLogger() {
               Start
             </Button>
           ) : workout?.status === "completed" ? (
-            <button
-              onClick={handleArchiveWorkout}
-              disabled={sessionBusy}
-              title="Archive workout"
-              className="group flex items-center gap-1.5 rounded-full border border-border/30 bg-transparent px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive active:scale-95 transition-all duration-200 disabled:opacity-40"
-            >
-              <Archive className="h-3 w-3 transition-transform duration-300 group-hover:scale-110" />
-              <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
-                Archive
-              </span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* Edit toggle */}
+              <button
+                onClick={() => setSessionEditMode((v) => !v)}
+                title={sessionEditMode ? "Stop editing" : "Edit session"}
+                className={cn(
+                  "group flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium active:scale-95 transition-all duration-200",
+                  sessionEditMode
+                    ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                    : "border-destructive/40 bg-transparent text-destructive hover:bg-destructive/10 hover:border-destructive/60 hover:text-destructive"
+                )}
+              >
+                <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[3rem]">
+                  {sessionEditMode ? "back" : "edit"}
+                </span>
+                <PenLine className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
 
       {/* Collapsible Session Selector */}
       {showSessionSelector && workouts && workouts.length > 1 && (
-        <div className="rounded-[1.2rem] border border-border/60 bg-card/90 p-2 animate-in slide-in-from-top-1 duration-150">
+        <div className="rounded-2xl border border-border/60 bg-card/80 p-2 animate-in slide-in-from-top-1 duration-150">
           <div className="space-y-1">
             {workouts.map((item) => {
               const isSelected = item.id === activeWorkoutId;
@@ -555,7 +591,7 @@ export function WorkoutLogger() {
           </div>
         }
       >
-        <div className="rounded-[1.5rem] border border-border/70 bg-muted/30 p-4">
+        <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
           <p className="font-medium">{pendingEditWorkout?.name}</p>
           <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
         </div>
@@ -578,18 +614,33 @@ export function WorkoutLogger() {
                       title={exercise.name}
                       exercise={exercise}
                       muscleMap={muscleMap}
-                      onDelete={undefined}
+                      onDelete={sessionEditMode ? () => handleDeleteWorkoutExercise(item.id) : undefined}
                       onStart={() => handleStartExercise(item.id)}
                       onFinish={() => handleFinishExercise(item.id)}
                       startedAt={item.startedAt}
                       completedAt={item.completedAt}
                       isActive={activeExerciseId === item.id}
                       isSessionActive={sessionActive}
-                      allowEdit={true}
+                      allowEdit={sessionEditMode}
                       isInGrid={false}
                     />
                   );
                 })}
+
+                {/* Session Archive located at the bottom in Edit Mode */}
+                {sessionEditMode && (
+                  <div className="pt-2 flex  text-[12px] justify-center">
+                    <Button
+                      variant="destructive"
+                      onClick={handleArchiveWorkout}
+                      disabled={sessionBusy}
+                      className="w-full sm:w-auto h-10 rounded-xl bg-destructive/15 text-destructive hover:bg-destructive/25 border border-destructive/30 shadow-none transition-colors"
+                    >
+                      <Archive className="mr-2 h-3 w-3" />
+                      Archive Session
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               workoutExercises.map((item) => {
@@ -605,6 +656,8 @@ export function WorkoutLogger() {
                     onDelete={!item.completedAt ? () => handleDeleteWorkoutExercise(item.id) : undefined}
                     onStart={() => handleStartExercise(item.id)}
                     onFinish={() => handleFinishExercise(item.id)}
+                    onMoveUp={() => moveWorkoutExercise(item.id, "up")}
+                    onMoveDown={() => moveWorkoutExercise(item.id, "down")}
                     startedAt={item.startedAt}
                     completedAt={item.completedAt}
                     isActive={activeExerciseId === item.id}
@@ -628,11 +681,12 @@ export function WorkoutLogger() {
             exercises={exercises ?? []}
             onAdd={handleQuickAddExercise}
             disabled={sessionBusy}
+            doneExerciseIds={doneExerciseIds}
           />
         </div>
       ) : (
         /* No workout — only allow starting on today */
-        <div className="flex flex-col items-center gap-4 rounded-[1.8rem] border border-dashed border-border/50 bg-card/60 px-6 py-12">
+        <div className="flex flex-col items-center gap-4 rounded-3xl border border-dashed border-border/60 bg-card/60 px-6 py-12">
           <p className="text-sm text-muted-foreground">No workout for {formatLocalDate(selectedDate, "EEEE, MMM d")}</p>
           {selectedDate === today && (
             <Button onClick={handleCreateAndStart} disabled={sessionBusy} className="rounded-full px-6">
@@ -655,29 +709,46 @@ export function WorkoutLogger() {
 function InlineExercisePicker({
   exercises,
   onAdd,
-  disabled
+  disabled,
+  doneExerciseIds,
 }: {
   exercises: Exercise[];
   onAdd: (exerciseId: string) => void;
   disabled: boolean;
+  doneExerciseIds: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
 
-  const filtered = useMemo(() => {
-    if (!filter) return exercises;
-    const lower = filter.toLowerCase();
-    return exercises.filter(e => e.name.toLowerCase().includes(lower));
-  }, [exercises, filter]);
+  // Only show exercises not yet added to this session
+  const available = useMemo(
+    () => exercises.filter((e) => !doneExerciseIds.has(e.id)),
+    [exercises, doneExerciseIds]
+  );
+
+  // Group by category, sorted alphabetically within each group
+  const groups = useMemo(() => {
+    const map = new Map<string, Exercise[]>();
+    for (const ex of available) {
+      const cat = ex.category ?? "Other";
+      const arr = map.get(cat) ?? [];
+      arr.push(ex);
+      map.set(cat, arr);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([cat, exs]) => ({
+        cat,
+        exs: [...exs].sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [available]);
 
   function close() {
     setOpen(false);
-    setFilter("");
   }
 
   return (
     <>
-      {/* Trigger — same visual as before */}
+      {/* Trigger */}
       <button
         onClick={() => setOpen(true)}
         disabled={disabled}
@@ -687,51 +758,91 @@ function InlineExercisePicker({
         Add Exercise
       </button>
 
-      {/* Bottom sheet */}
+      {/* Bottom sheet — pill-button grid, no search, no keyboard */}
       <BottomSheet isOpen={open} onClose={close} title="Add Exercise">
-        {/* Search */}
-        <div className="sticky top-0 border-b border-border/50 bg-card/98 px-4 pb-3">
-          <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-            <input
-              autoFocus
-              type="text"
-              placeholder="Search exercises..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-            />
+        {available.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+            All exercises already added
+          </p>
+        ) : (
+          <div className="px-4 py-3 space-y-5">
+            {groups.map(({ cat, exs }) => (
+              <div key={cat}>
+                <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {cat}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {exs.map((ex) => (
+                    <button
+                      key={ex.id}
+                      onClick={() => { onAdd(ex.id); close(); }}
+                      className="rounded-full border border-border/60 bg-card/70 px-3.5 py-2 text-sm font-medium
+                                 hover:border-primary/40 hover:bg-primary/10 hover:text-primary
+                                 active:scale-95 transition-all duration-150"
+                    >
+                      {ex.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {/* Safe area bottom padding */}
+            <div className="h-4" />
           </div>
-        </div>
-
-        {/* Exercise list */}
-        <div className="px-2 py-2">
-          {filtered.length > 0 ? (
-            <ul className="space-y-0.5">
-              {filtered.map((exercise) => (
-                <li key={exercise.id}>
-                  <button
-                    onClick={() => { onAdd(exercise.id); close(); }}
-                    className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent"
-                  >
-                    <span className="font-medium text-sm">{exercise.name}</span>
-                    <span className="ml-3 shrink-0 rounded-full border border-border/40 bg-muted/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                      {exercise.category}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No exercises found for &ldquo;{filter}&rdquo;
-            </p>
-          )}
-          {/* Bottom padding for safe area */}
-          <div className="h-6" />
-        </div>
+        )}
       </BottomSheet>
     </>
+  );
+}
+
+function TimeEditorModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialDurationSeconds
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (durationSeconds: number) => void;
+  initialDurationSeconds: number;
+}) {
+  const [mins, setMins] = useState("0");
+  const [secs, setSecs] = useState("0");
+
+  useEffect(() => {
+    if (isOpen) {
+      setMins(Math.floor(initialDurationSeconds / 60).toString());
+      setSecs((initialDurationSeconds % 60).toString());
+    }
+  }, [isOpen, initialDurationSeconds]);
+
+  function handleSave() {
+    const m = parseInt(mins, 10) || 0;
+    const s = parseInt(secs, 10) || 0;
+    onSave(m * 60 + s);
+    onClose();
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Duration">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Adjust the recorded time for this exercise.</p>
+        <div className="flex gap-4">
+          <div className="flex-1 space-y-1.5">
+            <Label>Minutes</Label>
+            <Input type="number" min="0" value={mins} onChange={(e) => setMins(e.target.value)} />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <Label>Seconds</Label>
+            <Input type="number" min="0" max="59" value={secs} onChange={(e) => setSecs(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -746,9 +857,12 @@ function WorkoutExerciseCard({
   onDelete,
   onStart,
   onFinish,
+  onMoveUp,
+  onMoveDown,
   startedAt,
   completedAt,
   isActive,
+  isSessionActive,
   allowEdit,
   isInGrid
 }: {
@@ -759,6 +873,8 @@ function WorkoutExerciseCard({
   onDelete?: () => void;
   onStart: () => void;
   onFinish: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   startedAt?: string;
   completedAt?: string;
   isActive: boolean;
@@ -816,6 +932,11 @@ function WorkoutExerciseCard({
   const [elapsed, setElapsed] = useState(() => computeElapsed(startedAt));
   const durationSeconds = computeDurationSeconds(startedAt, completedAt);
   const [expanded, setExpanded] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+
+  const handleTimeSave = async (durationSecs: number) => {
+    await updateExerciseTime(workoutExerciseId, durationSecs);
+  };
   const [editMode, setEditMode] = useState(false);
   const [showAddConfirm, setShowAddConfirm] = useState<{ reps: number; weight: number } | null>(null);
 
@@ -865,6 +986,12 @@ function WorkoutExerciseCard({
 
     return (
       <div className={cn("transition-all duration-200", isInGrid && expanded && "col-span-2")}>
+        <TimeEditorModal
+          isOpen={showTimeModal}
+          onClose={() => setShowTimeModal(false)}
+          onSave={handleTimeSave}
+          initialDurationSeconds={durationSeconds}
+        />
         {/* Add-set confirmation modal */}
         <Modal
           isOpen={!!showAddConfirm}
@@ -888,16 +1015,16 @@ function WorkoutExerciseCard({
             </div>
           }
         >
-           <p className="text-sm text-muted-foreground px-1">This will be added to the set log.</p>
+          <p className="text-sm text-muted-foreground px-1">This will be added to the set log.</p>
         </Modal>
 
         {!expanded ? (
           /* ── Collapsed tile ── */
           <button
             onClick={() => setExpanded(true)}
-            className="group flex w-full items-center gap-3 rounded-[1.2rem] border border-border/50 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80 active:bg-card/90"
+            className="group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80 active:bg-card/95"
           >
-            <Check className="h-4 w-4 shrink-0 text-success" />
+            <Check className="h-4 w-4 shrink-0 text-success transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0" strokeWidth={2.5} />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{title}</p>
               <p className="text-xs text-muted-foreground truncate">
@@ -906,26 +1033,41 @@ function WorkoutExerciseCard({
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
               {allowEdit && (
-                <span
-                  role="button"
-                  onClick={(e) => { e.stopPropagation(); setEditMode(true); setExpanded(true); }}
-                  className="rounded-full p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 active:bg-primary/20 transition-colors"
-                >
-                  <PenLine className="h-3 w-3" />
-                </span>
+                <>
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); setShowTimeModal(true); }}
+                    className="group border border-transparent hover:border-primary/20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                      {/* edit duration */}
+                    </span>
+                    <Clock className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+                  </span>
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); setEditMode(true); setExpanded(true); }}
+                    className="group border border-transparent hover:border-primary/20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 active:bg-primary/20 transition-colors"
+                  >
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5.5rem]">
+                      {/* edit exercise */}
+                    </span>
+                    <PenLine className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+                  </span>
+                </>
               )}
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
           </button>
         ) : (
           /* ── Expanded view ── */
-          <div className="rounded-[1.2rem] border border-border/50 bg-card/70 overflow-hidden animate-in slide-in-from-top-1 duration-150">
+          <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden animate-in slide-in-from-top-1 duration-150">
             {/* Expanded header */}
             <button
               onClick={() => { setExpanded(false); setEditMode(false); }}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
+              className="group flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
             >
-              <Check className="h-4 w-4 shrink-0 text-success" />
+              <Check className="h-4 w-4 shrink-0 text-success transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0" strokeWidth={2.5} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">{title}</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -934,18 +1076,48 @@ function WorkoutExerciseCard({
               </div>
               <div className="flex items-center gap-0.5 shrink-0">
                 {allowEdit && (
-                  <span
-                    role="button"
-                    onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
-                    className={cn(
-                      "rounded-full p-1.5 transition-colors",
-                      editMode
-                        ? "text-primary bg-primary/10"
-                        : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  <>
+                    <span
+                      role="button"
+                      onClick={(e) => { e.stopPropagation(); setShowTimeModal(true); }}
+                      className="group border border-transparent hover:border-primary/20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                        {/* edit duration */}
+                      </span>
+                      <Clock className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+                    </span>
+                    <span
+                      role="button"
+                      onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
+                      className={cn(
+                        "group border hover:border-primary/20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
+                        editMode
+                          ? "text-primary bg-primary/10 border-primary/20"
+                          : "border-transparent text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      )}
+                    >
+                      <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5.5rem]">
+                        {/* edit exercise */}
+                      </span>
+                      <PenLine className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+                    </span>
+                    {onDelete && editMode && (
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm("Archive this exercise from the session? (It can be restored from the settings)")) {
+                            onDelete();
+                          }
+                        }}
+                        className="rounded-full p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors group/archive"
+                        title="Archive exercise"
+                      >
+                        <Archive className="h-3.5 w-3.5 transition-transform duration-300 group-hover/archive:scale-110" />
+                      </span>
                     )}
-                  >
-                    <PenLine className="h-3 w-3" />
-                  </span>
+                  </>
                 )}
                 <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
@@ -1017,150 +1189,218 @@ function WorkoutExerciseCard({
 
   /* ── Pending (not started) exercise ── */
   if (!startedAt && !isFinished) {
-    return (
-      <div className="flex items-center gap-3 rounded-[1.2rem] border border-border/40 bg-card/40 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-[10px] text-muted-foreground">Pending</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="secondary" onClick={onStart} className="h-8 rounded-full px-3 text-xs">
-            Start
-          </Button>
-          {onDelete && (
-            <Button size="icon" variant="ghost" onClick={onDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  /* ── Active exercise card (full interactive view) ── */
-  return (
-    <div
-      className={cn(
-        "rounded-[1.4rem] border-2 bg-card/95 shadow-[0_16px_40px_-20px_hsl(var(--foreground)/0.4)] overflow-hidden transition-all",
-        isActive
-          ? "border-primary/30 shadow-[0_16px_40px_-16px_hsl(var(--primary)/0.25)]"
-          : isFinished && allowEdit
-            ? "border-border/50"
-            : "border-border/40"
-      )}
-    >
-      {/* Card header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <p className="font-semibold text-sm tracking-tight truncate">{title}</p>
-          {isTimerActive && (
-            <Badge className="bg-success/15 text-success border-success/20 px-2 py-0 text-[10px] font-mono animate-pulse">
-              {formatTimer(elapsed)}
-            </Badge>
-          )}
-          {isFinished && allowEdit && (
-            <Badge variant="outline" className="px-2 py-0 text-[10px]">Done</Badge>
-          )}
-          {sets && sets.length > 0 && (
-            <span className="text-[10px] text-muted-foreground">{sets.length} set{sets.length === 1 ? "" : "s"}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {isActive && (
-            <span
-              role="button"
-              title="Toggle edit mode"
-              onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
-              className={cn(
-                "rounded-full p-1.5 transition-colors cursor-pointer",
-                editMode
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-              )}
-            >
-              <PenLine className="h-3 w-3" />
-            </span>
-          )}
-          {isActive && (
-            <Button size="sm" variant="secondary" onClick={onFinish} className="h-7 rounded-full px-3 text-[11px]">
-              Finish
-            </Button>
-          )}
-          {!isActive && !isFinished && (
-            <Button size="sm" variant="secondary" onClick={onStart} className="h-7 rounded-full px-3 text-[11px]">
-              Start
-            </Button>
-          )}
-          {onDelete && (
-            <Button size="icon" variant="ghost" onClick={onDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Compact set chips */}
-      <div className="px-4 py-3 space-y-2">
-        {(sets ?? []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {(sets ?? []).map((setEntry) => (
-              editMode ? (
-                <SetChip
-                  key={setEntry.id}
-                  setEntry={setEntry}
-                  onUpdate={updateSet}
-                  onDelete={deleteSet}
-                  requireConfirm={false}
-                />
-              ) : (
-                <span
-                  key={setEntry.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs"
-                >
-                  <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
-                  <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+    if (!isSessionActive && allowEdit) {
+      if (!editMode) {
+        return (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/20 last:border-0 rounded-2xl bg-card/40">
+            <p className="text-[13px] font-medium text-muted-foreground/60 line-through decoration-muted-foreground/30 truncate">{title}</p>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-[10px] font-normal text-muted-foreground bg-muted/40">Unfinished</Badge>
+              <span
+                role="button"
+                onClick={(e) => { e.stopPropagation(); setEditMode(true); }}
+                className="group border border-transparent hover:border-primary/20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                title="Edit retroactively"
+              >
+                <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5.5rem]">
+                  edit exercise
                 </span>
-              )
-            ))}
+                <PenLine className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+              </span>
+            </div>
           </div>
-        )}
-
-        {/* Smart Quick Add */}
-        <div className="flex items-center gap-2 pt-1 flex-wrap">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <StepperInput
-              value={reps}
-              onChange={setReps}
-              step={1}
-              min={0}
-              label="reps"
-              inputMode="numeric"
-              size="md"
-            />
-            <span className="text-xs text-muted-foreground mb-3">×</span>
-            <StepperInput
-              value={weight}
-              onChange={setWeight}
-              step={2.5}
-              min={0}
-              label="kg"
-              inputMode="decimal"
-              size="md"
-            />
+        );
+      }
+      // If editMode is true, it falls through to the Active Card below.
+    } else {
+      return (
+        <div className="group flex items-center gap-2 border-b border-border/20 bg-transparent px-2 py-2 last:border-0 hover:bg-card/30 transition-colors">
+          <div className="flex flex-col gap-0 border-r border-border/20 pr-2 self-stretch justify-center">
+            {onMoveUp && (
+              <button onClick={onMoveUp} className="text-muted-foreground/40 hover:text-primary transition-colors p-0.5">
+                <ChevronUp className="h-4 w-4" />
+              </button>
+            )}
+            {onMoveDown && (
+              <button onClick={onMoveDown} className="text-muted-foreground/40 hover:text-primary transition-colors p-0.5">
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 self-start mt-0.5">
-            <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm shrink-0">
-              Log
+          <div className="min-w-0 flex-1 pl-1">
+            <p className="text-[13px] font-medium text-foreground/80 truncate">{title}</p>
+          </div>
+          <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" onClick={onStart}>
+              <Play className="h-3 w-3 fill-current" />
             </Button>
-            {lastSet && (
-              <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm shrink-0" title="Repeat last set">
-                <RotateCcw className="h-3.5 w-3.5" />
+            {onDelete && (
+              <Button size="icon" variant="ghost" onClick={onDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
         </div>
+      );
+    }
+  }
+
+  /* ── Active exercise card (full interactive view) ── */
+  return (
+    <>
+      <TimeEditorModal
+        isOpen={showTimeModal}
+        onClose={() => setShowTimeModal(false)}
+        onSave={handleTimeSave}
+        initialDurationSeconds={durationSeconds}
+      />
+      <div
+        className={cn(
+          "rounded-2xl border-2 bg-card/95 shadow-e3 overflow-hidden transition-all",
+          isActive
+            ? "border-primary/30 shadow-e3"
+            : isFinished && allowEdit
+              ? "border-border/60"
+              : "border-border/40"
+        )}
+      >
+        {/* Card header */}
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <p className="font-semibold text-sm tracking-tight truncate">{title}</p>
+            {isTimerActive && (
+              <Badge className="bg-success/15 text-success border-success/20 px-2 py-0 text-[10px] font-mono">
+                {formatTimer(elapsed)}
+              </Badge>
+            )}
+            {isFinished && allowEdit && (
+              <Badge variant="outline" className="px-2 py-0 text-[10px]">Done</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {(isActive || allowEdit) && (
+              <span
+                role="button"
+                onClick={(e) => { e.stopPropagation(); setShowTimeModal(true); }}
+                className="group flex border border-transparent hover:border-primary/20 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                title="Edit time"
+              >
+                <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5rem]">
+                  {/* edit duration */}
+                </span>
+                <Clock className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+              </span>
+            )}
+            {isActive && (
+              <span
+                role="button"
+                title="Toggle edit mode"
+                onClick={(e) => { e.stopPropagation(); setEditMode(!editMode); }}
+                className={cn(
+                  "group flex border hover:border-primary/20 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors cursor-pointer",
+                  editMode
+                    ? "text-primary bg-primary/10 border-primary/20"
+                    : "border-transparent text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+              >
+                <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[5.5rem]">
+                  {/* edit exercise */}
+                </span>
+                <PenLine className="h-3.5 w-3.5 duration-300 group-hover:-rotate-12 group-active:rotate-0" />
+              </span>
+            )}
+            {isActive && (
+              <Button size="sm" variant="secondary" onClick={onFinish} className="h-7 rounded-full px-3 text-[11px]">
+                Finish
+              </Button>
+            )}
+            {!isActive && !isFinished && isSessionActive && (
+              <Button size="sm" variant="secondary" onClick={onStart} className="h-7 rounded-full px-3 text-[11px]">
+                Start
+              </Button>
+            )}
+            {onDelete && editMode && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  if (window.confirm("Archive this exercise from the session? (It can be restored from the settings)")) {
+                    onDelete();
+                  }
+                }}
+                className="h-7 w-7 text-muted-foreground hover:text-destructive group/archive"
+                title="Archive exercise"
+              >
+                <Archive className="h-3.5 w-3.5 transition-transform duration-300 group-hover/archive:scale-110" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Compact set chips */}
+        <div className="px-4 py-3 space-y-2">
+          {(sets ?? []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground mr-0.5">{(sets ?? []).length} set{(sets ?? []).length === 1 ? "" : "s"}</span>
+              {(sets ?? []).map((setEntry) => (
+                editMode ? (
+                  <SetChip
+                    key={setEntry.id}
+                    setEntry={setEntry}
+                    onUpdate={updateSet}
+                    onDelete={deleteSet}
+                    requireConfirm={false}
+                  />
+                ) : (
+                  <span
+                    key={setEntry.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs animate-in zoom-in-95 duration-150"
+                  >
+                    <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
+                    <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* Smart Quick Add */}
+          <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <StepperInput
+                value={reps}
+                onChange={setReps}
+                step={1}
+                min={0}
+                label="reps"
+                inputMode="numeric"
+                size="md"
+              />
+              <span className="text-xs text-muted-foreground mb-4">×</span>
+              <StepperInput
+                value={weight}
+                onChange={setWeight}
+                step={2.5}
+                min={0}
+                label="kg"
+                inputMode="decimal"
+                size="md"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 self-start mt-0.5 shrink-0">
+              <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm">
+                Log
+              </Button>
+              {lastSet && (
+                <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm" title="Repeat last set">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

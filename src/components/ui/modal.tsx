@@ -30,7 +30,7 @@ export function Modal({
         className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" 
         onClick={onClose} 
       />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] border border-border/70 bg-card shadow-[0_32px_80px_-20px_hsl(var(--foreground)/0.35)] animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/60 bg-card shadow-e3 animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between border-b border-border/70 px-6 py-5 sm:px-8">
           <div className="space-y-1">
             <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
