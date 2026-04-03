@@ -84,7 +84,19 @@ export function useDbBootstrap() {
       }
     }
 
-    initDb();
+    initDb().then(() => {
+      // Request persistent storage so Android/Chrome cannot silently evict
+      // our IndexedDB data when the device storage runs low.
+      if (typeof navigator !== "undefined" && navigator.storage?.persist) {
+        navigator.storage.persist().then((granted) => {
+          if (granted) {
+            console.info("[storage] Persistent storage granted — IndexedDB is durable.");
+          } else {
+            console.warn("[storage] Persistent storage NOT granted — data may be evicted under storage pressure.");
+          }
+        }).catch(() => { /* silently ignore unsupported browsers */ });
+      }
+    });
 
     return () => {
       mounted = false;
