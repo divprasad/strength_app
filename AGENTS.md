@@ -49,22 +49,23 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 | Area | Status | Notes |
 |------|--------|-------|
 | Core workout loop | ✅ Stable | Create → start → log sets → finish → history |
-| PWA | ✅ Complete | Serwist service worker, precaching, offline-first caching |
+| UI/UX & Components | ✅ Polished | Press-and-hold animations, animated pills, bottom sheets, smart pre-fill |
+| Dashboard & History | ✅ Enhanced | 30-day scrollable calendar, "Copy as Template", gym session cost tracker |
+| PWA | ✅ Optimized | Serwist service worker, offline-first caching, Android native-like fullscreen |
 | Docker | ✅ Complete | Multi-stage build, ~180 MB image, named volume persistence |
-| Sync engine | ✅ Working | Background queue with retry; `online` event auto-trigger |
+| Sync engine | ✅ Robust | Background queue with exponential backoff, `online` auto-trigger, UI sync status |
 | Cascading delete | ✅ Working | Server-side orphan cleanup within `$transaction` |
 | Auto backups | ✅ Working | `fs.copyFile` of SQLite DB on every sync POST |
 | Bootstrap gate | ✅ Hardened | 30s server timeout, 10s local timeout, 45s hard deadline |
 | Integrity audit | ✅ Implemented | `integrity-audit.ts` with `healDatabase()` auto-fixer |
 | Command palette | ✅ Implemented | `Cmd+K` global navigation and quick actions |
-| Analytics | ✅ Present | Weekly volume, muscle distribution via Recharts |
+| Analytics | ✅ Present | Weekly volume, muscle distribution, gym session cost tracker |
 | Export/Import | ✅ Present | JSON export, server bootstrap pull from Settings |
 | CI | ✅ Active | `lint`, `typecheck`, `test:unit`, `build` on push; E2E manual |
 
 ### Known areas needing attention
 
 - **Multi-user support** — currently single-user (`DEFAULT_USER_ID`). Auth and user separation are not yet implemented.
-- **Sync status UI** — no visible indicator of pending/failed sync jobs for the user.
 - **E2E test coverage** — only one spec file exists (`app.e2e.spec.ts`); critical flows need more coverage.
 - **Bundle size** — no active optimization pass has been done.
 

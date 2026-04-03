@@ -117,7 +117,7 @@ export function ExerciseList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filteredExercises = exercises ?? [];
+  const filteredExercises = (exercises ?? []).filter((e) => !e.deletedAt);
 
   function handleOpenCreate() {
     setEditing(null);
@@ -165,6 +165,17 @@ export function ExerciseList() {
     }
   }
 
+  async function handleDelete(exerciseId: string) {
+    try {
+      setError(null);
+      const { softDeleteExercise } = await import("@/lib/repository");
+      await softDeleteExercise(exerciseId);
+      handleCloseModal();
+    } catch {
+      setError("Unable to delete exercise.");
+    }
+  }
+
   return (
     <div className="space-y-3">
 
@@ -180,7 +191,7 @@ export function ExerciseList() {
             return (
               <li
                 key={exercise.id}
-                className="group rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all hover:shadow-[0_8px_24px_-12px_hsl(var(--foreground)/0.15)] px-4 py-3"
+                className="group rounded-2xl border border-border/60 bg-card/60 hover:bg-card/80 transition-all hover:shadow-e2 px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: Name + meta */}
@@ -303,6 +314,7 @@ export function ExerciseList() {
                 }
               }}
               onCancel={handleCloseModal}
+              onDelete={editing ? () => handleDelete(editing.id) : undefined}
             />
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>

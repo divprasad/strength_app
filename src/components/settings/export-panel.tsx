@@ -242,7 +242,7 @@ export function ExportPanel() {
       />
 
       {status ? (
-        <div className="rounded-2xl border border-border/70 bg-card/82 px-4 py-3 text-sm text-muted-foreground shadow-e2">
+        <div className="rounded-2xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-muted-foreground shadow-e2">
           {status}
         </div>
       ) : null}
@@ -254,7 +254,7 @@ export function ExportPanel() {
           <CardDescription>Full export of all your training data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
             <p className="text-sm text-muted-foreground">JSON for backup and restore. CSV for spreadsheets.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -305,7 +305,7 @@ export function ExportPanel() {
           {auditError ? <p className="text-sm text-destructive">{auditError}</p> : null}
           {auditReport ? (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
@@ -329,7 +329,7 @@ export function ExportPanel() {
                     {auditReport.issues.map((issue, index) => (
                       <li
                         key={`${issue.entity}-${issue.id ?? "unknown"}-${index}`}
-                        className="rounded-[1.15rem] border border-border/70 bg-background/55 p-4 text-sm"
+                        className="rounded-2xl border border-border/60 bg-background/60 p-4 text-sm"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">

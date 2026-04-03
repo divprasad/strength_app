@@ -104,6 +104,40 @@ export async function normalizeWorkoutExerciseOrder(workoutId: string): Promise<
   });
 }
 
+export async function moveWorkoutExercise(workoutExerciseId: string, direction: "up" | "down"): Promise<void> {
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (!workoutExercise) return;
+
+  const workoutId = workoutExercise.workoutId;
+  const items = await db.workoutExercises.where({ workoutId }).sortBy("orderIndex");
+  
+  const idx = items.findIndex((item) => item.id === workoutExerciseId);
+  if (idx === -1) return;
+
+  if (direction === "up" && idx > 0) {
+    // Swap with previous
+    const prev = items[idx - 1];
+    items[idx - 1] = items[idx];
+    items[idx] = prev;
+  } else if (direction === "down" && idx < items.length - 1) {
+    // Swap with next
+    const next = items[idx + 1];
+    items[idx + 1] = items[idx];
+    items[idx] = next;
+  } else {
+    return; // Nothing to do
+  }
+
+  await db.transaction("rw", [db.workoutExercises, db.workouts], async () => {
+    for (let i = 0; i < items.length; i++) {
+      await db.workoutExercises.update(items[i].id, { orderIndex: i });
+    }
+    await db.workouts.update(workoutId, { updatedAt: nowIso() });
+  });
+
+  await enqueueSync(workoutId);
+}
+
 export async function removeExerciseFromWorkout(workoutExerciseId: string): Promise<void> {
   const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
   if (!workoutExercise) return;
@@ -222,6 +256,24 @@ export async function createExercise(data: Omit<Exercise, "id" | "createdAt" | "
   return exercise;
 }
 
+export async function softDeleteExercise(exerciseId: string): Promise<void> {
+  const exercise = await db.exercises.get(exerciseId);
+  if (!exercise) return;
+  await db.exercises.update(exerciseId, {
+    deletedAt: nowIso(),
+    updatedAt: nowIso(),
+  });
+}
+
+export async function restoreExercise(exerciseId: string): Promise<void> {
+  const exercise = await db.exercises.get(exerciseId);
+  if (!exercise) return;
+  await db.exercises.update(exerciseId, {
+    deletedAt: undefined,
+    updatedAt: nowIso(),
+  });
+}
+
 export async function isExerciseReferenced(exerciseId: string): Promise<boolean> {
   return db.workoutExercises.where("exerciseId").equals(exerciseId).first().then(Boolean);
 }
@@ -324,6 +376,23 @@ export async function finishWorkoutExercise(workoutExerciseId: string): Promise<
   await db.workoutExercises.update(workoutExerciseId, {
     completedAt: now
   });
+  await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
+  await enqueueSync(workoutExercise.workoutId);
+}
+
+export async function updateExerciseTime(workoutExerciseId: string, durationSeconds: number): Promise<void> {
+  const now = nowIso();
+  const workoutExercise = await db.workoutExercises.get(workoutExerciseId);
+  if (!workoutExercise) return;
+  
+  const end = workoutExercise.completedAt ? new Date(workoutExercise.completedAt) : new Date(now);
+  const start = new Date(end.getTime() - durationSeconds * 1000);
+  
+  await db.workoutExercises.update(workoutExerciseId, {
+    startedAt: start.toISOString(),
+    completedAt: end.toISOString()
+  });
+  
   await db.workouts.update(workoutExercise.workoutId, { updatedAt: now });
   await enqueueSync(workoutExercise.workoutId);
 }

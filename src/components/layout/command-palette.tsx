@@ -222,6 +222,11 @@ export function CommandPalette() {
     setExecuting(false);
   }, []);
 
+  // ─── Close palette on route change (e.g. bottom nav tap while palette is open) ───
+  useEffect(() => {
+    close();
+  }, [pathname, close]);
+
   async function executeCommand(command: Command) {
     if (command.kind === "navigate") {
       close();
@@ -312,7 +317,7 @@ export function CommandPalette() {
                   onMouseEnter={() => setSelectedIndex(globalIndex)}
                   disabled={executing}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-[0.85rem] border border-transparent px-3 py-2.5 text-left text-sm transition-all",
+                    "flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition-all",
                     isSelected
                       ? "border-border/70 bg-accent/60 shadow-[0_2px_8px_-4px_hsl(var(--foreground)/0.15)]"
                       : "hover:bg-accent/30",
@@ -385,7 +390,7 @@ export function CommandPalette() {
               role="dialog"
               aria-modal="true"
               aria-label="Command palette"
-              className="relative w-full overflow-hidden rounded-[1.85rem] border border-white/45 bg-card/95 text-card-foreground shadow-[0_36px_90px_-44px_hsl(var(--foreground)/0.85)] ring-1 ring-black/5 animate-in zoom-in-95 slide-in-from-top-2 duration-200"
+              className="relative w-full overflow-hidden rounded-3xl border border-white/45 bg-card/95 text-card-foreground shadow-e3 ring-1 ring-black/5 animate-in zoom-in-95 slide-in-from-top-2 duration-200"
               onKeyDown={handleKeydown}
             >
               {/* Search header */}

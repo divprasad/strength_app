@@ -42,14 +42,14 @@ export async function POST(request: NextRequest) {
     }
 
     const backupFilename = `db_backup_${fileTimestamp()}_no${totalWorkouts}_${lastWorkoutDate}_${lastWorkoutVolume}kg.db`;
-    
+
     // The workspace convention lists prisma/strength_dairy.db as the standard database location
     const sourceDbPath = path.join(process.cwd(), "prisma", "strength_dairy.db");
-    
+
     // Ensure the backups directory exists
     const backupDir = path.join(process.cwd(), "backups");
-    await fs.mkdir(backupDir, { recursive: true }).catch(() => {});
-    
+    await fs.mkdir(backupDir, { recursive: true }).catch(() => { });
+
     const backupPath = path.join(backupDir, backupFilename);
 
     // Attempt the backup (fails silently so it doesn't break the sync if db is locked/missing)
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         select: { id: true }
       });
       const exercisesToDelete = existingExercises.map(e => e.id).filter(id => !incomingExerciseIds.includes(id));
-      
+
       if (exercisesToDelete.length > 0) {
         await tx.setEntry.deleteMany({
           where: { workoutExerciseId: { in: exercisesToDelete } }
@@ -109,20 +109,43 @@ export async function POST(request: NextRequest) {
 
       // Find and delete removed Sets within remaining exercises
       if (incomingExerciseIds.length > 0) {
-          const existingSets = await tx.setEntry.findMany({
-            where: { workoutExerciseId: { in: incomingExerciseIds } },
-            select: { id: true }
+        const existingSets = await tx.setEntry.findMany({
+          where: { workoutExerciseId: { in: incomingExerciseIds } },
+          select: { id: true }
+        });
+        const setsToDelete = existingSets.map(s => s.id).filter(id => !incomingSetIds.includes(id));
+        if (setsToDelete.length > 0) {
+          await tx.setEntry.deleteMany({
+            where: { id: { in: setsToDelete } }
           });
-          const setsToDelete = existingSets.map(s => s.id).filter(id => !incomingSetIds.includes(id));
-          if (setsToDelete.length > 0) {
-             await tx.setEntry.deleteMany({
-               where: { id: { in: setsToDelete } }
-             });
-          }
+        }
       }
 
       // 2. Upsert WorkoutExercises and their Sets
       for (const item of bundle.items) {
+        if (item.exercise) {
+          await tx.exercise.upsert({
+            where: { id: item.exercise.id },
+            update: {
+              name: item.exercise.name,
+              category: item.exercise.category ?? null,
+              equipment: item.exercise.equipment ?? null,
+              primaryMuscleIds: JSON.stringify(item.exercise.primaryMuscleIds || []),
+              secondaryMuscleIds: JSON.stringify(item.exercise.secondaryMuscleIds || []),
+              notes: item.exercise.notes ?? null,
+            },
+            create: {
+              id: item.exercise.id,
+              name: item.exercise.name,
+              category: item.exercise.category ?? null,
+              equipment: item.exercise.equipment ?? null,
+              primaryMuscleIds: JSON.stringify(item.exercise.primaryMuscleIds || []),
+              secondaryMuscleIds: JSON.stringify(item.exercise.secondaryMuscleIds || []),
+              notes: item.exercise.notes ?? null,
+            }
+          });
+        }
+
         await tx.workoutExercise.upsert({
           where: { id: item.workoutExercise.id },
           update: {

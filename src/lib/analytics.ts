@@ -100,9 +100,9 @@ export async function getExerciseProgress(exerciseId: string, weeksBack = 12): P
     return points.sort((a, b) => a.date.localeCompare(b.date));
   });
 }
-export async function get30DaySummary(): Promise<{ completedCount: number; totalVolume: number; weeklyVolumes: number[] }> {
-  const thirtyDaysAgo = subDays(new Date(), 30);
-  const startStr = format(thirtyDaysAgo, "yyyy-MM-dd");
+export async function get28DaySummary(): Promise<{ completedCount: number; totalVolume: number; weeklyVolumes: number[] }> {
+  const twentyEightDaysAgo = subDays(new Date(), 28);
+  const startStr = format(twentyEightDaysAgo, "yyyy-MM-dd");
   const endStr = format(new Date(), "yyyy-MM-dd");
 
   return db.transaction("r", [db.workouts, db.workoutExercises, db.exercises, db.setEntries, db.settings], async () => {
@@ -150,3 +150,4 @@ export async function get30DaySummary(): Promise<{ completedCount: number; total
     };
   });
 }
+
