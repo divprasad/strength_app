@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { subDays, eachDayOfInterval, isBefore, startOfDay, format } from "date-fns";
+import { subDays, eachDayOfInterval, format } from "date-fns";
 import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Play, Clock } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Modal } from "@/components/ui/modal";
@@ -24,8 +24,6 @@ import {
   startWorkoutSessionForWorkout,
   startWorkoutExercise,
   summarizeSets,
-  updateWorkout,
-  syncWorkoutToServer,
   archiveWorkout,
   deleteWorkout,
   moveWorkoutExercise,
@@ -38,7 +36,6 @@ import type { Exercise, MuscleGroup, SetEntry, Workout } from "@/types/domain";
 import { formatDurationLong, formatTimeOfDay, computeDurationSeconds } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 
 /* ─── helpers ─── */
@@ -332,13 +329,6 @@ export function WorkoutLogger() {
     if (workoutId === activeWorkoutId) clearActiveWorkout();
   };
 
-  const handleUpdateTime = async (time: string) => {
-    if (!workout || !time) return;
-    const [hours, minutes] = time.split(":").map(Number);
-    const date = new Date(workout.sessionStartedAt || nowIso());
-    date.setHours(hours, minutes, 0, 0);
-    await updateWorkout(workout.id, { sessionStartedAt: date.toISOString() });
-  };
 
   // Phase 2: Quick-add exercise — auto-creates workout + starts session if needed
   async function handleQuickAddExercise(exerciseId: string) {
@@ -400,7 +390,7 @@ export function WorkoutLogger() {
   /* ─── render ─── */
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 stagger-children">
       {/* ── Month History Strip — hidden during active session ── */}
       <div
         className={cn(
@@ -423,12 +413,12 @@ export function WorkoutLogger() {
       </div>
 
       {/* ── Compact Header Bar ── */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/80 px-4 py-3 shadow-e2">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/30 bg-card/75 backdrop-blur-lg px-4 py-3 shadow-e1">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="text-sm font-semibold tracking-tight text-foreground">
             {formatLocalDate(selectedDate, "EEE, MMM d")}
           </span>
-          <div className="h-4 w-px bg-border/50" />
+          <div className="h-4 w-px bg-border/30" />
           {workout?.status === "completed" && !sessionActive ? (
             <button className="group flex items-center gap-1.5 rounded-full border border-success/25 bg-success/5 px-2.5 py-1 text-[10px] font-medium text-success/70 hover:bg-success/12 hover:border-success/50 hover:text-success active:scale-95 transition-all duration-200">
               <Check
@@ -527,7 +517,7 @@ export function WorkoutLogger() {
 
       {/* Collapsible Session Selector */}
       {showSessionSelector && workouts && workouts.length > 1 && (
-        <div className="rounded-2xl border border-border/60 bg-card/80 p-2 animate-in slide-in-from-top-1 duration-150">
+        <div className="rounded-2xl border border-border/30 bg-card/75 backdrop-blur-lg p-2 animate-fade-up">
           <div className="space-y-1">
             {workouts.map((item) => {
               const isSelected = item.id === activeWorkoutId;
@@ -591,7 +581,7 @@ export function WorkoutLogger() {
           </div>
         }
       >
-        <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+        <div className="rounded-xl border border-border/20 bg-muted/20 p-4">
           <p className="font-medium">{pendingEditWorkout?.name}</p>
           <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
         </div>
@@ -669,11 +659,9 @@ export function WorkoutLogger() {
               })
             )
           ) : (
-            <Card className="border-dashed border-border/50">
-              <CardContent className="pt-5">
-                <EmptyState title="No exercises yet" description="Add one below to start." />
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm p-6 text-center">
+              <EmptyState title="No exercises yet" description="Add one below to start." />
+            </div>
           )}
 
           {/* ── Inline Exercise Picker (always at bottom) ── */}
@@ -686,7 +674,7 @@ export function WorkoutLogger() {
         </div>
       ) : (
         /* No workout — only allow starting on today */
-        <div className="flex flex-col items-center gap-4 rounded-3xl border border-dashed border-border/60 bg-card/60 px-6 py-12">
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm px-6 py-12">
           <p className="text-sm text-muted-foreground">No workout for {formatLocalDate(selectedDate, "EEEE, MMM d")}</p>
           {selectedDate === today && (
             <Button onClick={handleCreateAndStart} disabled={sessionBusy} className="rounded-full px-6">
@@ -752,7 +740,7 @@ function InlineExercisePicker({
       <button
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 bg-card/40 px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card/70 hover:text-foreground disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm px-4 py-3 text-sm text-muted-foreground transition-all duration-200 ease-spring hover:border-primary/20 hover:bg-card/60 hover:text-foreground disabled:opacity-50"
       >
         <Plus className="h-4 w-4" />
         Add Exercise
@@ -765,7 +753,7 @@ function InlineExercisePicker({
             All exercises already added
           </p>
         ) : (
-          <div className="px-4 py-3 space-y-5">
+          <div className="px-4 py-3 space-y-5 stagger-children">
             {groups.map(({ cat, exs }) => (
               <div key={cat}>
                 <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -776,9 +764,9 @@ function InlineExercisePicker({
                     <button
                       key={ex.id}
                       onClick={() => { onAdd(ex.id); close(); }}
-                      className="rounded-full border border-border/60 bg-card/70 px-3.5 py-2 text-sm font-medium
-                                 hover:border-primary/40 hover:bg-primary/10 hover:text-primary
-                                 active:scale-95 transition-all duration-150"
+                      className="rounded-full border border-border/30 bg-card/50 backdrop-blur-sm px-3.5 py-2 text-sm font-medium
+                                 hover:border-primary/20 hover:bg-primary/8 hover:text-primary
+                                 active:scale-95 transition-all duration-200 ease-spring"
                     >
                       {ex.name}
                     </button>
@@ -1022,7 +1010,7 @@ function WorkoutExerciseCard({
           /* ── Collapsed tile ── */
           <button
             onClick={() => setExpanded(true)}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-left transition-all hover:bg-card/80 active:bg-card/95"
+            className="group flex w-full items-center gap-3 rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm px-4 py-3 text-left transition-all duration-200 ease-spring hover:bg-card/80 active:bg-card/90"
           >
             <Check className="h-4 w-4 shrink-0 text-success transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0" strokeWidth={2.5} />
             <div className="min-w-0 flex-1">
@@ -1061,11 +1049,11 @@ function WorkoutExerciseCard({
           </button>
         ) : (
           /* ── Expanded view ── */
-          <div className="rounded-2xl border border-border/60 bg-card/60 overflow-hidden animate-in slide-in-from-top-1 duration-150">
+          <div className="rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm overflow-hidden animate-fade-up">
             {/* Expanded header */}
             <button
               onClick={() => { setExpanded(false); setEditMode(false); }}
-              className="group flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/90 transition-colors"
+              className="group flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-card/70 transition-colors duration-200"
             >
               <Check className="h-4 w-4 shrink-0 text-success transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0" strokeWidth={2.5} />
               <div className="min-w-0 flex-1">
@@ -1139,7 +1127,7 @@ function WorkoutExerciseCard({
                     ) : (
                       <span
                         key={setEntry.id}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/30 bg-background/40 px-2.5 py-1 text-xs"
                       >
                         <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
                         <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
@@ -1151,7 +1139,7 @@ function WorkoutExerciseCard({
 
               {/* Add set form — only in editMode */}
               {editMode && (
-                <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/30">
+                <div className="flex items-center gap-3 pt-2 mt-1 border-t border-border/20">
                   <StepperInput
                     value={reps}
                     onChange={setReps}
@@ -1192,7 +1180,7 @@ function WorkoutExerciseCard({
     if (!isSessionActive && allowEdit) {
       if (!editMode) {
         return (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/20 last:border-0 rounded-2xl bg-card/40">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/15 last:border-0 rounded-2xl bg-card/30 backdrop-blur-sm">
             <p className="text-[13px] font-medium text-muted-foreground/60 line-through decoration-muted-foreground/30 truncate">{title}</p>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-[10px] font-normal text-muted-foreground bg-muted/40">Unfinished</Badge>
@@ -1214,8 +1202,8 @@ function WorkoutExerciseCard({
       // If editMode is true, it falls through to the Active Card below.
     } else {
       return (
-        <div className="group flex items-center gap-2 border-b border-border/20 bg-transparent px-2 py-2 last:border-0 hover:bg-card/30 transition-colors">
-          <div className="flex flex-col gap-0 border-r border-border/20 pr-2 self-stretch justify-center">
+        <div className="group flex items-center gap-2 border-b border-border/15 bg-transparent px-2 py-2 last:border-0 hover:bg-card/25 transition-colors duration-200">
+          <div className="flex flex-col gap-0 border-r border-border/15 pr-2 self-stretch justify-center">
             {onMoveUp && (
               <button onClick={onMoveUp} className="text-muted-foreground/40 hover:text-primary transition-colors p-0.5">
                 <ChevronUp className="h-4 w-4" />
@@ -1256,16 +1244,16 @@ function WorkoutExerciseCard({
       />
       <div
         className={cn(
-          "rounded-2xl border-2 bg-card/95 shadow-e3 overflow-hidden transition-all",
+          "rounded-2xl border-2 bg-card/90 backdrop-blur-lg shadow-e2 overflow-hidden transition-all duration-200 ease-spring",
           isActive
-            ? "border-primary/30 shadow-e3"
+            ? "border-primary/20 shadow-[0_0_20px_-8px_hsl(var(--primary)/0.15)]"
             : isFinished && allowEdit
-              ? "border-border/60"
-              : "border-border/40"
+              ? "border-border/30"
+              : "border-border/20"
         )}
       >
         {/* Card header */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/20">
           <div className="flex items-center gap-2.5 min-w-0">
             <p className="font-semibold text-sm tracking-tight truncate">{title}</p>
             {isTimerActive && (
@@ -1354,7 +1342,7 @@ function WorkoutExerciseCard({
                 ) : (
                   <span
                     key={setEntry.id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs animate-in zoom-in-95 duration-150"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/30 bg-background/40 px-2.5 py-1 text-xs animate-in zoom-in-95 duration-150"
                   >
                     <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
                     <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
@@ -1447,7 +1435,7 @@ function SetChip({
             </div>
           }
         >
-          <div className="rounded-xl border border-border/50 bg-muted/30 px-4 py-3">
+          <div className="rounded-xl border border-border/20 bg-muted/20 px-4 py-3">
             <p className="text-sm">
               Set <span className="font-semibold text-primary">#{setEntry.setNumber}</span>:{" "}
               <span className="font-semibold">{editReps} reps × {editWeight}kg</span>
@@ -1455,7 +1443,7 @@ function SetChip({
           </div>
         </Modal>
 
-        <div className="flex items-center gap-1.5 rounded-xl border border-primary/20 bg-accent/30 px-2 py-1.5 animate-in zoom-in-95 duration-100">
+        <div className="flex items-center gap-1.5 rounded-xl border border-primary/15 bg-accent/20 px-2 py-1.5 animate-in zoom-in-95 duration-100">
           <span className="text-[10px] font-semibold text-primary/70 w-4">#{setEntry.setNumber}</span>
           <Input
             type="number"
@@ -1504,7 +1492,7 @@ function SetChip({
         setEditWeight(String(setEntry.weight));
         setEditing(true);
       }}
-      className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-xs transition-colors hover:border-primary/20 hover:bg-accent/30"
+      className="inline-flex items-center gap-1.5 rounded-full border border-border/30 bg-background/40 px-2.5 py-1 text-xs transition-all duration-200 ease-spring hover:border-primary/15 hover:bg-accent/20"
     >
       <span className="font-semibold text-primary/70">#{setEntry.setNumber}</span>
       <span className="text-muted-foreground">{setEntry.reps}×{setEntry.weight}kg</span>
@@ -1556,23 +1544,15 @@ function MonthHistoryStrip({
     todayRef.current?.scrollIntoView({ behavior: "auto", inline: "center", block: "nearest" });
   }, []);
 
-  // Get top-5 muscles (by exercise frequency) for a given date's workouts
-  function getTopMuscles(dateStr: string): string[] {
-    const workoutsOnDay = monthWorkoutMap.get(dateStr) ?? [];
-    // We'll compute this in the popover so keep it async-friendly via a separate hook
-    return [];
-  }
-
   const hasWorkout = (dateStr: string) => (monthWorkoutMap.get(dateStr)?.length ?? 0) > 0;
   const isToday = (dateStr: string) => dateStr === today;
-  const isPast = (dateStr: string) => isBefore(new Date(dateStr), startOfDay(new Date()));
 
   return (
     <div className="relative">
       {/* Strip container */}
       <div
         ref={scrollRef}
-        className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 px-0.5"
+        className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1.5 px-0.5"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {days.map((day) => {
@@ -1597,14 +1577,14 @@ function MonthHistoryStrip({
                   }
                 }}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-2xl px-2 py-2 transition-all duration-200 min-w-[44px]",
+                  "flex flex-col items-center gap-0.5 rounded-2xl px-2 py-2 transition-all duration-200 ease-spring min-w-[44px]",
                   isTodayCell
-                    ? "bg-primary text-primary-foreground shadow-[0_4px_12px_-4px_hsl(var(--primary)/0.5)]"
+                    ? "bg-primary text-primary-foreground shadow-[0_4px_14px_-4px_hsl(var(--primary)/0.4)]"
                     : isSelected
-                      ? "bg-accent text-foreground"
+                      ? "bg-accent/60 text-foreground backdrop-blur-sm"
                       : hasW
-                        ? "bg-card/80 hover:bg-card border border-border/40 hover:border-primary/30"
-                        : "hover:bg-muted/50 text-muted-foreground"
+                        ? "bg-card/60 hover:bg-card/80 border border-border/25 hover:border-primary/20 backdrop-blur-sm"
+                        : "hover:bg-muted/30 text-muted-foreground"
                 )}
               >
                 <span className={cn(
@@ -1698,11 +1678,11 @@ function WorkoutHistoryPopover({
 
   return (
     <div
-      className="absolute left-1/2 top-full mt-2 z-50 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card shadow-[0_16px_40px_-12px_hsl(var(--foreground)/0.25)] animate-in zoom-in-95 slide-in-from-top-2 duration-150"
+      className="absolute left-1/2 top-full mt-2 z-50 -translate-x-1/2 w-56 rounded-2xl border border-border/30 bg-card/95 backdrop-blur-xl shadow-[0_16px_40px_-12px_hsl(var(--foreground)/0.2)] animate-fade-up"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="px-4 pt-3 pb-2 border-b border-border/40">
+      <div className="px-4 pt-3 pb-2 border-b border-border/20">
         <p className="text-xs font-semibold text-foreground">{dateLabel}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
           {exerciseCount} exercise{exerciseCount !== 1 ? "s" : ""}
@@ -1745,7 +1725,7 @@ function WorkoutHistoryPopover({
         </button>
         <button
           onClick={onClose}
-          className="mt-1.5 w-full rounded-xl px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted/50 transition-colors"
+          className="mt-1.5 w-full rounded-xl px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors"
         >
           Close
         </button>

@@ -180,7 +180,7 @@ export function ExerciseList() {
     <div className="space-y-3">
 
       {filteredExercises.length > 0 ? (
-        <ul className="grid gap-2">
+        <ul className="grid gap-2 stagger-children">
           {filteredExercises.map((exercise) => {
             const best = bests?.[exercise.id];
             const seenDate = lastSeen?.[exercise.id];
@@ -191,38 +191,37 @@ export function ExerciseList() {
             return (
               <li
                 key={exercise.id}
-                className="group rounded-2xl border border-border/60 bg-card/60 hover:bg-card/80 transition-all hover:shadow-e2 px-4 py-3"
+                className="group rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm hover:bg-card/85 transition-all duration-200 ease-spring hover:shadow-e1 px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: Name + meta */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold tracking-tight text-foreground truncate">
+                      <p className="font-semibold tracking-[-0.02em] text-foreground truncate">
                         {exercise.name}
                       </p>
-                      {/* Last seen chip */}
                       {seenDate && (
-                        <span className="text-[10px] font-medium text-muted-foreground/60 tabular-nums shrink-0">
+                        <span className="text-[10px] font-medium text-muted-foreground/45 tabular-nums shrink-0">
                           {relativeTime(seenDate)}
                         </span>
                       )}
                       <button
                         onClick={() => handleOpenEdit(exercise)}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-muted"
+                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-muted/50"
                         title="Edit exercise"
                       >
-                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                        <Edit2 className="h-3 w-3 text-muted-foreground/60" />
                       </button>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {exercise.category && (
-                        <Badge className="bg-primary/10 text-primary border-transparent px-2 py-0 text-[10px] uppercase font-bold tracking-wider">
+                        <Badge className="bg-primary/8 text-primary/80 border-primary/10 px-2 py-0 text-[10px] uppercase font-bold tracking-wider">
                           {exercise.category}
                         </Badge>
                       )}
                       {exercise.equipment && exercise.equipment.trim() !== "" && (
-                        <Badge variant="outline" className="border-border/50 text-muted-foreground px-2 py-0 text-[10px] font-normal">
+                        <Badge variant="outline" className="border-border/40 text-muted-foreground/60 px-2 py-0 text-[10px] font-normal">
                           {exercise.equipment}
                         </Badge>
                       )}
@@ -231,7 +230,7 @@ export function ExerciseList() {
                           {primaryMuscles.map(muscle => muscle && (
                             <span
                               key={muscle.id}
-                              className="text-[10px] font-medium text-muted-foreground/80 bg-muted/40 px-1.5 py-0.5 rounded-md"
+                              className="text-[10px] font-medium text-muted-foreground/60 bg-muted/30 px-1.5 py-0.5 rounded-md"
                             >
                               {muscle.name}
                             </span>
@@ -246,13 +245,13 @@ export function ExerciseList() {
                     {best ? (
                       <div className="flex flex-col items-end gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <Trophy className="h-3 w-3 text-amber-500/70" />
+                          <Trophy className="h-3 w-3 text-amber-500/60" />
                           <span className="text-lg font-bold tabular-nums tracking-tight text-foreground">
                             {best.estimated1RM}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-medium">kg</span>
+                          <span className="text-[10px] text-muted-foreground/60 font-medium">kg</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground/60 tabular-nums">
+                        <p className="text-[10px] text-muted-foreground/45 tabular-nums">
                           {best.weight}×{best.reps}
                           {best.date && (
                             <span className="ml-1">
@@ -262,7 +261,7 @@ export function ExerciseList() {
                         </p>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground/40 italic">no data</span>
+                      <span className="text-[10px] text-muted-foreground/30 italic">no data</span>
                     )}
                   </div>
                 </div>
@@ -271,9 +270,9 @@ export function ExerciseList() {
           })}
         </ul>
       ) : (
-        <Card className="border-dashed bg-transparent border-border/60 shadow-none">
+        <Card className="border-dashed bg-transparent border-border/40 shadow-none">
           <CardContent className="pt-5">
-            <EmptyState 
+            <EmptyState
               title="No exercises yet"
               description="Create one to start logging."
             />
@@ -281,11 +280,11 @@ export function ExerciseList() {
         </Card>
       )}
 
-      {/* Add exercise — below the list, matching muscle manager style */}
+      {/* Add exercise */}
       <div className="flex gap-2">
         <button
           onClick={handleOpenCreate}
-          className="flex flex-1 items-center gap-2 rounded-xl border border-border/50 bg-background/80 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card/80 transition-all text-left"
+          className="flex flex-1 items-center gap-2 rounded-xl border border-border/30 bg-card/40 backdrop-blur-sm px-4 py-2.5 text-sm text-muted-foreground/60 hover:text-foreground hover:border-primary/20 hover:bg-card/70 transition-all duration-200 text-left"
         >
           Add exercise...
         </button>
@@ -295,7 +294,7 @@ export function ExerciseList() {
         </Button>
       </div>
 
-      <Modal 
+      <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editing ? `Edit ${editing.name}` : "Create Exercise"}

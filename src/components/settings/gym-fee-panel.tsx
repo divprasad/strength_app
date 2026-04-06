@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
-import { Card, CardContent } from "@/components/ui/card";
 import { DollarSign } from "lucide-react";
 
 export function GymFeePanel() {
@@ -26,22 +25,24 @@ export function GymFeePanel() {
     await db.settings.update("default", patch);
   };
 
+  const inputClass = "w-full rounded-xl border border-border/30 bg-background/60 backdrop-blur-sm px-3 py-2.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all duration-200";
+
   return (
-    <Card className="border-border/50">
-      <CardContent className="pt-5 space-y-4">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="rounded-lg bg-primary/10 p-1.5">
-            <DollarSign className="h-4 w-4 text-primary" />
+    <div className="rounded-2xl border border-border/30 bg-card/75 backdrop-blur-lg overflow-hidden shadow-e1">
+      <div className="p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-primary/8 p-2">
+            <DollarSign className="h-4 w-4 text-primary/70" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">Gym Membership</h3>
-            <p className="text-[10px] text-muted-foreground">Track your cost per session on the dashboard</p>
+            <h3 className="text-sm font-semibold tracking-[-0.02em]">Gym Membership</h3>
+            <p className="text-[10px] text-muted-foreground/60">Track your cost per session on the dashboard</p>
           </div>
         </div>
 
         {/* Fee */}
-        <div className="space-y-1">
-          <label htmlFor="gym-fee" className="text-xs font-medium text-muted-foreground">
+        <div className="space-y-1.5">
+          <label htmlFor="gym-fee" className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.08em]">
             Membership fee (€)
           </label>
           <input
@@ -57,13 +58,13 @@ export function GymFeePanel() {
                 save({ gymFee: v });
               }
             }}
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+            className={inputClass}
           />
         </div>
 
         {/* Period */}
-        <div className="space-y-1">
-          <label htmlFor="gym-period" className="text-xs font-medium text-muted-foreground">
+        <div className="space-y-1.5">
+          <label htmlFor="gym-period" className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.08em]">
             Billing period (days)
           </label>
           <input
@@ -79,13 +80,13 @@ export function GymFeePanel() {
                 save({ gymFeePeriodDays: v });
               }
             }}
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+            className={inputClass}
           />
         </div>
 
         {/* Target */}
-        <div className="space-y-1">
-          <label htmlFor="gym-target" className="text-xs font-medium text-muted-foreground">
+        <div className="space-y-1.5">
+          <label htmlFor="gym-target" className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.08em]">
             Target cost per session (€)
           </label>
           <input
@@ -101,15 +102,15 @@ export function GymFeePanel() {
                 save({ gymFeeTargetPerSession: v });
               }
             }}
-            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+            className={inputClass}
           />
         </div>
 
         {/* Preview */}
-        <div className="rounded-xl bg-muted/50 px-3 py-2 text-[10px] text-muted-foreground">
+        <div className="rounded-xl bg-muted/30 border border-border/20 px-3 py-2.5 text-[11px] text-muted-foreground/70">
           You need <span className="font-semibold text-foreground">{Math.ceil(fee / target)}</span> sessions per {period} days to reach €{target.toFixed(2)}/session
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

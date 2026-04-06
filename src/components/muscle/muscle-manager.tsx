@@ -129,7 +129,7 @@ export function MuscleManager() {
         </p>
 
         {/* 1-column list */}
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2 stagger-children">
           {(muscles ?? []).map((muscle) => {
             const exerciseNames = exercisesByMuscle.get(muscle.id) ?? [];
             const exerciseCount = exerciseNames.length;
@@ -140,8 +140,8 @@ export function MuscleManager() {
               <li
                 key={muscle.id}
                 className={cn(
-                  "group relative rounded-2xl border border-border/50 bg-card/60 hover:bg-card/90 transition-all p-3.5",
-                  isUnused && "opacity-60"
+                  "group relative rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm hover:bg-card/85 transition-all duration-200 ease-spring p-3.5",
+                  isUnused && "opacity-50"
                 )}
               >
                 {editingId === muscle.id ? (
@@ -197,7 +197,7 @@ export function MuscleManager() {
                           setEditingName(muscle.name);
                           setEditError(null);
                         }}
-                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-muted"
+                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1.5 rounded-md hover:bg-muted/50"
                         title="Edit muscle group"
                       >
                         <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -217,7 +217,7 @@ export function MuscleManager() {
           <Input
             placeholder="Add muscle group..."
             {...form.register("name")}
-            className="flex-1 rounded-xl bg-background/80 border-border/50 shadow-sm"
+            className="flex-1 rounded-xl bg-card/40 backdrop-blur-sm border-border/30 shadow-none"
           />
           <Button type="submit" size="sm" className="shrink-0 rounded-xl px-4 h-10">
             <Plus className="h-4 w-4 mr-1" />
