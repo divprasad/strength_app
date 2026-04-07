@@ -100,19 +100,30 @@ export async function getExerciseProgress(exerciseId: string, weeksBack = 12): P
     return points.sort((a, b) => a.date.localeCompare(b.date));
   });
 }
-export async function get28DaySummary(): Promise<{ completedCount: number; totalVolume: number; weeklyVolumes: number[] }> {
-  const twentyEightDaysAgo = subDays(new Date(), 28);
-  const startStr = format(twentyEightDaysAgo, "yyyy-MM-dd");
-  const endStr = format(new Date(), "yyyy-MM-dd");
+/** @deprecated use getBillingPeriodSummary */
+export const get28DaySummary = () => getBillingPeriodSummary();
 
+export async function getBillingPeriodSummary(): Promise<{
+  completedCount: number;
+  totalVolume: number;
+  weeklyVolumes: number[];
+  periodDays: number;
+  weekCount: number;
+}> {
   return db.transaction("r", [db.workouts, db.workoutExercises, db.exercises, db.setEntries, db.settings], async () => {
+    const settings = (await db.settings.get("default")) ?? { volumePrimaryMultiplier: 1, volumeSecondaryMultiplier: 0.5 };
+    const periodDays = (settings as AppSettings).gymFeePeriodDays ?? 28;
+    const weekCount = Math.round(periodDays / 7);
+
+    const startStr = format(subDays(new Date(), periodDays - 1), "yyyy-MM-dd");
+    const endStr = format(new Date(), "yyyy-MM-dd");
+
     const allWorkouts = await db.workouts
       .where("date")
       .between(startStr, endStr, true, true)
       .toArray();
-    
+
     const workouts = allWorkouts.filter(w => w.status !== "archived");
-    const settings = (await db.settings.get("default")) ?? { volumePrimaryMultiplier: 1, volumeSecondaryMultiplier: 0.5 };
 
     let totalVolume = 0;
     const volumeByDate: Record<string, number> = {};
@@ -129,16 +140,18 @@ export async function get28DaySummary(): Promise<{ completedCount: number; total
       }
     }
 
-    // Compute 4-week volume trend
+    // Weekly volume buckets capped to the actual billing period
     const weeklyVolumes: number[] = [];
-    for (let i = 3; i >= 0; i--) {
+    for (let i = weekCount - 1; i >= 0; i--) {
       const wkStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 });
       const wkEnd = endOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 });
       const days = eachDayOfInterval({ start: wkStart, end: wkEnd });
       let wkVol = 0;
       for (const day of days) {
         const key = format(day, "yyyy-MM-dd");
-        wkVol += volumeByDate[key] ?? 0;
+        if (key >= startStr && key <= endStr) {
+          wkVol += volumeByDate[key] ?? 0;
+        }
       }
       weeklyVolumes.push(Math.round(wkVol));
     }
@@ -146,7 +159,9 @@ export async function get28DaySummary(): Promise<{ completedCount: number; total
     return {
       completedCount: workouts.length,
       totalVolume: Math.round(totalVolume),
-      weeklyVolumes
+      weeklyVolumes,
+      periodDays,
+      weekCount,
     };
   });
 }

@@ -4,7 +4,7 @@ import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { getWeeklyMetrics, get28DaySummary } from "@/lib/analytics";
+import { getWeeklyMetrics, getBillingPeriodSummary } from "@/lib/analytics";
 import { db } from "@/lib/db";
 import { localDateIso } from "@/lib/utils";
 import { getWorkoutBundle } from "@/lib/repository";
@@ -54,7 +54,7 @@ export function Dashboard() {
   const metrics = useLiveQuery(() => getWeeklyMetrics(todayIso), [todayIso]);
   const recent = useLiveQuery(() => db.workouts.orderBy("date").reverse().filter(w => w.status !== "archived").limit(5).toArray(), []);
   const muscles = useLiveQuery(() => db.muscleGroups.toArray(), []);
-  const summary28 = useLiveQuery(() => get28DaySummary(), []);
+  const summary28 = useLiveQuery(() => getBillingPeriodSummary(), []);
   const settings = useLiveQuery(() => db.settings.get("default"), []);
 
   const topMuscles = Object.entries(metrics?.byMuscle ?? {})
@@ -245,39 +245,44 @@ export function Dashboard() {
           weeklyVolumes={summary28.weeklyVolumes}
           gymFee={settings?.gymFee ?? 48}
           targetCost={settings?.gymFeeTargetPerSession ?? 3}
+          periodDays={summary28.periodDays}
+          weekCount={summary28.weekCount}
         />
       )}
 
       {/* ── Part C: Recent Workouts ── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
+      <div className="rounded-2xl border border-border/30 bg-card/75 shadow-e1 backdrop-blur-lg overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Recent Sessions</p>
           <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground/60 hover:text-foreground" onClick={() => router.push("/history")}>
             View all
           </Button>
         </div>
-        {recent && recent.length > 0 ? (
-          <div className="space-y-1.5">
-            {recent.map((workout) => (
-              <CompactWorkoutRow key={workout.id} workout={workout} muscles={muscles ?? []} />
-            ))}
-          </div>
-        ) : (
-          <Card className="border-dashed border-border/40">
-            <CardContent className="pt-5">
-              <EmptyState
-                title="No workouts yet"
-                description="Start logging to build your history."
-                action={
-                  <Button className="rounded-full px-5" onClick={() => router.push("/workouts")}>
-                    Start logging
-                  </Button>
-                }
-              />
-            </CardContent>
-          </Card>
-        )}
+        <div className="px-3 pb-3">
+          {recent && recent.length > 0 ? (
+            <div className="space-y-1.5">
+              {recent.map((workout) => (
+                <CompactWorkoutRow key={workout.id} workout={workout} muscles={muscles ?? []} />
+              ))}
+            </div>
+          ) : (
+            <Card className="border-dashed border-border/40">
+              <CardContent className="pt-5">
+                <EmptyState
+                  title="No workouts yet"
+                  description="Start logging to build your history."
+                  action={
+                    <Button className="rounded-full px-5" onClick={() => router.push("/workouts")}>
+                      Start logging
+                    </Button>
+                  }
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
+
     </div>
   );
 }
@@ -290,9 +295,11 @@ interface GymCostCardProps {
   weeklyVolumes: number[];
   gymFee: number;
   targetCost: number;
+  periodDays: number;
+  weekCount: number;
 }
 
-function GymCostCard({ sessionCount, totalVolume, weeklyVolumes, gymFee, targetCost }: GymCostCardProps) {
+function GymCostCard({ sessionCount, totalVolume, weeklyVolumes, gymFee, targetCost, periodDays, weekCount }: GymCostCardProps) {
   const sessionsNeeded = Math.ceil(gymFee / targetCost);
   const costPerSession = sessionCount > 0 ? gymFee / sessionCount : gymFee;
   const progress = Math.min(sessionCount / sessionsNeeded, 1);
@@ -327,7 +334,7 @@ function GymCostCard({ sessionCount, totalVolume, weeklyVolumes, gymFee, targetC
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-            Last 4 weeks
+            {weekCount === 4 ? "Last 4 weeks" : weekCount % 1 === 0 ? `Last ${weekCount} weeks` : `Last ${periodDays} days`}
           </p>
           {targetHit && (
             <div className="flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 animate-scale-in">
