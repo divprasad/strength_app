@@ -1010,7 +1010,7 @@ function WorkoutExerciseCard({
           /* ── Collapsed tile ── */
           <button
             onClick={() => setExpanded(true)}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm px-4 py-3 text-left transition-all duration-200 ease-spring hover:bg-card/80 active:bg-card/90"
+            className="group flex w-full items-center gap-3 rounded-2xl border border-border/30 bg-card/75 backdrop-blur-lg shadow-e1 px-4 py-3 text-left transition-all duration-200 ease-spring hover:bg-card/85 active:bg-card/95"
           >
             <Check className="h-4 w-4 shrink-0 text-success transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0" strokeWidth={2.5} />
             <div className="min-w-0 flex-1">
@@ -1049,7 +1049,7 @@ function WorkoutExerciseCard({
           </button>
         ) : (
           /* ── Expanded view ── */
-          <div className="rounded-2xl border border-border/30 bg-card/60 backdrop-blur-sm overflow-hidden animate-fade-up">
+          <div className="rounded-2xl border border-border/30 bg-card/75 backdrop-blur-lg shadow-e1 overflow-hidden animate-fade-up">
             {/* Expanded header */}
             <button
               onClick={() => { setExpanded(false); setEditMode(false); }}
