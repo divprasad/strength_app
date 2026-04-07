@@ -6,7 +6,7 @@ import fs from "fs/promises";
 import path from "path";
 
 type Payload = {
-  action: "start" | "finish" | "sync";
+  action: "sync";
   userId: string;
   bundle: WorkoutBundle;
 };
@@ -14,8 +14,6 @@ type Payload = {
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as Payload;
   const { bundle, userId } = payload;
-  console.log("[API DEBUG] CWD:", process.cwd());
-  console.log("[API DEBUG] DATABASE_URL:", process.env.DATABASE_URL);
 
   if (!bundle) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
@@ -198,8 +196,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  console.log("[API DEBUG GET] CWD:", process.cwd());
-  console.log("[API DEBUG GET] DATABASE_URL:", process.env.DATABASE_URL);
   try {
     const workouts = await prisma.workout.findMany({
       include: {

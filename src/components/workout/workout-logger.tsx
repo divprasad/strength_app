@@ -25,7 +25,6 @@ import {
   startWorkoutExercise,
   summarizeSets,
   updateWorkout,
-  syncWorkoutToServer,
   archiveWorkout,
   deleteWorkout,
   moveWorkoutExercise,
@@ -111,6 +110,9 @@ export function WorkoutLogger() {
   const [sessionBusy, setSessionBusy] = useState(false);
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [sessionEditMode, setSessionEditMode] = useState(false);
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showArchiveWorkoutConfirm, setShowArchiveWorkoutConfirm] = useState(false);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<{ id: string; status: string } | null>(null);
 
   // Month history strip — all workouts in the past 30 days
   const today = localDateIso(new Date());
@@ -255,14 +257,17 @@ export function WorkoutLogger() {
 
   const handleFinishWorkout = async () => {
     if (!activeWorkoutId) return;
-    const confirmed = window.confirm("End workout and save?");
-    if (!confirmed) return;
+    setShowFinishConfirm(true);
+  };
+
+  const confirmFinishWorkout = async () => {
+    setShowFinishConfirm(false);
+    if (!activeWorkoutId) return;
     try {
       await finishWorkoutSession(activeWorkoutId);
       setActiveWorkoutId(null);
     } catch (error) {
       console.error("Failed to finish workout:", error);
-      alert("Failed to save workout to server. It is still saved locally.");
     }
   };
 
@@ -315,21 +320,31 @@ export function WorkoutLogger() {
 
   const handleArchiveWorkout = async () => {
     if (!activeWorkoutId) return;
-    const confirmed = window.confirm(
-      "Archive this workout? It will be hidden from history but can be restored in Settings."
-    );
-    if (!confirmed) return;
+    setShowArchiveWorkoutConfirm(true);
+  };
+
+  const confirmArchiveWorkout = async () => {
+    setShowArchiveWorkoutConfirm(false);
+    if (!activeWorkoutId) return;
     await archiveWorkout(activeWorkoutId);
     clearActiveWorkout();
   };
 
   const handleDeleteSession = async (workoutId: string, status: string) => {
-    if (status !== "draft") {
-      const confirmed = window.confirm("Delete this session? This cannot be undone.");
-      if (!confirmed) return;
+    if (status === "draft") {
+      await deleteWorkout(workoutId);
+      if (workoutId === activeWorkoutId) clearActiveWorkout();
+      return;
     }
-    await deleteWorkout(workoutId);
-    if (workoutId === activeWorkoutId) clearActiveWorkout();
+    setPendingDeleteSession({ id: workoutId, status });
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!pendingDeleteSession) return;
+    const { id } = pendingDeleteSession;
+    setPendingDeleteSession(null);
+    await deleteWorkout(id);
+    if (id === activeWorkoutId) clearActiveWorkout();
   };
 
   const handleUpdateTime = async (time: string) => {
@@ -595,6 +610,52 @@ export function WorkoutLogger() {
           <p className="font-medium">{pendingEditWorkout?.name}</p>
           <p className="text-sm text-muted-foreground">{pendingEditWorkout?.date}</p>
         </div>
+      </Modal>
+
+      {/* ── Workout-level confirmation modals ── */}
+      <Modal
+        isOpen={showFinishConfirm}
+        onClose={() => setShowFinishConfirm(false)}
+        title="End workout?"
+        description="Save and finish your current session."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowFinishConfirm(false)}>Cancel</Button>
+            <Button onClick={confirmFinishWorkout}>End Workout</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">Your workout will be saved and marked as completed.</p>
+      </Modal>
+
+      <Modal
+        isOpen={showArchiveWorkoutConfirm}
+        onClose={() => setShowArchiveWorkoutConfirm(false)}
+        title="Archive this workout?"
+        description="It will be hidden from history but can be restored in Settings."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowArchiveWorkoutConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmArchiveWorkout}>Archive</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">Archived workouts can be restored from the Settings page.</p>
+      </Modal>
+
+      <Modal
+        isOpen={!!pendingDeleteSession}
+        onClose={() => setPendingDeleteSession(null)}
+        title="Delete this session?"
+        description="This cannot be undone."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setPendingDeleteSession(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteSession}>Delete</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">All sets and exercise data for this session will be permanently removed.</p>
       </Modal>
 
       {/* ── Exercise List ── */}
@@ -929,6 +990,7 @@ function WorkoutExerciseCard({
 
   const isFinished = Boolean(completedAt);
   const isTimerActive = isActive && !isFinished && Boolean(startedAt);
+  const [showExerciseArchiveConfirm, setShowExerciseArchiveConfirm] = useState(false);
   const [elapsed, setElapsed] = useState(() => computeElapsed(startedAt));
   const durationSeconds = computeDurationSeconds(startedAt, completedAt);
   const [expanded, setExpanded] = useState(false);
@@ -1107,9 +1169,7 @@ function WorkoutExerciseCard({
                         role="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm("Archive this exercise from the session? (It can be restored from the settings)")) {
-                            onDelete();
-                          }
+                          setShowExerciseArchiveConfirm(true);
                         }}
                         className="rounded-full p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors group/archive"
                         title="Archive exercise"
@@ -1323,11 +1383,7 @@ function WorkoutExerciseCard({
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => {
-                  if (window.confirm("Archive this exercise from the session? (It can be restored from the settings)")) {
-                    onDelete();
-                  }
-                }}
+                onClick={() => setShowExerciseArchiveConfirm(true)}
                 className="h-7 w-7 text-muted-foreground hover:text-destructive group/archive"
                 title="Archive exercise"
               >
@@ -1400,6 +1456,23 @@ function WorkoutExerciseCard({
           </div>
         </div>
       </div>
+
+      {onDelete && (
+        <Modal
+          isOpen={showExerciseArchiveConfirm}
+          onClose={() => setShowExerciseArchiveConfirm(false)}
+          title="Archive this exercise?"
+          description="It can be restored from the Settings page."
+          footer={
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setShowExerciseArchiveConfirm(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => { setShowExerciseArchiveConfirm(false); onDelete(); }}>Archive</Button>
+            </div>
+          }
+        >
+          <p className="text-sm text-muted-foreground">This exercise will be removed from the current session.</p>
+        </Modal>
+      )}
     </>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { useLiveQuery } from "dexie-react-hooks";
 import { format, parseISO } from "date-fns";
 import { ArchiveRestore, Trash2 } from "lucide-react";
@@ -8,6 +10,7 @@ import { restoreWorkout, deleteWorkout } from "@/lib/repository";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
 
 export function ArchivePanel() {
   const archivedWorkouts = useLiveQuery(
@@ -22,18 +25,25 @@ export function ArchivePanel() {
 
   const count = archivedWorkouts?.length ?? 0;
   const excCount = archivedExercises?.length ?? 0;
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   async function handleRestoreWorkout(id: string) {
     await restoreWorkout(id);
   }
 
   async function handleDelete(id: string) {
-    if (window.confirm("This action cannot be undone. Are you sure you want to permanently delete this workout and all its data?")) {
-      await deleteWorkout(id);
-    }
+    setPendingDeleteId(id);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    await deleteWorkout(id);
   }
 
   return (
+    <>
     <div className="space-y-6">
 
     <Card className="overflow-hidden">
@@ -139,5 +149,21 @@ export function ArchivePanel() {
     </Card>
 
     </div>
+
+      <Modal
+        isOpen={!!pendingDeleteId}
+        onClose={() => setPendingDeleteId(null)}
+        title="Permanently delete?"
+        description="This action cannot be undone."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">This workout and all its data will be permanently removed.</p>
+      </Modal>
+    </>
   );
 }

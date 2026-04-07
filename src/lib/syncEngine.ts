@@ -7,6 +7,9 @@ let isProcessing = false;
 
 /**
  * Grabs all pending workouts from the syncQueue and sends them to the server.
+ * Failed jobs are skipped until their exponential backoff delay has elapsed
+ * (500ms * 2^retryCount, capped at 30s). This prevents hammering the server
+ * under flaky connectivity.
  */
 export async function processSyncQueue(): Promise<void> {
   if (isProcessing) return;
@@ -17,6 +20,13 @@ export async function processSyncQueue(): Promise<void> {
     const pendingJobs = await db.syncQueue.where("status").equals("pending").toArray();
 
     for (const job of pendingJobs) {
+      // Exponential backoff: skip jobs that haven't waited long enough since last failure
+      if (job.retryCount > 0 && job.lastAttemptAt) {
+        const backoffMs = Math.min(30_000, Math.pow(2, job.retryCount) * 500);
+        const elapsed = Date.now() - Date.parse(job.lastAttemptAt);
+        if (elapsed < backoffMs) continue;
+      }
+
       const success = await pushWorkoutToServer(job.id, job.action as "upsert" | "delete");
       if (success) {
         await db.syncQueue.delete(job.id);

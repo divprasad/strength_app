@@ -3,7 +3,7 @@ import { DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG, DEFAULT_USER_ID } from "@
 import { createStableId, nowIso } from "@/lib/utils";
 import type { AppSettings, Exercise, MuscleGroup, SetEntry, SyncJob, Workout, WorkoutExercise } from "@/types/domain";
 
-function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
+export function inferWorkoutStatus(workout: Partial<Workout>): "draft" | "active" | "completed" {
   if (!workout.sessionStartedAt) return "draft";
   if (!workout.sessionEndedAt) return "active";
   return "completed";

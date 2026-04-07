@@ -1,16 +1,10 @@
 import { endOfWeek, format, parseISO, startOfWeek } from "date-fns";
-import { db } from "@/lib/db";
+import { db, inferWorkoutStatus } from "@/lib/db";
 import { createId, localDateIso, nowIso } from "@/lib/utils";
 import type { Exercise, MuscleGroup, SetEntry, Workout, WorkoutBundle, WorkoutExercise, WorkoutStatus } from "@/types/domain";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { processSyncQueue, flushSyncQueue } from "@/lib/syncEngine";
 
-
-function inferWorkoutStatus(workout: Pick<Workout, "sessionStartedAt" | "sessionEndedAt">): WorkoutStatus {
-  if (!workout.sessionStartedAt) return "draft";
-  if (!workout.sessionEndedAt) return "active";
-  return "completed";
-}
 
 export async function listWorkoutsByDate(date: string): Promise<Workout[]> {
   return db.workouts.where("date").equals(date).sortBy("updatedAt");
@@ -44,12 +38,6 @@ export async function updateWorkout(workoutId: string, patch: Partial<Workout>):
   await enqueueSync(workoutId);
 }
 
-export async function getOrCreateWorkoutByDate(date: string): Promise<Workout> {
-  // Deprecated compatibility helper. New session flows should create/select by workoutId.
-  const existing = await db.workouts.where("date").equals(date).first();
-  if (existing) return existing;
-  return createWorkoutForDate(date);
-}
 
 export async function getWorkoutBundle(workoutId: string): Promise<WorkoutBundle | null> {
   const workout = await db.workouts.get(workoutId);
@@ -215,15 +203,6 @@ export async function reorderSet(setId: string, direction: "up" | "down"): Promi
   if (workoutExercise) await enqueueSync(workoutExercise.workoutId);
 }
 
-export async function weekRangeDateStrings(anchorDateIso: string): Promise<{ start: string; end: string }> {
-  const anchor = parseISO(anchorDateIso);
-  const start = startOfWeek(anchor, { weekStartsOn: 1 });
-  const end = endOfWeek(anchor, { weekStartsOn: 1 });
-  return {
-    start: format(start, "yyyy-MM-dd"),
-    end: format(end, "yyyy-MM-dd")
-  };
-}
 
 export async function createMuscleGroup(name: string): Promise<MuscleGroup> {
   const now = nowIso();
@@ -321,9 +300,6 @@ export async function enqueueSync(workoutId: string, action: "upsert" | "delete"
   }, 100);
 }
 
-export async function syncWorkoutToServer(workoutId: string): Promise<void> {
-  await enqueueSync(workoutId);
-}
 
 export async function startWorkoutSession(date: string): Promise<Workout | null> {
   const workout = await createWorkoutForDate(date);
@@ -514,15 +490,16 @@ export async function checkServerSyncStatus(): Promise<boolean> {
   return localMax > serverMax; // Sync if local has newer data
 }
 
+/**
+ * Pushes all local muscles, exercises, and workouts to the server using
+ * upsert semantics. Does NOT delete server data first — the API upsert
+ * handlers and server-side orphan GC handle stale row cleanup safely.
+ *
+ * This is safe to call even under flaky connectivity: a partial push
+ * will leave the server in a consistent (if incomplete) state, and
+ * the next push will resume from where it left off.
+ */
 export async function syncEverythingToServer(): Promise<void> {
-  // 1. Clear server state to ensure a clean overwrite (prevents zombie data)
-  await Promise.all([
-    fetch("/api/muscles", { method: "DELETE" }),
-    fetch("/api/exercises", { method: "DELETE" }),
-    fetch("/api/workouts", { method: "DELETE" })
-  ]);
-
-  // 2. Push current local state
   await syncAllMuscles();
   await syncAllExercises();
   await syncAllWorkouts();

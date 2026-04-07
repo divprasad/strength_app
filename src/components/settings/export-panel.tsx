@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 
 async function buildPayload(): Promise<ExportPayload> {
   const [muscleGroups, exercises, workouts, workoutExercises, setEntries, settings] = await Promise.all([
@@ -43,6 +44,9 @@ export function ExportPanel() {
   const [auditReport, setAuditReport] = useState<IntegrityAuditReport | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   async function exportJson() {
     const payload = await buildPayload();
@@ -79,16 +83,13 @@ export function ExportPanel() {
     setStatus("CSV export downloaded as separate tables.");
   }
 
-  async function importJson(file: File) {
-    setLoading(true); // Set loading true
+  async function importJson(file: File, clearServer: boolean) {
+    setPendingImportFile(null);
+    setLoading(true);
     setStatus("Importing data...");
     try {
       const text = await file.text();
       const payload = JSON.parse(text) as ExportPayload;
-
-      const clearServer = window.confirm(
-        "Do you also want to clear all workouts from the SERVER? (Recommended for a clean import state)"
-      );
 
       // 1. Safety Backup: Export current state before replacing it
       setStatus("Creating safety backup...");
@@ -98,7 +99,7 @@ export function ExportPanel() {
         setStatus("Clearing server data...");
         const res = await fetch("/api/workouts", { method: "DELETE" });
         if (!res.ok) {
-          alert("Failed to clear server data. Continuing with local replacement only.");
+          setStatus("Failed to clear server data. Continuing with local replacement only.");
         }
       }
 
@@ -146,7 +147,7 @@ export function ExportPanel() {
       console.error("Import failed:", error);
       setStatus("Import failed. Check console for details.");
     } finally {
-      setLoading(false); // Set loading false
+      setLoading(false);
     }
   }
 
@@ -161,12 +162,20 @@ export function ExportPanel() {
         return;
       }
 
-      const confirmed = window.confirm(
-        "Push all local data to the server? This will overwrite server data with your current local state."
-      );
-      if (!confirmed) return;
+      setShowSyncConfirm(true);
+    } catch (error) {
+      console.error("Sync check failed:", error);
+      setStatus("Sync check failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      setStatus("Syncing everything to server...");
+  async function confirmSyncToServer() {
+    setShowSyncConfirm(false);
+    setLoading(true);
+    setStatus("Syncing everything to server...");
+    try {
       await syncEverythingToServer();
       setStatus("Global sync complete.");
     } catch (error) {
@@ -178,11 +187,11 @@ export function ExportPanel() {
   }
 
   async function handleResetFromServer() {
-    const confirmed = window.confirm(
-      "Replace all local data with server data? This cannot be undone."
-    );
-    if (!confirmed) return;
+    setShowResetConfirm(true);
+  }
 
+  async function confirmResetFromServer() {
+    setShowResetConfirm(false);
     setLoading(true);
     setStatus("Resetting and pulling from server...");
     try {
@@ -232,6 +241,7 @@ export function ExportPanel() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <PageIntro
         title="Settings"
@@ -272,7 +282,7 @@ export function ExportPanel() {
           <CardDescription>Restore from a JSON backup or sync with the server.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="file" accept=".json,application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
+          <Input type="file" accept=".json,application/json" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingImportFile(f); }} disabled={loading} />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
             Push to Server
           </Button>
@@ -356,5 +366,52 @@ export function ExportPanel() {
         </CardContent>
       </Card>
     </div>
+
+      {/* ── Confirmation Modals ── */}
+      <Modal
+        isOpen={!!pendingImportFile}
+        onClose={() => setPendingImportFile(null)}
+        title="Clear server data?"
+        description="Do you also want to clear all workouts from the SERVER before importing?"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => pendingImportFile && importJson(pendingImportFile, false)}>No, local only</Button>
+            <Button onClick={() => pendingImportFile && importJson(pendingImportFile, true)}>Yes, clear server</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">A safety backup will be exported before any data is replaced.</p>
+      </Modal>
+
+      <Modal
+        isOpen={showSyncConfirm}
+        onClose={() => setShowSyncConfirm(false)}
+        title="Push to server?"
+        description="Sync your current local state to the server."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowSyncConfirm(false)}>Cancel</Button>
+            <Button onClick={confirmSyncToServer}>Push</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">Your local data will be pushed to the server using safe upsert operations.</p>
+      </Modal>
+
+      <Modal
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        title="Pull from server?"
+        description="Replace all local data with server data? This cannot be undone."
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmResetFromServer}>Replace Local Data</Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">All local workouts, exercises, and settings will be replaced with the server&apos;s version.</p>
+      </Modal>
+    </>
   );
 }

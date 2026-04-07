@@ -53,21 +53,30 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 | Dashboard & History | ✅ Enhanced | 30-day scrollable calendar, "Copy as Template", gym session cost tracker |
 | PWA | ✅ Optimized | Serwist service worker, offline-first caching, Android native-like fullscreen |
 | Docker | ✅ Complete | Multi-stage build, ~180 MB image, named volume persistence |
-| Sync engine | ✅ Robust | Background queue with exponential backoff, `online` auto-trigger, UI sync status |
+| Sync engine | ✅ Working | Background queue with `online` auto-trigger; **no retry backoff yet** |
 | Cascading delete | ✅ Working | Server-side orphan cleanup within `$transaction` |
 | Auto backups | ✅ Working | `fs.copyFile` of SQLite DB on every sync POST |
 | Bootstrap gate | ✅ Hardened | 30s server timeout, 10s local timeout, 45s hard deadline |
 | Integrity audit | ✅ Implemented | `integrity-audit.ts` with `healDatabase()` auto-fixer |
 | Command palette | ✅ Implemented | `Cmd+K` global navigation and quick actions |
 | Analytics | ✅ Present | Weekly volume, muscle distribution, gym session cost tracker |
-| Export/Import | ✅ Present | JSON export, server bootstrap pull from Settings |
+| Export/Import | ✅ Present | JSON export, CSV export, server bootstrap pull from Settings |
 | CI | ✅ Active | `lint`, `typecheck`, `test:unit`, `build` on push; E2E manual |
 
-### Known areas needing attention
+### Known technical debt (from 2026-04-06 lean refactor audit)
 
+- **`[API DEBUG]` logs in production** — `route.ts` lines 17–18 and 201–202 print `process.env.DATABASE_URL` on every request. **Remove before any production deployment.**
+- **Unused packages** — `@libsql/client`, `@prisma/adapter-libsql`, and `react-is` are in `package.json` with zero source imports. Uninstall them.
+- **Dead exports** — `syncWorkoutToServer()`, `getOrCreateWorkoutByDate()`, `bootstrapMuscles()`, `bootstrapExercises()` have no callers. Delete them.
+- **No sync retry backoff** — failed sync jobs are retried immediately with no delay, which hammers the server under flaky connectivity.
+- **`window.confirm` / `alert` (11 occurrences)** — should use the `<Modal>` component for all destructive confirmations.
+- **`workout-logger.tsx` is 1,756 lines** — should be split into `WorkoutExerciseCard`, `MonthHistoryStrip`, and `InlineExercisePicker` sub-files.
+- **Analytics N+1 queries** — `getWeeklyMetrics` and `get28DaySummary` call `db.exercises.get()` per item inside a loop. Should use `bulkGet`.
 - **Multi-user support** — currently single-user (`DEFAULT_USER_ID`). Auth and user separation are not yet implemented.
-- **E2E test coverage** — only one spec file exists (`app.e2e.spec.ts`); critical flows need more coverage.
-- **Bundle size** — no active optimization pass has been done.
+- **E2E test coverage** — only one spec file (`app.e2e.spec.ts`); critical flows need more coverage.
+- **Bundle size** — Recharts (~150 KB gzipped) is the largest pruning candidate. The 4 charts in `analytics-view.tsx` could be replaced with vanilla SVG.
+
+Full analysis: `docs/lean_refactor_audit_2026_04_06.md`
 
 ---
 
@@ -81,11 +90,20 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 | `src/lib/sync.ts` | Server → client bootstrap (muscles, exercises, workouts) |
 | `src/lib/integrity-audit.ts` | Data consistency checker + auto-healer |
 | `src/lib/analytics.ts` | Volume/frequency computations for the analytics page |
+| `src/lib/format-sets.ts` | Set formatting/collapsing utilities |
+| `src/lib/time.ts` | Duration and time-of-day formatting |
+| `src/lib/volume.ts` | Attributed volume and e1RM calculations |
+| `src/lib/store.ts` | Zustand global UI state (selectedDate, activeWorkoutId, sessionActive) |
+| `src/lib/constants.ts` | DEFAULT_USER_ID, DEFAULT_MUSCLE_GROUPS, DEFAULT_VOLUME_CONFIG |
 | `src/types/domain.ts` | Canonical TypeScript types for all domain entities |
 | `src/hooks/use-db-bootstrap.ts` | Client-side bootstrap lifecycle with timeout safety nets |
 | `src/components/layout/bootstrap-gate.tsx` | Renders loading screen until DB is ready |
 | `src/components/layout/command-palette.tsx` | Global `Cmd+K` command palette |
 | `src/components/layout/app-shell.tsx` | Top-level app shell with navigation |
+| `src/components/workout/workout-logger.tsx` | Main workout logging UI (1,756 lines — split candidate) |
+| `src/components/dashboard/dashboard.tsx` | Dashboard with weekly metrics and gym cost card |
+| `src/components/analytics/analytics-view.tsx` | Analytics page with Recharts bar/line charts |
+| `src/components/settings/export-panel.tsx` | Export, import, sync, and integrity check UI |
 | `src/app/api/workouts/route.ts` | Workout bundle upsert/delete with garbage collection |
 | `src/app/api/muscles/route.ts` | Muscle group CRUD |
 | `src/app/api/exercises/route.ts` | Exercise CRUD |
@@ -102,6 +120,7 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 4. **Prefer correctness and data integrity over speed.**
 5. **Do not make broad architecture changes silently.** Explain what you're changing and why.
 6. **Do not revert user changes** unless the user explicitly asks for it.
+7. **Do not add `[DEBUG]` or development `console.log` calls** to API routes. Use proper logging or remove them before finishing a task.
 
 ---
 
@@ -117,6 +136,11 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 - **Never write direct `fetch()` from components.** All mutations go through the repository layer → Dexie → `enqueueSync()`.
 - **The sync engine handles network traffic.** It reads from `syncQueue`, builds `WorkoutBundle` payloads, and POSTs to `/api/workouts`.
 - **Deletes are sync-aware.** `enqueueSync(workoutId, "delete")` queues a DELETE that the engine sends as `DELETE /api/workouts?id=...`.
+- **`syncEverythingToServer()` is a nuclear reset** — it DELETEs all server data then re-pushes. It is not safe to use during a partial network failure. Prefer the normal queue-based sync for routine operations.
+
+### Confirmations and modals
+
+- **Never use `window.confirm` or `alert` for user-facing interactions.** Use the `<Modal>` component in `src/components/ui/modal.tsx` for all destructive confirmation dialogs. `window.confirm` blocks the main thread and breaks in some PWA contexts.
 
 ### Persistence changes
 
@@ -156,7 +180,7 @@ The app shows "Preparing local database…" until the bootstrap gate unlocks:
 - **Design system:** Tailwind CSS with CSS custom properties for theming (`globals.css`)
 - **Component library:** Custom primitives in `src/components/ui/` (Button, Card, Modal, BottomSheet, Combobox, StepperInput, etc.)
 - **Icons:** Lucide React
-- **Charts:** Recharts
+- **Charts:** Recharts (used only in `analytics-view.tsx` — replacement candidate for bundle reduction)
 - **Forms:** React Hook Form + Zod validation
 - **State:** Zustand for global UI state (`src/lib/store.ts`); Dexie `useLiveQuery` for data
 - **Responsive:** Mobile-first with a bottom nav bar (`bottom-nav.tsx`)
@@ -184,5 +208,5 @@ If a check cannot be run, say so clearly and explain why.
 
 - Keep `README.md` current as the user-facing overview of the app.
 - Keep this `AGENTS.md` current as the stable execution guide for agents.
-- Reference docs in `/docs/` cover architecture decisions — update them if the architecture changes.
+- Reference docs in `/docs/` cover architecture decisions and audit reports — update them if the architecture changes.
 - If the roadmap changes, update both `README.md` and `AGENTS.md` in the same pass.
