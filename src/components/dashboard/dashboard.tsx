@@ -219,7 +219,7 @@ export function Dashboard() {
           <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] tabular-nums">
             {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}<span className="ml-1 text-sm font-normal text-muted-foreground">kg</span>
           </p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">this week</p>
+          {/* <p className="mt-0.5 text-[10px] text-muted-foreground">this week</p> */}
         </div>
 
         <div className="rounded-2xl border border-border/50 bg-card/80 px-4 py-3.5 shadow-e2">
