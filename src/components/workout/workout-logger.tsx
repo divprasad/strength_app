@@ -347,13 +347,8 @@ export function WorkoutLogger() {
       if (current && !current.sessionStartedAt) {
         await startWorkoutSessionForWorkout(wid);
       }
-      // Add exercise
-      const item = await addExerciseToWorkout(wid, exerciseId);
-      // Auto-start the exercise (finish current active one first)
-      if (activeExerciseId) {
-        await finishWorkoutExercise(activeExerciseId);
-      }
-      await startWorkoutExercise(item.id);
+      // Add exercise in pending state — user starts it manually
+      await addExerciseToWorkout(wid, exerciseId);
     } finally {
       setSessionBusy(false);
     }
@@ -1353,7 +1348,7 @@ function WorkoutExerciseCard({
           )}
 
           {/* Smart Quick Add */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <StepperInput
                 value={reps}
@@ -1375,7 +1370,7 @@ function WorkoutExerciseCard({
                 size="md"
               />
             </div>
-            <div className="flex items-center gap-1.5 self-start mt-0.5 shrink-0">
+            <div className="flex items-center gap-1.5 ml-auto">
               <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm">
                 Log
               </Button>
