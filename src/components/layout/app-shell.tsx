@@ -4,13 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
+import { db } from "@/lib/db";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { ScaleControl } from "@/components/layout/scale-control";
 
 // At lg+ all 6 are shown inline. At md, only primaryLinks are shown + ⋯ overflow.
 const primaryLinks = [
@@ -28,6 +31,8 @@ const overflowLinks = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const sessionActive = useUiStore((s) => s.sessionActive);
+  const settings = useLiveQuery(() => db.settings.get("default"), []);
+  const appScale = settings?.appScale ?? 1.0;
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-1.5 md:gap-2.5">
+              <ScaleControl />
               <ThemeToggle />
               <PaletteToggle />
               <CommandPalette />
@@ -138,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-4 md:px-6 md:py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-4 md:px-6 md:py-8" style={{ zoom: appScale }}>{children}</main>
       <BottomNav />
     </div>
   );
