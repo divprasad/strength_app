@@ -25,7 +25,7 @@ const primaryLinks = [
 
 const overflowLinks = [
   { href: "/exercises", label: "Exercises" },
-  { href: "/settings", label: "Settings" },
+  { href: "/settings", label: "Admin" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
 
   return (
-    <div className="min-h-dvh pb-20 md:pb-6">
+    <div className="min-h-dvh pb-20 md:pb-6" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header
         className={cn(
           "sticky top-0 z-30 border-b border-border/20 bg-background/70 backdrop-blur-2xl",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifySession } from "@/lib/auth";
 import type { WorkoutBundle } from "@/types/domain";
 import fs from "fs/promises";
 import path from "path";
@@ -11,8 +12,12 @@ type Payload = {
 };
 
 export async function POST(request: NextRequest) {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authUserId = session.userId;
+
   const payload = (await request.json()) as Payload;
-  const { bundle, userId } = payload;
+  const { bundle } = payload;
   console.log("[API DEBUG] CWD:", process.cwd());
   console.log("[API DEBUG] DATABASE_URL:", process.env.DATABASE_URL);
 
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
           date: bundle.workout.date,
           notes: bundle.workout.notes,
           status: bundle.workout.status,
-          userId: userId,
+          userId: authUserId,
           sessionStartedAt: bundle.workout.sessionStartedAt ? new Date(bundle.workout.sessionStartedAt) : null,
           sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
         },
@@ -102,7 +107,7 @@ export async function POST(request: NextRequest) {
           date: bundle.workout.date,
           notes: bundle.workout.notes,
           status: bundle.workout.status,
-          userId: userId,
+          userId: authUserId,
           sessionStartedAt: bundle.workout.sessionStartedAt ? new Date(bundle.workout.sessionStartedAt) : null,
           sessionEndedAt: bundle.workout.sessionEndedAt ? new Date(bundle.workout.sessionEndedAt) : null,
         },
@@ -219,10 +224,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  console.log("[API DEBUG GET] CWD:", process.cwd());
-  console.log("[API DEBUG GET] DATABASE_URL:", process.env.DATABASE_URL);
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const workouts = await prisma.workout.findMany({
+      where: { userId: session.userId },
       include: {
         exercises: {
           include: {
@@ -245,11 +252,18 @@ export async function GET() {
   }
 }
 export async function DELETE(request: NextRequest) {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (id) {
+      const workout = await prisma.workout.findUnique({ where: { id } });
+      if (!workout || workout.userId !== session.userId) {
+         return NextResponse.json({ error: "Not found or unauthorized" }, { status: 403 });
+      }
       await prisma.$transaction([
         prisma.setEntry.deleteMany({
           where: { workoutExercise: { workoutId: id } }
@@ -264,11 +278,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ status: "ok", message: `Workout ${id} deleted` });
     }
 
-    await prisma.$transaction([
-      prisma.setEntry.deleteMany(),
-      prisma.workoutExercise.deleteMany(),
-      prisma.workout.deleteMany()
-    ]);
+    // Clear all only for this user
+    const userWorkouts = await prisma.workout.findMany({ where: { userId: session.userId }, select: { id: true } });
+    const workoutIds = userWorkouts.map(w => w.id);
+
+    if (workoutIds.length > 0) {
+      await prisma.$transaction([
+        prisma.setEntry.deleteMany({ where: { workoutExercise: { workoutId: { in: workoutIds } } } }),
+        prisma.workoutExercise.deleteMany({ where: { workoutId: { in: workoutIds } } }),
+        prisma.workout.deleteMany({ where: { id: { in: workoutIds } } })
+      ]);
+    }
     return NextResponse.json({ status: "ok", message: "All workouts cleared" });
   } catch (error) {
     console.error("Failed to clear workouts:", error);

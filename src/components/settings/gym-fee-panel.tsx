@@ -116,7 +116,7 @@ export function GymFeePanel() {
           {weeksError ? (
             <p className="text-[11px] text-destructive animate-fade-in">{weeksError}</p>
           ) : (
-            <p className="text-[11px] text-muted-foreground/50">{weeks * 7} days</p>
+            <p className="text-[11px] text-muted-foreground/70">{weeks * 7} days</p>
           )}
         </div>
 

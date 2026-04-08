@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifySession } from "@/lib/auth";
 import type { MuscleGroup } from "@/types/domain";
 
 export async function GET() {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const muscles = await prisma.muscleGroup.findMany();
     return NextResponse.json({ muscles });
@@ -13,6 +17,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { muscleGroups }: { muscleGroups: MuscleGroup[] } = await request.json();
 
   if (!muscleGroups || !Array.isArray(muscleGroups)) {
@@ -53,9 +60,13 @@ export async function POST(request: NextRequest) {
   }
 }
 export async function DELETE() {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    await prisma.muscleGroup.deleteMany();
-    return NextResponse.json({ status: "ok", message: "All muscles cleared" });
+    // We do not delete system muscle groups in multi-user environments.
+    // await prisma.muscleGroup.deleteMany();
+    return NextResponse.json({ status: "ok", message: "Muscles are global system data, skip clear." });
   } catch (error) {
     console.error("Failed to clear muscles:", error);
     return NextResponse.json({ error: "Clear failed" }, { status: 500 });

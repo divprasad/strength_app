@@ -127,7 +127,7 @@ export function WeeklyHistory() {
                 <p className={cn("mt-1 text-lg font-bold tracking-[-0.03em]", selected ? "text-primary" : "")}>{format(date, "d")}</p>
                 <p className={cn(
                   "mt-1 text-[10px] font-medium",
-                  hasWorkout ? "text-success" : "text-muted-foreground/30"
+                  hasWorkout ? "text-success" : "text-muted-foreground/50"
                 )}>
                   {hasWorkout ? "Logged" : "–"}
                 </p>
@@ -154,9 +154,9 @@ export function WeeklyHistory() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border/20">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-semibold tracking-tight">{dayLabel}</span>
-                    <span className="text-muted-foreground/30 text-xs">·</span>
+                    <span className="text-muted-foreground/50 text-xs">·</span>
                     <span className="text-sm font-semibold tracking-tight">{timeLabel}</span>
-                    <span className="text-[11px] text-muted-foreground/50 tabular-nums ml-1">{formatDurationLong(durationSeconds)}</span>
+                    <span className="text-[11px] text-muted-foreground/70 tabular-nums ml-1">{formatDurationLong(durationSeconds)}</span>
                   </div>
                   <button
                     onClick={() => handleCopyAsTemplate(entry.workout.id)}
@@ -181,7 +181,7 @@ export function WeeklyHistory() {
                         <div key={exerciseEntry.item.id} className="space-y-0.5">
                           <div className="flex items-center justify-between gap-4">
                             <p className="text-sm font-medium tracking-tight text-foreground">{exerciseEntry.exercise?.name ?? "Unknown exercise"}</p>
-                            <span className="text-[10px] tabular-nums text-muted-foreground/50 shrink-0">{formatDurationLong(exerciseDuration)}</span>
+                            <span className="text-[10px] tabular-nums text-muted-foreground/70 shrink-0">{formatDurationLong(exerciseDuration)}</span>
                           </div>
                           <p className="text-xs text-muted-foreground/60">
                             {formatCollapsedSets(collapseSetGroups(exerciseEntry.sets))}
@@ -190,7 +190,7 @@ export function WeeklyHistory() {
                       );
                     })
                   ) : (
-                    <p className="text-xs text-muted-foreground/40 italic">No exercises recorded.</p>
+                    <p className="text-xs text-muted-foreground/60 italic">No exercises recorded.</p>
                   )}
                 </div>
               </div>
@@ -201,7 +201,7 @@ export function WeeklyHistory() {
         <div className="rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm px-6 py-10 text-center animate-fade-up">
           <Moon className="h-8 w-8 mx-auto text-muted-foreground/20 mb-3" strokeWidth={1.5} />
           <p className="text-sm font-medium text-muted-foreground/60">Rest day</p>
-          <p className="text-xs text-muted-foreground/40 mt-1">No workout logged for this day.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">No workout logged for this day.</p>
           {selectedDate === localDateIso(new Date()) && (
             <Button
               size="sm"

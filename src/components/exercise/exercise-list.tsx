@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ExerciseForm } from "@/components/exercise/exercise-form";
-import { Edit2, Plus, Trophy } from "lucide-react";
+import { Edit2, Plus, Search, Trophy } from "lucide-react";
 
 /* ── 1RM helper (Epley formula) ── */
 function estimate1RM(weight: number, reps: number): number {
@@ -116,8 +116,13 @@ export function ExerciseList() {
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredExercises = (exercises ?? []).filter((e) => !e.deletedAt);
+  const filteredExercises = (exercises ?? []).filter((e) => {
+    if (e.deletedAt) return false;
+    if (searchQuery.trim() === "") return true;
+    return e.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   function handleOpenCreate() {
     setEditing(null);
@@ -178,6 +183,18 @@ export function ExerciseList() {
 
   return (
     <div className="space-y-3">
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-4 w-4 text-muted-foreground/60" />
+        </div>
+        <input
+          type="search"
+          placeholder="Search exercises..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full rounded-xl border border-border/30 bg-card/40 backdrop-blur-sm pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-primary/30 transition-all"
+        />
+      </div>
 
       {filteredExercises.length > 0 ? (
         <ul className="grid gap-2 stagger-children">
@@ -201,7 +218,7 @@ export function ExerciseList() {
                         {exercise.name}
                       </p>
                       {seenDate && (
-                        <span className="text-[10px] font-medium text-muted-foreground/45 tabular-nums shrink-0">
+                        <span className="text-[10px] font-medium text-muted-foreground/60 tabular-nums shrink-0">
                           {relativeTime(seenDate)}
                         </span>
                       )}
@@ -251,7 +268,7 @@ export function ExerciseList() {
                           </span>
                           <span className="text-[10px] text-muted-foreground/60 font-medium">kg</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground/45 tabular-nums">
+                        <p className="text-[10px] text-muted-foreground/60 tabular-nums">
                           {best.weight}×{best.reps}
                           {best.date && (
                             <span className="ml-1">
@@ -261,7 +278,7 @@ export function ExerciseList() {
                         </p>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground/30 italic">no data</span>
+                      <span className="text-[10px] text-muted-foreground/50 italic">no data</span>
                     )}
                   </div>
                 </div>

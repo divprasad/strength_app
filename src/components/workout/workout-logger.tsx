@@ -538,7 +538,7 @@ export function WorkoutLogger() {
                   <button
                     onClick={() => handleDeleteSession(item.id, item.status)}
                     title="Delete session"
-                    className="shrink-0 p-2 mr-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    className="shrink-0 p-2 mr-1 rounded-lg text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1200,12 +1200,12 @@ function WorkoutExerciseCard({
         <div className="group flex items-center gap-2 border-b border-border/15 bg-transparent px-2 py-2 last:border-0 hover:bg-card/25 transition-colors duration-200">
           <div className="flex flex-col gap-0 border-r border-border/15 pr-2 self-stretch justify-center">
             {onMoveUp && (
-              <button onClick={onMoveUp} className="text-muted-foreground/40 hover:text-primary transition-colors p-0.5">
+              <button onClick={onMoveUp} className="text-muted-foreground/60 hover:text-primary transition-colors p-0.5">
                 <ChevronUp className="h-4 w-4" />
               </button>
             )}
             {onMoveDown && (
-              <button onClick={onMoveDown} className="text-muted-foreground/40 hover:text-primary transition-colors p-0.5">
+              <button onClick={onMoveDown} className="text-muted-foreground/60 hover:text-primary transition-colors p-0.5">
                 <ChevronDown className="h-4 w-4" />
               </button>
             )}

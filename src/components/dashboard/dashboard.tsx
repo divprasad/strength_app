@@ -156,7 +156,7 @@ export function Dashboard() {
             </div>
           </div>
           {recentWorkout && (
-            <span className="mt-3 shrink-0 text-[11px] text-muted-foreground/50 tabular-nums">
+            <span className="mt-3 shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
               Last: {formatRelativeShort(recentWorkout.sessionEndedAt ?? recentWorkout.sessionStartedAt ?? recentWorkout.updatedAt)}
             </span>
           )}
@@ -215,7 +215,7 @@ export function Dashboard() {
           <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] tabular-nums animate-count-up">
             {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}<span className="ml-1 text-sm font-normal text-muted-foreground/60">kg</span>
           </p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground/50">this week</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground/70">this week</p>
         </div>
 
         <div className="rounded-2xl border border-border/30 bg-card/75 px-4 py-3.5 shadow-e1 backdrop-blur-lg">
@@ -232,7 +232,7 @@ export function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="mt-2 text-xs text-muted-foreground/50">None yet</p>
+            <p className="mt-2 text-xs text-muted-foreground/70">None yet</p>
           )}
         </div>
       </div>
@@ -389,7 +389,7 @@ function GymCostCard({ sessionCount, totalVolume, weeklyVolumes, gymFee, targetC
             </div>
 
             {weeklyVolumes.some(v => v > 0) && (
-              <MiniSparkline values={weeklyVolumes} className="text-muted-foreground/50" />
+              <MiniSparkline values={weeklyVolumes} className="text-muted-foreground/70" />
             )}
 
             <div className="space-y-1">
@@ -464,12 +464,12 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{dateStr}</p>
           <p className="text-xs text-muted-foreground/60 truncate mt-0.5">
-            {formatDurationRounded(durationSeconds)} · {topMusclesStr || "No muscles"} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg
+            {formatDurationRounded(durationSeconds)} · {topMusclesStr || "No muscles"} · {totalReps > 0 ? `${totalReps} reps · ${Math.round(totalVolume).toLocaleString()}kg` : "Empty session"}
           </p>
         </div>
         <div className="flex flex-col items-end shrink-0 gap-0.5">
-          <span className="text-xs text-muted-foreground/50 tabular-nums">{timeStr}</span>
-          <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/40" />
+          <span className="text-xs text-muted-foreground/70 tabular-nums">{timeStr}</span>
+          <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/60" />
         </div>
       </button>
     );
@@ -485,12 +485,12 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{dateStr}</p>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            {formatDurationRounded(durationSeconds)} · {totalReps} reps · {Math.round(totalVolume).toLocaleString()}kg vol
+            {formatDurationRounded(durationSeconds)} · {totalReps > 0 ? `${totalReps} reps · ${Math.round(totalVolume).toLocaleString()}kg vol` : "Empty session"}
           </p>
         </div>
         <div className="flex flex-col items-end shrink-0 gap-0.5">
-          <span className="text-xs text-muted-foreground/50 tabular-nums">{timeStr}</span>
-          <ChevronUp className="h-2.5 w-2.5 text-muted-foreground/40" />
+          <span className="text-xs text-muted-foreground/70 tabular-nums">{timeStr}</span>
+          <ChevronUp className="h-2.5 w-2.5 text-muted-foreground/60" />
         </div>
       </button>
       <div className="border-t border-border/20 px-4 py-3 space-y-2">
@@ -506,7 +506,7 @@ function CompactWorkoutRow({ workout, muscles }: { workout: Workout; muscles: Mu
                   </span>
                 </div>
               </div>
-              <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatDurationLong(exerciseDuration)}</span>
+              <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">{formatDurationLong(exerciseDuration)}</span>
             </div>
           );
         })}

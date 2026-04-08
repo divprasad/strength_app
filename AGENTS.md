@@ -5,6 +5,14 @@ This is the **main branch** — all layers of the stack are in scope.
 
 ---
 
+> [!CAUTION]
+> ## CURRENT BRANCH MISSION: Offline PIN Authentication
+> We are currently implementing offline PIN support in the `add_authentication` workspace. 
+> - **In Scope:** `prisma/schema.prisma` (adding User model), `src/app/login`, `src/types/domain.ts`.
+> - **Out of Scope:** Do not touch the workout logger, history views, or analytics. 
+
+---
+
 ## Mission
 
 Strength Log is a mobile-first, local-first workout tracker built on Next.js.
@@ -103,6 +111,20 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 5. **Do not make broad architecture changes silently.** Explain what you're changing and why.
 6. **Do not revert user changes** unless the user explicitly asks for it.
 
+### Strict Scope Containment (The "Surgical Edit" Rule)
+
+7. **Zero Unrelated Touching (No "Drive-By" Refactoring):** You are strictly forbidden from "cleaning up," formatting, or refactoring code outside the direct, absolute minimum scope of your current prompt. Never "improve" adjacent functions or adjust elements simply because you are already editing that file.
+8. **Surgical Precision:** When implementing new systems (e.g., Authentication or Multi-User support), you must ONLY modify the explicitly necessary utilities, targeted UI routes (e.g., `/login`), and the exact database queries required. Implicit scope expansion is strictly prohibited.
+9. **Preserve Core Engines Absolutely:** The Local-First IndexedDB-to-Prisma sync pipeline is mission-critical. DO NOT alter the core logic of `syncEngine.ts`, `repository.ts`, or `useDbBootstrap` unless explicitly instructed to integrate the new feature's state. Any side-effect modifications to these core files will corrupt the sync flow and are strictly forbidden.
+
+---
+
+### Tooling Constraints & Destructive Actions
+
+10. **Terminal Guardrails:** Do NOT run `npx prisma db push` or `npx prisma migrate dev` unless you explicitly ask the user for permission.
+11. **Dependency Hygiene:** Do NOT install new `npm` packages without checking if a native or already-installed lightweight alternative exists. ALWAYS ask before modifying `package.json`.
+12. **Banned Dependencies:** Do NOT use `axios` (npm). The project relies exclusively on the native `fetch` API. `axios` has known security vulnerabilities and is strictly prohibited.
+
 ---
 
 ## Execution guidance
@@ -177,6 +199,9 @@ npm run test:e2e     # playwright (requires dev server running)
 ```
 
 If a check cannot be run, say so clearly and explain why.
+
+**Test Failure Protocol:**
+If a unit test or type check fails after your change, **revert and rethink**. Do NOT forcefully change a test file to make the test pass unless you have proven the original test logic was fundamentally flawed or outdated. Preserving existing test invariants is paramount.
 
 ---
 

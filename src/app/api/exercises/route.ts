@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifySession } from "@/lib/auth";
 import type { Exercise } from "@/types/domain";
 
 export async function GET() {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const exercises = await prisma.exercise.findMany();
+    const exercises = await prisma.exercise.findMany({
+      where: {
+        OR: [{ userId: null }, { userId: session.userId }]
+      }
+    });
     return NextResponse.json({ exercises });
   } catch (error) {
     console.error("Failed to fetch exercises:", error);
@@ -13,6 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { exercises }: { exercises: Exercise[] } = await request.json();
 
   if (!exercises || !Array.isArray(exercises)) {
@@ -49,6 +60,7 @@ export async function POST(request: NextRequest) {
             primaryMuscleIds: JSON.stringify(primaryMuscleIds),
             secondaryMuscleIds: JSON.stringify(secondaryMuscleIds),
             notes: e.notes,
+            userId: session.userId,
             createdAt: isNaN(createdAt.getTime()) ? now : createdAt,
             updatedAt: isNaN(updatedAt.getTime()) ? now : updatedAt
           }
@@ -66,9 +78,14 @@ export async function POST(request: NextRequest) {
   }
 }
 export async function DELETE() {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    await prisma.exercise.deleteMany();
-    return NextResponse.json({ status: "ok", message: "All exercises cleared" });
+    await prisma.exercise.deleteMany({
+      where: { userId: session.userId }
+    });
+    return NextResponse.json({ status: "ok", message: "User exercises cleared" });
   } catch (error) {
     console.error("Failed to clear exercises:", error);
     return NextResponse.json({ error: "Clear failed" }, { status: 500 });

@@ -57,7 +57,7 @@ const NAV_COMMANDS: NavigateCommand[] = [
   { id: "nav-exercises", label: "Exercises", href: "/exercises", aliases: ["exercise", "library"], kind: "navigate", section: "Navigate" },
   { id: "nav-history", label: "History", href: "/history", aliases: ["past", "previous"], kind: "navigate", section: "Navigate" },
   { id: "nav-analytics", label: "Analytics", href: "/analytics", aliases: ["stats", "charts"], kind: "navigate", section: "Navigate" },
-  { id: "nav-settings", label: "Settings", href: "/settings", aliases: ["prefs", "preferences"], kind: "navigate", section: "Navigate" },
+  { id: "nav-settings", label: "Admin", href: "/settings", aliases: ["settings", "prefs", "preferences", "admin"], kind: "navigate", section: "Navigate" },
 ];
 
 /* ─── Workout template categories ─── */
@@ -474,7 +474,7 @@ export function CommandPalette() {
                     <kbd className="rounded border border-border/50 bg-background/60 px-1.5 py-0.5 text-[9px] font-mono">esc</kbd>
                     {" "}close
                   </span>
-                  <span className="text-[10px] text-muted-foreground/50">
+                  <span className="text-[10px] text-muted-foreground/70">
                     {flatList.length} result{flatList.length !== 1 ? "s" : ""}
                   </span>
                 </div>

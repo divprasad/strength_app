@@ -5,6 +5,12 @@ export interface Timestamps {
   updatedAt: string;
 }
 
+export interface User extends Timestamps {
+  id: Id;
+  username: string;
+  pinHash: string;
+}
+
 export interface MuscleGroup extends Timestamps {
   id: Id;
   name: string;
@@ -18,6 +24,7 @@ export interface Exercise extends Timestamps {
   primaryMuscleIds: Id[];
   secondaryMuscleIds: Id[];
   notes?: string;
+  userId?: string;
   deletedAt?: string;
 }
 
@@ -54,7 +61,8 @@ export interface SetEntry extends Timestamps {
 }
 
 export interface AppSettings {
-  id: "default";
+  id: string;
+  userId?: string;
   volumePrimaryMultiplier: number;
   volumeSecondaryMultiplier: number;
   themePref?: "light" | "dark";

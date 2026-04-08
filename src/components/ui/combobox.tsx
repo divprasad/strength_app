@@ -141,12 +141,12 @@ export function Combobox({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type to filter..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
             />
             {query && (
               <button
                 onClick={() => setQuery("")}
-                className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground transition-colors"
               >
                 <X className="h-3 w-3" />
               </button>

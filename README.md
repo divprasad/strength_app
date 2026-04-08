@@ -1,109 +1,118 @@
-# Strength Log
+# Strength Log 🏋️
 
-Strength Log is a mobile-first workout tracker for logging training sessions quickly, reviewing history, and understanding progress over time. 
+Strength Log is a mobile-first, local-first workout tracker built on Next.js. It's designed to be instantaneously responsive by writing purely to local IndexedDB (`Dexie`) and queueing asynchronous syncs to a `Prisma`/`SQLite` backend whenever a network is available.
 
-## What the app intends to do
+> [!IMPORTANT]
+> **🤖 ARE YOU AN AI AGENT?** 
+> Before making *any* code changes or tool calls, you **MUST** read `AGENTS.md`. It contains strict surgical edit rules, local-first architecture bounds, and the core files you are forbidden from modifying without explicit permission.
 
-The product is meant to cover the full workout logging loop:
+---
 
-- Manage a reusable exercise library and muscle groups
-- Start a workout session for a chosen date
-- Add exercises and log sets quickly during the session
-- Review completed sessions in history
-- See weekly analytics and progress trends
-- Export data in structured formats
+## 🏗️ Architecture Quick-Start
 
-The core infrastructure uses a **Local-First Sync Architecture**. The app remains instantaneously responsive by writing purely to local IndexedDB (`Dexie`) and seamlessly queues all mutations to a background `syncEngine` that communicates with the `Prisma` SQL backend whenever the network is available.
+Strength Log employs a strict **Local-First Sync Architecture**. The app remains incredibly fast because the UI never waits on a network request to load or save data.
 
-## Current development status
-
-The app is functionally complete, fully installable as a PWA, and deployable via Docker:
-
-- **Progressive Web App (PWA):** Installs natively to Android/iOS desktops via modern Service Workers, skipping the app store entirely. Boots instantly with no browser UI padding.
-- **Local-Network Docker Hosting:** Runs silently via Docker container on any home NAS or Pi network (`docker-compose up -d`), persisting SQLite tightly via `db-data` named volumes.
-- **Global Command Palette:** Keyboard-friendly (`Cmd+K`) unified navigation and fast-action menu for blazing-fast workflow jumping.
-- **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
-- **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
-- **Automated DB Backups:** Every successful server sync creates a rolling numbered backup (`1_strength_diary_DATE_VOLkg_BU.db`, `2_…`, etc.) in `prisma/backups/`. Newest is always slot 1; old backups shift up. Infinite history, never deleted.
-- History, analytics, export, and import are present. Pulling/Bootstrapping directly from the server is supported via the Settings panel.
-- Typecheck, lint, build, and unit tests pass locally. Playwright End-to-End coverage is available to certify the critical flow scenarios.
-
-## Detailed Documentation
-
-Four detailed static HTML reference files are available inside the `/docs` directory to help developers navigate the architectural choices, project structure, and roadmap. You can open them natively in any browser:
-- `docs/meta_processes.html` (Local-First Sync flow)
-- `docs/folder_structure.html` (Codebase Map)
-- `docs/tech_stack.html` (Tooling choices)
-- `docs/future_roadmap.html` (PWA Deployment path)
-
-## Broad technical implementation
-
-### Frontend
-
-- `Next.js` App Router
-- `React` + `TypeScript`
-- `Tailwind CSS`
-- Feature components under `src/components/**`
-
-### Client-side data and state
-
-- `Dexie` + IndexedDB for current local persistence
-- `dexie-react-hooks` for reactive reads
-- Internal offline `syncQueue` table for background processing
-- `React Hook Form` + `Zod` for validated forms
-
-### Domain and repository layer
-
-- Canonical domain types in `src/types/domain.ts` (including `SyncJob`)
-- Local data schema and bootstrap in `src/lib/db.ts`
-- Centralized queueing logic in `src/lib/repository.ts`
-- The Sync background loop in `src/lib/syncEngine.ts`
-
-### Current server-side implementation
-
-- A centralized API route at `src/app/api/workouts/route.ts` handles the unified `WorkoutBundle` payload via atomic Prisma `$transaction` upserts, preventing zombie rows.
-- SQLite acts as the final persistent ledger. 
-
-## Local setup (development)
-
-### Via Docker (Recommended for PWA hosting)
-
-To emulate the production environment serving the Progressive Web App locally via port 3400:
-
-```bash
-docker compose up --build -d
-```
-*(Tip: In Brave/Chrome Android, navigate to `brave://flags` and explicitly allow `http://<your-local-ip>:3400` under "Insecure origins treated as secure" to trigger the PWA Install prompt on your local home Wi-Fi!)*
-
-### Via local Node (Development)
-
-1. Install dependencies:
-```bash
-npm ci
+```text
+┌─────────────────────────────────────────────────┐
+│  React UI  (Next.js App Router + Tailwind)      │
+│  └─ useLiveQuery() reads from Dexie reactively  │
+├─────────────────────────────────────────────────┤
+│  Repository layer  (src/lib/repository.ts)      │
+│  └─ All writes go to Dexie → enqueueSync()      │
+├─────────────────────────────────────────────────┤
+│  Sync Engine  (src/lib/syncEngine.ts)           │
+│  └─ Drains syncQueue → POST /api/workouts       │
+│  └─ Auto-triggers on `online` event             │
+├─────────────────────────────────────────────────┤
+│  API Routes  (src/app/api/**/route.ts)          │
+│  └─ Prisma $transaction upserts to SQLite       │
+│  └─ Auto-backup on every workout sync           │
+├─────────────────────────────────────────────────┤
+│  SQLite  (prisma/dev.db)                        │
+│  └─ Final persistent ledger                     │
+└─────────────────────────────────────────────────┘
 ```
 
-2. Start the app:
-```bash
-npm run dev
-```
+**Key Data Rule:** All UI components read and write to IndexedDB. Components **never** call `fetch()` directly for mutations.
 
-3. Run automated checks:
-```bash
-npm run check
-```
+---
 
-## Docker deployment (production)
+## 🚀 Developer Workflows
 
-With backend persistence and infrastructure formally secured via Docker and PWA, the primary architecture is stable. The remaining trajectory focuses on opening the app's functionality:
+This app supports two primary development paths depending on whether you are adjusting UI components or testing the Progressive Web App (PWA) installation flow.
 
-### 1. Multi-User Accounts & Authentication
-Implementing multiple parallel user structures so family/friends sharing the same local URL can separate workloads. This will be protected by an **Offline 4-Digit PIN** mechanism stored in IndexedDB since standard cloud OAuth cannot bridge over a local disconnected home PWA smoothly.
+### Path A: Standard Local Development (Node)
+Use this path for general feature development, UI changes, and testing backend logic.
 
-### 2. Production Clean-ups
-Minifying components, expanding test coverage across the newly tabbed Exercises interface, and adding user-facing UI toggles if background syncing fails consecutively.
+1. First, set up your local environment variables:
+   ```bash
+   cp .env.example .env
+   # Ensure DATABASE_URL is set correctly for your Prisma dev db
+   ```
+2. Install dependencies:
+   ```bash
+   npm ci
+   ```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+3. Run automated assurance checks:
+   ```bash
+   npm run check
+   ```
 
-## Automated checks
+### Path B: Production & PWA Testing (Docker)
+Use this path if you need to test the service worker, offline caching, or natively installing the app to a mobile device.
 
-- Unit tests use `Vitest` for pure `src/lib/**` logic.
-- Fast CI runs `lint`, `typecheck`, `test:unit`, and `build` on every branch push and on pull requests into `main`.
-- Playwright E2E runs as a separate manual GitHub Actions workflow.
+1. Boot the entire stack (Next.js + Persistent SQLite Volume):
+   ```bash
+   docker compose up --build -d
+   ```
+*(Tip: To test PWA installation on a local mobile device, navigate to `brave://flags` or `chrome://flags` on your phone, and explicitly allow `http://<your-local-ip>:3400` under "Insecure origins treated as secure")*
+
+---
+
+## ⚠️ File Boundaries & Danger Zones
+
+To protect the integrity of the off-line syncing mechanisms, explicit boundaries exist within the codebase.
+
+- 🔴 **DANGER ZONE (Do not touch without Extreme Care)**:
+  - `src/lib/syncEngine.ts` - The heart of the network queue. 
+  - `src/lib/repository.ts` - The primary data abstraction. 
+  - `src/lib/db.ts` - Schema migrations and Dexie config.
+  Any modifications here risk corrupting user data or breaking the sync loop. See `AGENTS.md` for "Surgical Edit Rules".
+
+- 🟢 **SAFE ZONES**:
+  - `src/components/**` - UI views and components.
+  - `src/app/**` - Next.js routes and layouts.
+
+---
+
+## 🤝 Contribution Guidelines
+
+To maintain synchronization stability and code legibility, please adhere to the following when submitting PRs:
+- **Use Conventional Commits**: e.g., `feat: offline pin auth`, `fix: zombie row bug in sync`
+- **Agent Hand-off**: If an AI agent assisted with your contribution, ensure they have updated `AGENTS.md` or `/docs` with any new context before terminating the session.
+- **Troubleshooting IndexedDB**: If you enter a broken local state during development, IndexedDB might be corrupt. Go to `Chrome Dev Tools -> Application -> Storage -> Clear site data` and reload. Do not attempt to forcefully delete migrations unless you know what you are doing.
+
+---
+
+## 📚 Documentation Hub
+
+Before undertaking major refactors, consult the static reference files located in `/docs`. You can open these natively in any browser:
+- `docs/meta_processes.html` - Deep dive into resolving local-first sync conflicts.
+- `docs/folder_structure.html` - Comprehensive codebase map.
+- `docs/tech_stack.html` - Reasons behind tooling choices (Dexie, Serwist, Prisma).
+- `AGENTS.md` - Operating guide, current project status, and strict rules for AI Agents.
+
+---
+
+## 🌟 Features & Current Status
+
+The application is functionally complete covering the full workout loop, with automated E2E tests, robust data integrity tooling, and an integrated global command palette.
+
+- **Progressive Web App (PWA):** Installs natively. Boots instantly. Offline-first routing via `Serwist`.
+- **Local-Network Docker:** Designed to run silently on a home NAS/Raspberry Pi.
+- **Automated DB Backups:** Every server sync creates a rolling numbered backup in `prisma/backups/`.
+- **Zero-Latency UI:** All CRUD operations happen logically at 0ms latency thanks to Dexie and background syncing.

@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  pinHash   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workouts  Workout[]
+  exercises Exercise[]
+  settings  Settings?
+}
+
 model MuscleGroup {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -22,6 +34,8 @@ model Exercise {
   primaryMuscleIds   String
   secondaryMuscleIds String
   notes              String?
+  userId             String?
+  user               User?             @relation(fields: [userId], references: [id])
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   workoutExercises   WorkoutExercise[]
@@ -33,7 +47,8 @@ model Workout {
   date             String
   notes            String?
   status           String            @default("completed")
-  userId           String            @default("default_user")
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
   sessionStartedAt DateTime?
   sessionEndedAt   DateTime?
   createdAt        DateTime          @default(now())
@@ -70,7 +85,9 @@ model SetEntry {
 }
 
 model Settings {
-  id                        String   @id  // always "default"
+  id                        String   @id @default(uuid())
+  userId                    String   @unique
+  user                      User     @relation(fields: [userId], references: [id])
   volumePrimaryMultiplier   Float    @default(1.0)
   volumeSecondaryMultiplier Float    @default(0.5)
   gymFee                    Float?

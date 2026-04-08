@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifySession } from "@/lib/auth";
 
 const DEFAULT_SETTINGS = {
   id: "default",
@@ -12,8 +13,11 @@ const DEFAULT_SETTINGS = {
 };
 
 export async function GET() {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+    const settings = await prisma.settings.findUnique({ where: { userId: session.userId } });
     return NextResponse.json({ settings: settings ?? DEFAULT_SETTINGS });
   } catch (error) {
     console.error("[Settings API] GET failed:", error);
@@ -22,6 +26,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await verifySession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = await request.json();
     const {
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const settings = await prisma.settings.upsert({
-      where: { id: "default" },
+      where: { userId: session.userId },
       update: {
         ...(volumePrimaryMultiplier !== undefined && { volumePrimaryMultiplier }),
         ...(volumeSecondaryMultiplier !== undefined && { volumeSecondaryMultiplier }),
@@ -44,7 +51,7 @@ export async function POST(request: NextRequest) {
         ...(appScale !== undefined && { appScale }),
       },
       create: {
-        id: "default",
+        userId: session.userId,
         volumePrimaryMultiplier: volumePrimaryMultiplier ?? 1.0,
         volumeSecondaryMultiplier: volumeSecondaryMultiplier ?? 0.5,
         gymFee: gymFee ?? null,

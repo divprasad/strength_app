@@ -185,7 +185,7 @@ export function MuscleManager() {
                       <div className="min-w-0 pr-6">
                         {exerciseCount > 0 ? (
                           <p className="text-xs text-muted-foreground truncate">
-                            {exerciseCount} ex <span className="text-muted-foreground/40 mx-1">|</span> {exerciseNames.join(", ")}
+                            {exerciseCount} ex <span className="text-muted-foreground/60 mx-1">|</span> {exerciseNames.join(", ")}
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground italic truncate">no exercises</p>

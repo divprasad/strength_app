@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import * as bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 function createStableId(prefix: string, seed: string): string {
@@ -14,10 +15,25 @@ function createStableId(prefix: string, seed: string): string {
 async function main() {
   console.log("Seeding defaults...");
 
+  const adminPasswordHash = await bcrypt.hash("0000", 10);
+  const adminUser = await prisma.user.upsert({
+    where: { username: "admin" },
+    update: { pinHash: adminPasswordHash },
+    create: {
+      id: "default_user",
+      username: "admin",
+      pinHash: adminPasswordHash,
+    }
+  });
+
   // Only clear reference data (muscles + exercises). Never delete workouts —
   // those are user data that must survive re-seeding.
-  await prisma.exercise.deleteMany();
-  await prisma.muscleGroup.deleteMany();
+  try {
+    await prisma.exercise.deleteMany();
+    await prisma.muscleGroup.deleteMany();
+  } catch (e) {
+    console.warn("Could not delete reference data (is it referenced by user data?), skipping...");
+  }
 
   const muscles = [
     "Chest", "Back", "Shoulders", "Biceps", "Triceps",
@@ -76,10 +92,11 @@ async function main() {
 
   // ── Seed Default Settings ───────────────────────────────────────────────────
   await prisma.settings.upsert({
-    where: { id: "default" },
+    where: { userId: adminUser.id },
     update: {},
     create: {
       id: "default",
+      userId: adminUser.id,
       volumePrimaryMultiplier: 1.0,
       volumeSecondaryMultiplier: 0.5,
       appScale: 1.0,

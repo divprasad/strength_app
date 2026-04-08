@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureBootstrapped } from "@/lib/db";
+import { ensureBootstrapped, clearDatabaseForUserSwitch, db } from "@/lib/db";
 import { bootstrapFromServer } from "@/lib/sync";
 
 /** Race a promise against a timeout. Rejects with "Timeout" if ms elapses. */
@@ -18,8 +18,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * Generous timeout for the server bootstrap.
  * In Next.js dev mode, the very first API request triggers route compilation
  * which can easily take 10-20s on a cold start. 30s accommodates this.
+ * In prod we use a tighter 12s — if the server is up, it should respond fast.
  */
-const SERVER_BOOTSTRAP_TIMEOUT_MS = 30_000;
+const SERVER_BOOTSTRAP_TIMEOUT_MS =
+  process.env.NODE_ENV === "development" ? 8_000 : 12_000;
 
 /**
  * Safety-net timeout for the local Dexie bootstrap.
@@ -32,8 +34,9 @@ const LOCAL_BOOTSTRAP_TIMEOUT_MS = 10_000;
  * Absolute maximum time we will show "Preparing local database…" before
  * giving up and rendering the app anyway. This is a hard safety net —
  * the app may be degraded but at least the user isn't stuck forever.
+ * In dev, 20s is more than enough (the force-open button appears at 12s).
  */
-const HARD_DEADLINE_MS = 45_000;
+const HARD_DEADLINE_MS = process.env.NODE_ENV === "development" ? 20_000 : 45_000;
 
 export function useDbBootstrap() {
   const [ready, setReady] = useState(false);
@@ -54,6 +57,23 @@ export function useDbBootstrap() {
 
     async function initDb() {
       try {
+        // 0. Verify Auth User and scope DB
+        const authRes = await fetch("/api/auth/me");
+        if (authRes.ok) {
+          const { userId } = await authRes.json();
+          const currentSettings = await db.settings.get("default");
+          if (currentSettings && currentSettings.userId && currentSettings.userId !== userId) {
+            console.log("[bootstrap] User changed. Wiping local data to prevent leakage...");
+            await clearDatabaseForUserSwitch();
+          }
+        } else if (authRes.status === 401) {
+          console.log("[bootstrap] Unauthorized. Redirecting to login...");
+          if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+            window.location.href = "/login";
+            return;
+          }
+        }
+
         // 1. Try pulling canonical data from the server (with timeout).
         //    This is the primary source of truth for muscles, exercises and workouts.
         await withTimeout(bootstrapFromServer(), SERVER_BOOTSTRAP_TIMEOUT_MS);

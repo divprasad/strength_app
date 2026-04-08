@@ -101,6 +101,17 @@ class StrengthDatabase extends Dexie {
         }
       });
 
+    this.version(8)
+      .stores({
+        muscleGroups: "id, name, updatedAt",
+        exercises: "id, name, updatedAt",
+        workouts: "id, date, name, status, updatedAt, userId",
+        workoutExercises: "id, workoutId, exerciseId, [workoutId+orderIndex]",
+        setEntries: "id, workoutExerciseId, [workoutExerciseId+setNumber], updatedAt",
+        settings: "id, userId",
+        syncQueue: "id, status, createdAt"
+      });
+
     this.muscleGroups = this.table("muscleGroups");
     this.exercises = this.table("exercises");
     this.workouts = this.table("workouts");
@@ -159,6 +170,14 @@ async function seedDatabase(database: StrengthDatabase): Promise<void> {
           updatedAt: now,
         });
       }
+    }
+  });
+}
+
+export async function clearDatabaseForUserSwitch(): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    for (const table of db.tables) {
+      await table.clear();
     }
   });
 }

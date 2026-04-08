@@ -121,8 +121,7 @@ export function AnalyticsView() {
 
   const exerciseRows = Object.entries(metrics?.byExercise ?? {})
     .map(([name, volume]) => ({ name, volume: Math.round(volume) }))
-    .sort((a, b) => b.volume - a.volume)
-    .slice(0, 5);
+    .sort((a, b) => b.volume - a.volume);
   const activeDays = (metrics?.perDay ?? []).filter((day) => day.volume > 0).length;
   const topExercise = exerciseRows[0]?.name ?? "No data";
   const periodLabel = weeks === 1 ? "this week" : "last 4 weeks";
@@ -174,19 +173,19 @@ export function AnalyticsView() {
           <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] tabular-nums animate-count-up">
             {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
           </p>
-          <p className="text-[10px] text-muted-foreground/50">kg</p>
+          <p className="text-[10px] text-muted-foreground/70">kg</p>
         </div>
 
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Muscles</p>
           <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] animate-count-up">{muscleRows.length}</p>
-          <p className="text-[10px] text-muted-foreground/50">tracked</p>
+          <p className="text-[10px] text-muted-foreground/70">tracked</p>
         </div>
 
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg overflow-hidden">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Top Exercise</p>
           <p className="mt-1.5 text-sm font-bold tracking-[-0.02em] truncate">{topExercise}</p>
-          <p className="text-[10px] text-muted-foreground/50">{periodLabel}</p>
+          <p className="text-[10px] text-muted-foreground/70">{periodLabel}</p>
         </div>
       </div>
 
@@ -240,7 +239,7 @@ export function AnalyticsView() {
       </div>
 
       {/* Exercise Progress */}
-      <div className="rounded-2xl border border-border/30 bg-card/75 overflow-hidden shadow-e1 backdrop-blur-lg">
+      <div className="rounded-2xl border border-border/30 bg-card/75 shadow-e1 backdrop-blur-lg">
         <div className="px-5 pt-5 pb-3">
           <p className="text-sm font-semibold tracking-[-0.02em]">Exercise Progress</p>
           <p className="text-xs text-muted-foreground/60 mt-0.5">Track max weight and estimated 1RM over time.</p>

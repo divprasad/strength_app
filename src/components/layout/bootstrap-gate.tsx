@@ -6,14 +6,20 @@ import { useDbBootstrap } from "@/hooks/use-db-bootstrap";
 export function BootstrapGate({ children }: { children: ReactNode }) {
   const ready = useDbBootstrap();
   const [showSlowHint, setShowSlowHint] = useState(false);
+  const [showForceOpen, setShowForceOpen] = useState(false);
+  const [forced, setForced] = useState(false);
 
   useEffect(() => {
     if (ready) return;
-    const timer = setTimeout(() => setShowSlowHint(true), 6_000);
-    return () => clearTimeout(timer);
+    const hintTimer = setTimeout(() => setShowSlowHint(true), 6_000);
+    const forceTimer = setTimeout(() => setShowForceOpen(true), 12_000);
+    return () => {
+      clearTimeout(hintTimer);
+      clearTimeout(forceTimer);
+    };
   }, [ready]);
 
-  if (!ready) {
+  if (!ready && !forced) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
         <div
@@ -23,8 +29,16 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
         <p className="text-sm text-muted-foreground">Preparing local database…</p>
         {showSlowHint && (
           <p className="max-w-xs text-center text-xs text-muted-foreground/60">
-            First load can be slow while the server compiles. Hang tight…
+            First load can be slow while the server compiles routes…
           </p>
+        )}
+        {showForceOpen && (
+          <button
+            onClick={() => setForced(true)}
+            className="mt-2 rounded-full border border-border/40 bg-muted/30 px-4 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            Force open anyway →
+          </button>
         )}
       </div>
     );
