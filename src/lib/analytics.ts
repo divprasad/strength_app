@@ -18,8 +18,13 @@ export interface ExerciseProgressPoint {
 }
 
 export async function getWeeklyMetrics(anchorDateIso: string): Promise<WeeklyMetrics> {
-  const start = startOfWeek(parseISO(anchorDateIso), { weekStartsOn: 1 });
-  const end = endOfWeek(parseISO(anchorDateIso), { weekStartsOn: 1 });
+  return getMetricsForWeeks(anchorDateIso, 1);
+}
+
+export async function getMetricsForWeeks(anchorDateIso: string, weekCount: number): Promise<WeeklyMetrics> {
+  const anchorDate = parseISO(anchorDateIso);
+  const end = endOfWeek(anchorDate, { weekStartsOn: 1 });
+  const start = startOfWeek(subWeeks(anchorDate, weekCount - 1), { weekStartsOn: 1 });
 
   return db.transaction("r", [db.workouts, db.workoutExercises, db.exercises, db.setEntries, db.settings], async () => {
     const allWorkouts = await db.workouts.where("date").between(format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd"), true, true).toArray();

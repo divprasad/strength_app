@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
-import { getExerciseProgress, getWeeklyMetrics } from "@/lib/analytics";
+import { getExerciseProgress, getMetricsForWeeks } from "@/lib/analytics";
 import { db } from "@/lib/db";
-import { localDateIso } from "@/lib/utils";
+import { cn, localDateIso } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
 import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,8 @@ function MeasuredChart({
 
 export function AnalyticsView() {
   const today = localDateIso(new Date());
-  const metrics = useLiveQuery(() => getWeeklyMetrics(today), [today]);
+  const [weeks, setWeeks] = useState<1 | 4>(1);
+  const metrics = useLiveQuery(() => getMetricsForWeeks(today, weeks), [today, weeks]);
   const muscles = useLiveQuery(() => db.muscleGroups.toArray(), []);
   const exercises = useLiveQuery(() => db.exercises.orderBy("name").toArray(), []);
   const [exerciseId, setExerciseId] = useState("");
@@ -116,32 +117,60 @@ export function AnalyticsView() {
   const muscleRows = Object.entries(metrics?.byMuscle ?? {})
     .map(([muscleId, volume]) => ({ name: muscles?.find((m) => m.id === muscleId)?.name ?? "Unknown", volume: Math.round(volume) }))
     .sort((a, b) => b.volume - a.volume)
-    .slice(0, 8);
+    .slice(0, 5);
 
   const exerciseRows = Object.entries(metrics?.byExercise ?? {})
     .map(([name, volume]) => ({ name, volume: Math.round(volume) }))
     .sort((a, b) => b.volume - a.volume)
-    .slice(0, 8);
+    .slice(0, 5);
   const activeDays = (metrics?.perDay ?? []).filter((day) => day.volume > 0).length;
   const topExercise = exerciseRows[0]?.name ?? "No data";
+  const periodLabel = weeks === 1 ? "this week" : "last 4 weeks";
+  const totalLabel = weeks === 1 ? "Weekly Total" : "4-Week Total";
 
   return (
     <div className="space-y-5 stagger-children">
       <PageIntro
         title="Analytics"
-        description="Weekly volume and progress."
+        description="Volume and progress."
         meta={
           <>
-            <Badge className="bg-primary/8 text-primary/80 border-primary/10 px-3 py-1">{Math.round(metrics?.totalVolume ?? 0).toLocaleString()} kg this week</Badge>
+            <Badge className="bg-primary/8 text-primary/80 border-primary/10 px-3 py-1">{Math.round(metrics?.totalVolume ?? 0).toLocaleString()} kg {periodLabel}</Badge>
             <Badge className="bg-muted/50 text-muted-foreground border-border/40">{activeDays} active day{activeDays === 1 ? "" : "s"}</Badge>
           </>
         }
       />
 
+      {/* Period Toggle */}
+      <div className="flex rounded-2xl border border-border/30 bg-card/75 p-1 shadow-e1 backdrop-blur-lg">
+        <button
+          onClick={() => setWeeks(1)}
+          className={cn(
+            "flex-1 rounded-xl py-2 text-xs font-semibold transition-all duration-200 ease-spring",
+            weeks === 1
+              ? "bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.4)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          This Week
+        </button>
+        <button
+          onClick={() => setWeeks(4)}
+          className={cn(
+            "flex-1 rounded-xl py-2 text-xs font-semibold transition-all duration-200 ease-spring",
+            weeks === 4
+              ? "bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.4)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Last 4 Weeks
+        </button>
+      </div>
+
       {/* Stats Row */}
       <div className="grid gap-3 grid-cols-3">
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Weekly Total</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{totalLabel}</p>
           <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] tabular-nums animate-count-up">
             {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
           </p>
@@ -157,7 +186,7 @@ export function AnalyticsView() {
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg overflow-hidden">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Top Exercise</p>
           <p className="mt-1.5 text-sm font-bold tracking-[-0.02em] truncate">{topExercise}</p>
-          <p className="text-[10px] text-muted-foreground/50">this week</p>
+          <p className="text-[10px] text-muted-foreground/50">{periodLabel}</p>
         </div>
       </div>
 
