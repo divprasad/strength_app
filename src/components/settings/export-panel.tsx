@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { db } from "@/lib/db";
 import { DEFAULT_USER_ID } from "@/lib/constants";
 import { payloadToCsvMap, payloadToJson } from "@/lib/export";
@@ -13,7 +13,7 @@ import { PageIntro } from "@/components/layout/page-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Upload } from "lucide-react";
 
 async function buildPayload(): Promise<ExportPayload> {
   const [muscleGroups, exercises, workouts, workoutExercises, setEntries, settings] = await Promise.all([
@@ -232,30 +232,30 @@ export function ExportPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 stagger-children">
       <PageIntro
         title="Settings"
         description="Backup, restore, and sync your data."
         meta={
-          auditReport ? <Badge>{auditReport.ok ? "✓ Healthy" : `${auditReport.summary.total} issue${auditReport.summary.total === 1 ? "" : "s"}`}</Badge> : null
+          auditReport ? <Badge className={auditReport.ok ? "bg-success/10 text-success border-success/20" : "bg-destructive/10 text-destructive border-destructive/20"}>{auditReport.ok ? "✓ Healthy" : `${auditReport.summary.total} issue${auditReport.summary.total === 1 ? "" : "s"}`}</Badge> : null
         }
       />
 
       {status ? (
-        <div className="rounded-2xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-muted-foreground shadow-e2">
+        <div className="rounded-2xl border border-border/30 bg-card/70 backdrop-blur-lg px-4 py-3 text-sm text-muted-foreground/80 shadow-e1 animate-fade-up">
           {status}
         </div>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden border-border/30 bg-card/75 backdrop-blur-lg">
           <CardHeader className="pb-4">
           <CardTitle>Export Data</CardTitle>
           <CardDescription>Full export of all your training data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-            <p className="text-sm text-muted-foreground">JSON for backup and restore. CSV for spreadsheets.</p>
+          <div className="rounded-xl border border-border/20 bg-background/30 p-4">
+            <p className="text-sm text-muted-foreground/70">JSON for backup and restore. CSV for spreadsheets.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={exportJson}>Export JSON</Button>
@@ -266,13 +266,17 @@ export function ExportPanel() {
         </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden border-border/30 bg-card/75 backdrop-blur-lg">
           <CardHeader className="pb-4">
           <CardTitle>Import & Sync</CardTitle>
           <CardDescription>Restore from a JSON backup or sync with the server.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="file" accept=".json,application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} disabled={loading} />
+          <FileInputButton
+            accept=".json,application/json"
+            onFile={(f) => importJson(f)}
+            disabled={loading}
+          />
           <Button onClick={handleSyncToServer} disabled={loading} variant="secondary" className="w-full">
             Push to Server
           </Button>
@@ -289,7 +293,7 @@ export function ExportPanel() {
         </Card>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-border/30 bg-card/75 backdrop-blur-lg">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -305,7 +309,7 @@ export function ExportPanel() {
           {auditError ? <p className="text-sm text-destructive">{auditError}</p> : null}
           {auditReport ? (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+              <div className="rounded-xl border border-border/20 bg-background/30 p-4 backdrop-blur-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{auditReport.ok ? "Healthy" : "Issues Found"}</p>
@@ -329,7 +333,7 @@ export function ExportPanel() {
                     {auditReport.issues.map((issue, index) => (
                       <li
                         key={`${issue.entity}-${issue.id ?? "unknown"}-${index}`}
-                        className="rounded-2xl border border-border/60 bg-background/60 p-4 text-sm"
+                        className="rounded-xl border border-border/20 bg-background/30 p-4 backdrop-blur-sm text-sm"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -355,6 +359,51 @@ export function ExportPanel() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* ── Styled file input ── */
+
+function FileInputButton({
+  accept,
+  onFile,
+  disabled,
+}: {
+  accept: string;
+  onFile: (file: File) => void;
+  disabled?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="sr-only"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            setFileName(f.name);
+            onFile(f);
+          }
+        }}
+        disabled={disabled}
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        className="flex items-center gap-2 rounded-xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm px-4 py-2.5 text-sm text-muted-foreground transition-all duration-200 ease-spring hover:border-primary/20 hover:bg-card/60 hover:text-foreground disabled:opacity-50 w-full"
+      >
+        <Upload className="h-4 w-4 shrink-0" />
+        <span className="truncate">
+          {fileName ? fileName : "Choose a JSON backup file…"}
+        </span>
+      </button>
     </div>
   );
 }

@@ -23,6 +23,7 @@
     "date-fns": "^4.1.0",
     "dexie": "^4.2.0",
     "dexie-react-hooks": "^1.1.7",
+    "geist": "^1.7.0",
     "lucide-react": "^0.542.0",
     "next": "^16.2.0",
     "react": "19.1.1",

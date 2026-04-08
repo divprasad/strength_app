@@ -14,19 +14,19 @@ export function PageIntro({ eyebrow, title, description, action, meta, className
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-3xl border border-white/50 bg-card/80 px-5 py-5 shadow-e3 ring-1 ring-black/5 md:px-7 md:py-6",
+        "relative overflow-hidden rounded-2xl border border-border/30 bg-card/80 px-5 py-5 shadow-e2 backdrop-blur-lg md:px-7 md:py-6 animate-fade-up",
         className
       )}
     >
-      <div className="absolute inset-y-0 right-0 hidden w-72 bg-[radial-gradient(circle_at_top_right,hsl(var(--accent)/0.45),transparent_65%)] md:block" />
+      <div className="absolute inset-y-0 right-0 hidden w-64 bg-[radial-gradient(circle_at_top_right,hsl(var(--glow)/0.12),transparent_70%)] md:block" />
       <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {eyebrow ? (
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-primary/70">{eyebrow}</p>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-primary/70">{eyebrow}</p>
           ) : null}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-[-0.05em] md:text-[2.5rem]">{title}</h1>
-            {description ? <p className="max-w-3xl text-sm text-muted-foreground md:text-base">{description}</p> : null}
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-bold tracking-[-0.04em] md:text-[2.25rem] md:leading-tight">{title}</h1>
+            {description ? <p className="max-w-3xl text-sm text-muted-foreground/80 md:text-base">{description}</p> : null}
           </div>
           {meta ? <div className="flex flex-wrap gap-2">{meta}</div> : null}
         </div>

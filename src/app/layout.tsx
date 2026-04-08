@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { GeistSans } from "geist/font/sans";
 import "@/app/globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { BootstrapGate } from "@/components/layout/bootstrap-gate";
@@ -26,7 +27,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={GeistSans.variable}>
       <head>
         <script
           id="theme-script"
@@ -46,7 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
         <link rel="apple-touch-icon" href="/icon-512.svg" />
       </head>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className={GeistSans.className}>
         <ThemeProvider>
           <AppShell>
             <BootstrapGate>{children}</BootstrapGate>
@@ -57,4 +58,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-

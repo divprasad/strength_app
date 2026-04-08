@@ -18,28 +18,34 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-3xl border border-white/55 bg-card/95 shadow-e3 backdrop-blur md:hidden">
-      <ul className="mx-auto grid max-w-xl grid-cols-6 gap-1 p-1.5">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                className={cn(
-                  "flex min-h-[3.9rem] flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[11px] transition-colors",
-                  active
-                    ? "border-primary/15 bg-primary text-primary-foreground shadow-[0_14px_28px_-18px_hsl(var(--primary)/0.85)]"
-                    : "text-muted-foreground hover:border-border/70 hover:bg-background/65"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <nav className="fixed inset-x-3 bottom-3 z-40 md:hidden">
+      <div className="mx-auto max-w-lg rounded-2xl border border-border/40 bg-card/90 shadow-e3 backdrop-blur-xl">
+        <ul className="grid grid-cols-6 gap-0.5 p-1">
+          {items.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className={cn(
+                    "relative flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-all duration-300 ease-spring",
+                    active
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {/* Active pill background */}
+                  {active && (
+                    <span className="absolute inset-0.5 rounded-xl bg-primary shadow-[0_2px_12px_-4px_hsl(var(--primary)/0.6)] animate-scale-in" />
+                  )}
+                  <Icon className={cn("relative z-10 h-[18px] w-[18px] transition-transform duration-300", active && "scale-105")} />
+                  <span className="relative z-10">{label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </nav>
   );
 }

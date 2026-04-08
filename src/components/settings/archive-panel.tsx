@@ -6,7 +6,6 @@ import { ArchiveRestore, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { restoreWorkout, deleteWorkout } from "@/lib/repository";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export function ArchivePanel() {
@@ -34,22 +33,22 @@ export function ArchivePanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-4">
-        <CardTitle>Archived Workouts</CardTitle>
-        <CardDescription>
+    <div className="rounded-2xl border border-border/30 bg-card/75 overflow-hidden shadow-e1 backdrop-blur-lg">
+      <div className="px-5 pt-5 pb-3 space-y-1">
+        <h3 className="text-sm font-semibold tracking-[-0.02em]">Archived Workouts</h3>
+        <p className="text-xs text-muted-foreground/60">
           {count} workout{count === 1 ? "" : "s"} hidden from your history and analytics. You can restore them or delete them permanently.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </div>
+      <div className="px-5 pb-5">
         {archivedWorkouts && archivedWorkouts.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {archivedWorkouts.reverse().map((workout) => (
               <li
                 key={workout.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 p-4 shadow-e1"
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-background/30 p-4 backdrop-blur-sm"
               >
                 <div className="min-w-0">
                   <p className="font-medium">{workout.name || workout.date}</p>
@@ -61,7 +60,7 @@ export function ArchivePanel() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="hover:bg-accent/80 hover:text-accent-foreground border border-border/70"
+                    className="hover:bg-accent/60 hover:text-accent-foreground border border-border/30"
                     title="Restore Workout"
                     onClick={() => handleRestoreWorkout(workout.id)}
                   >
@@ -87,23 +86,23 @@ export function ArchivePanel() {
             description="Workouts you archive from the dashboard will appear here."
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
 
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-4">
-        <CardTitle>Deleted Exercises</CardTitle>
-        <CardDescription>
+    <div className="rounded-2xl border border-border/30 bg-card/75 overflow-hidden shadow-e1 backdrop-blur-lg">
+      <div className="px-5 pt-5 pb-3 space-y-1">
+        <h3 className="text-sm font-semibold tracking-[-0.02em]">Deleted Exercises</h3>
+        <p className="text-xs text-muted-foreground/60">
           {excCount} exercise{excCount === 1 ? "" : "s"} soft-deleted from your library. You can restore them to make them available again.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </div>
+      <div className="px-5 pb-5">
         {archivedExercises && archivedExercises.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {archivedExercises.reverse().map((exc) => (
               <li
                 key={exc.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 p-4 shadow-e1"
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/20 bg-background/30 p-4 backdrop-blur-sm"
               >
                 <div className="min-w-0">
                   <p className="font-medium text-[15px]">{exc.name}</p>
@@ -115,7 +114,7 @@ export function ArchivePanel() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="hover:bg-accent/80 hover:text-accent-foreground border border-border/70"
+                    className="hover:bg-accent/60 hover:text-accent-foreground border border-border/30"
                     title="Restore Exercise"
                     onClick={async () => {
                       const { restoreExercise } = await import("@/lib/repository");
@@ -135,8 +134,8 @@ export function ArchivePanel() {
             description="Exercises you delete from the library will appear here."
           />
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
 
     </div>
   );

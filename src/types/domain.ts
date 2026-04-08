@@ -65,6 +65,8 @@ export interface AppSettings {
   gymFeePeriodDays?: number;
   /** Target cost per session in euros (default: 3) */
   gymFeeTargetPerSession?: number;
+  /** UI zoom scale: 0.85–1.30, step 0.05, default 1.0 */
+  appScale?: number;
 }
 
 export interface WorkoutBundle {

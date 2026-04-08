@@ -23,12 +23,19 @@ const config: Config = {
         "accent-foreground": "hsl(var(--accent-foreground))",
         destructive: "hsl(var(--destructive))",
         "destructive-foreground": "hsl(var(--destructive-foreground))",
-        success: "hsl(var(--success))"
+        success: "hsl(var(--success))",
+        glow: "hsl(var(--glow))"
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)"
+      },
+      transitionTimingFunction: {
+        spring: "var(--transition-spring)"
+      },
+      fontFamily: {
+        sans: ["var(--font-geist)", "system-ui", "-apple-system", "sans-serif"]
       }
     }
   },
