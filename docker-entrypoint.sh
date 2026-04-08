@@ -7,18 +7,26 @@ set -e
 # Runs inside the final (runner) stage before `node server.js`.
 #
 # Responsibilities:
-#   1. Copy fresh migration files from the image's staging area into the
+#   1. One-time rename: strength_dairy.db → strength_diary.db (typo fix migration).
+#   2. Copy fresh migration files from the image's staging area into the
 #      volume-mounted /app/prisma/ so new migrations survive container rebuilds.
-#   2. Run `prisma migrate deploy` — creates strength_dairy.db if missing, applies any
+#   3. Run `prisma migrate deploy` — creates strength_diary.db if missing, applies any
 #      pending migrations against an existing one.
-#   3. If strength_dairy.db was just created (first boot), run `prisma db seed` to
+#   4. If strength_diary.db was just created (first boot), run `prisma db seed` to
 #      populate default muscle groups and exercises.
-#   4. Start the Next.js standalone server.
+#   5. Start the Next.js standalone server.
 # ─────────────────────────────────────────────────────────────────────────────
 
 PRISMA_VOLUME="/app/prisma"
 MIGRATIONS_STAGING="/app/prisma_migrations_staging"
-DB_PATH="${PRISMA_VOLUME}/strength_dairy.db"
+DB_PATH="${PRISMA_VOLUME}/strength_diary.db"
+
+# ── One-time typo migration: dairy → diary ────────────────────────────────────
+OLD_DB="${PRISMA_VOLUME}/strength_dairy.db"
+if [ -f "$OLD_DB" ] && [ ! -f "$DB_PATH" ]; then
+  echo "[entrypoint] Migrating strength_dairy.db → strength_diary.db (one-time rename)..."
+  mv "$OLD_DB" "$DB_PATH"
+fi
 
 echo "[entrypoint] Syncing fresh migration files into volume..."
 # Ensure the migrations directory exists in the volume
@@ -38,18 +46,22 @@ cp /app/prisma_schema/migration_lock.toml "${PRISMA_VOLUME}/migrations/migration
 FRESH_DB=false
 if [ ! -f "${DB_PATH}" ]; then
   FRESH_DB=true
-  echo "[entrypoint] No existing strength_dairy.db found — fresh install."
+  echo "[entrypoint] No existing strength_diary.db found — fresh install."
 fi
 
-# ── Ensure strength_dairy.db is writable by the nextjs user ──────────────────
+# ── Ensure strength_diary.db is writable by the nextjs user ──────────────────
 # This entrypoint runs as root so we can safely chown before dropping privileges.
-# Handles the case where strength_dairy.db was seeded by a macOS host (UID 501) or a
+# Handles the case where strength_diary.db was seeded by a macOS host (UID 501) or a
 # previous container with a mismatched UID, making it unwritable at runtime.
 if [ -f "${DB_PATH}" ]; then
-  echo "[entrypoint] Fixing ownership of strength_dairy.db..."
+  echo "[entrypoint] Fixing ownership of strength_diary.db..."
   chown nextjs:nodejs "${DB_PATH}"
   chmod 664 "${DB_PATH}"
 fi
+
+# ── Ensure backups directory exists and is writable ──────────────────────────
+mkdir -p "${PRISMA_VOLUME}/backups"
+chown nextjs:nodejs "${PRISMA_VOLUME}/backups"
 
 # ── Apply migrations ─────────────────────────────────────────────────────────
 echo "[entrypoint] Running prisma migrate deploy..."

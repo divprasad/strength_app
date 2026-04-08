@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 const WORKOUT_API_PATH = "/api/workouts";
 const MUSCLE_API_PATH = "/api/muscles";
 const EXERCISE_API_PATH = "/api/exercises";
+const SETTINGS_API_PATH = "/api/settings";
 
 export async function bootstrapMuscles(): Promise<void> {
   const response = await fetch(MUSCLE_API_PATH);
@@ -105,6 +106,40 @@ export async function bootstrapFromServer(): Promise<void> {
     }
   );
 
+  // Also pull settings from server and merge into Dexie
+  await bootstrapSettings();
+
   console.log(`Bootstrapped ${muscles.length} muscles, ${exercises.length} exercises, ${serverWorkouts?.length ?? 0} workouts from server.`);
+}
+
+/**
+ * Fetches settings from the server and merges them into Dexie.
+ * Preserves device-local fields (themePref, paletteIdx) that are never synced server-side.
+ */
+export async function bootstrapSettings(): Promise<void> {
+  try {
+    const res = await fetch(SETTINGS_API_PATH);
+    if (!res.ok) return;
+    const { settings: serverSettings } = await res.json();
+    if (!serverSettings) return;
+
+    // Get current Dexie settings to preserve device-local fields
+    const localSettings = await db.settings.get("default");
+
+    await db.settings.put({
+      id: "default",
+      volumePrimaryMultiplier: serverSettings.volumePrimaryMultiplier ?? 1.0,
+      volumeSecondaryMultiplier: serverSettings.volumeSecondaryMultiplier ?? 0.5,
+      gymFee: serverSettings.gymFee ?? undefined,
+      gymFeePeriodDays: serverSettings.gymFeePeriodDays ?? undefined,
+      gymFeeTargetPerSession: serverSettings.gymFeeTargetPerSession ?? undefined,
+      appScale: serverSettings.appScale ?? 1.0,
+      // Preserve device-local display preferences
+      themePref: localSettings?.themePref,
+      paletteIdx: localSettings?.paletteIdx,
+    });
+  } catch (error) {
+    console.warn("[Bootstrap] Could not fetch settings from server:", error);
+  }
 }
 
