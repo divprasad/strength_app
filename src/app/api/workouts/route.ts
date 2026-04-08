@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { WorkoutBundle } from "@/types/domain";
-import { fileTimestamp } from "@/lib/utils";
 import fs from "fs/promises";
 import path from "path";
 
@@ -21,8 +20,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
   }
 
-  // Auto-Backup Mechanism
+  // ── Rolling Backup ──────────────────────────────────────────────────────────
+  // Derives the live DB path from DATABASE_URL so it works in both local dev
+  // (file:./dev.db → prisma/dev.db) and Docker (file:./strength_diary.db → /app/prisma/strength_diary.db).
+  // Backups are written to prisma/backups/ as:
+  //   1_strength_diary_YYYY-MM-DD_VOLUMEkg_BU.db  ← newest
+  //   2_strength_diary_...                          ← previous
+  //   N_strength_diary_...                          ← oldest (infinite, never deleted)
   try {
+    const dbUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+    const dbFile = dbUrl.replace(/^file:/, "");
+    // Prisma resolves relative paths from the schema location = process.cwd()/prisma
+    const sourceDbPath = dbFile.startsWith("/")
+      ? dbFile
+      : path.join(process.cwd(), "prisma", dbFile);
+
     const [lastWorkout, totalWorkouts] = await Promise.all([
       prisma.workout.findFirst({ orderBy: { date: "desc" } }),
       prisma.workout.count(),
@@ -41,23 +53,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backupFilename = `db_backup_${fileTimestamp()}_no${totalWorkouts}_${lastWorkoutDate}_${lastWorkoutVolume}kg.db`;
+    const backupDir = path.join(process.cwd(), "prisma", "backups");
+    await fs.mkdir(backupDir, { recursive: true });
 
-    // The workspace convention lists prisma/strength_dairy.db as the standard database location
-    const sourceDbPath = path.join(process.cwd(), "prisma", "strength_dairy.db");
-
-    // Ensure the backups directory exists
-    const backupDir = path.join(process.cwd(), "backups");
-    await fs.mkdir(backupDir, { recursive: true }).catch(() => { });
-
-    const backupPath = path.join(backupDir, backupFilename);
-
-    // Attempt the backup (fails silently so it doesn't break the sync if db is locked/missing)
+    // Check DB file exists before attempting backup
     await fs.access(sourceDbPath);
-    await fs.copyFile(sourceDbPath, backupPath);
-    console.log(`[API Backup] Created auto-backup: ${backupFilename}`);
+
+    // Read existing numbered backup files
+    const allFiles = await fs.readdir(backupDir);
+    const buFiles = allFiles
+      .map((f) => ({ name: f, num: parseInt(f.match(/^(\d+)_/)?.[1] ?? "0", 10) }))
+      .filter((f) => f.num > 0 && f.name.endsWith("_BU.db"))
+      .sort((a, b) => b.num - a.num); // highest number first
+
+    // Rotate: rename N → N+1 (process highest first to avoid clobbering)
+    for (const { name, num } of buFiles) {
+      const oldPath = path.join(backupDir, name);
+      const newName = name.replace(/^\d+_/, `${num + 1}_`);
+      await fs.rename(oldPath, path.join(backupDir, newName));
+    }
+
+    // Write new backup as slot 1
+    const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
+    await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
+    console.log(`[API Backup] Rolling backup created: ${slot1Name} (total backups: ${buFiles.length + 1}, ${totalWorkouts} workouts)`);
   } catch (backupError) {
-    console.log("[API Backup] Skipping auto-backup (ensure strength_dairy.db exists):", backupError);
+    console.log("[API Backup] Skipping backup:", backupError);
   }
 
   try {

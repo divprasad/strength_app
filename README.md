@@ -24,7 +24,7 @@ The app is functionally complete, fully installable as a PWA, and deployable via
 - **Global Command Palette:** Keyboard-friendly (`Cmd+K`) unified navigation and fast-action menu for blazing-fast workflow jumping.
 - **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
 - **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
-- **Automated DB Backups:** Every successful server sync automatically commands the server to duplicate the SQLite `strength_dairy.db` locally as a fallback measure.
+- **Automated DB Backups:** Every successful server sync creates a rolling numbered backup (`1_strength_diary_DATE_VOLkg_BU.db`, `2_…`, etc.) in `prisma/backups/`. Newest is always slot 1; old backups shift up. Infinite history, never deleted.
 - History, analytics, export, and import are present. Pulling/Bootstrapping directly from the server is supported via the Settings panel.
 - Typecheck, lint, build, and unit tests pass locally. Playwright End-to-End coverage is available to certify the critical flow scenarios.
 

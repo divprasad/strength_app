@@ -74,7 +74,20 @@ async function main() {
     });
   }
 
+  // ── Seed Default Settings ───────────────────────────────────────────────────
+  await prisma.settings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      volumePrimaryMultiplier: 1.0,
+      volumeSecondaryMultiplier: 0.5,
+      appScale: 1.0,
+    }
+  });
+
   console.log("Seeding completed.");
+
 }
 
 main()

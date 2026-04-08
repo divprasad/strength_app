@@ -28,6 +28,9 @@ export async function processSyncQueue(): Promise<void> {
         });
       }
     }
+
+    // Always push settings on every sync cycle — keeps SQLite in sync with Dexie
+    await pushSettingsToServer();
   } finally {
     isProcessing = false;
   }
@@ -102,6 +105,32 @@ async function pushWorkoutToServer(workoutId: string, action: "upsert" | "delete
   } catch (error) {
     console.warn("[SyncEngine] Failed to sync workout", workoutId, error);
     return false;
+  }
+}
+
+/**
+ * Reads current AppSettings from Dexie and upserts them to /api/settings.
+ * Only syncs non-device-local fields (excludes themePref, paletteIdx).
+ */
+async function pushSettingsToServer(): Promise<void> {
+  try {
+    const settings = await db.settings.get("default");
+    if (!settings) return;
+
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        volumePrimaryMultiplier: settings.volumePrimaryMultiplier,
+        volumeSecondaryMultiplier: settings.volumeSecondaryMultiplier,
+        gymFee: settings.gymFee ?? null,
+        gymFeePeriodDays: settings.gymFeePeriodDays ?? null,
+        gymFeeTargetPerSession: settings.gymFeeTargetPerSession ?? null,
+        appScale: settings.appScale ?? 1.0,
+      }),
+    });
+  } catch (error) {
+    console.warn("[SyncEngine] Failed to sync settings:", error);
   }
 }
 

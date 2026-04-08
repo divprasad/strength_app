@@ -68,3 +68,14 @@ model SetEntry {
   updatedAt         DateTime?       @updatedAt
   workoutExercise   WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
 }
+
+model Settings {
+  id                        String   @id  // always "default"
+  volumePrimaryMultiplier   Float    @default(1.0)
+  volumeSecondaryMultiplier Float    @default(0.5)
+  gymFee                    Float?
+  gymFeePeriodDays          Int?
+  gymFeeTargetPerSession    Float?
+  appScale                  Float    @default(1.0)
+  updatedAt                 DateTime @updatedAt
+}

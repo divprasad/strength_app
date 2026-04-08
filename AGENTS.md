@@ -128,7 +128,7 @@ When modifying anything related to data storage, explain:
 ### Database locations
 
 - **Development:** `prisma/dev.db` (set in `.env` as `DATABASE_URL`)
-- **Backup reference:** `prisma/strength_dairy.db` (auto-backup target in workout route)
+- **Backup reference:** `prisma/backups/` — rolling numbered backups (`1_strength_diary_DATE_VOLkg_BU.db`, etc.)
 - **Test:** `prisma/dev_test.db` (set in `playwright.config.ts`)
 
 ### Dexie schema versioning
