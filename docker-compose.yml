@@ -3,8 +3,10 @@ services:
     build: .
     container_name: strength-log
     restart: unless-stopped
-    ports:
-      - "3400:3000"
+    # ports:
+    #   - "3400:3000"
+    expose:
+      - "3000" # Exposes to Caddy internally, no longer binds directly to the machine's ports
     volumes:
       # Named volume: survives container teardown and rebuilds.
       # Maps to /app/prisma inside the container, which is where
@@ -19,7 +21,20 @@ services:
       # so the full resolved path is /app/prisma/strength_diary.db
       - DATABASE_URL=file:./strength_diary.db
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: strength-caddy
+    restart: unless-stopped
+    ports:
+      - "3400:3400" # Caddy listens on 3400 and serves HTTPS
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - strength-log
+
 volumes:
   db-data:
-    # Named volume managed by Docker — persists across `docker compose down`
-    # and `docker compose up --build`.
+  caddy_data:
+  caddy_config:
