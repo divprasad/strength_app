@@ -3,6 +3,17 @@ import { prisma } from "@/lib/prisma";
 import type { WorkoutBundle } from "@/types/domain";
 import fs from "fs/promises";
 import path from "path";
+import crypto from "crypto";
+
+/** Returns the MD5 hex digest of a file, or null if the file can't be read. */
+async function md5File(filePath: string): Promise<string | null> {
+  try {
+    const buf = await fs.readFile(filePath);
+    return crypto.createHash("md5").update(buf).digest("hex");
+  } catch {
+    return null;
+  }
+}
 
 type Payload = {
   action: "start" | "finish" | "sync";
@@ -66,17 +77,36 @@ export async function POST(request: NextRequest) {
       .filter((f) => f.num > 0 && f.name.endsWith("_BU.db"))
       .sort((a, b) => b.num - a.num); // highest number first
 
-    // Rotate: rename N → N+1 (process highest first to avoid clobbering)
-    for (const { name, num } of buFiles) {
-      const oldPath = path.join(backupDir, name);
-      const newName = name.replace(/^\d+_/, `${num + 1}_`);
-      await fs.rename(oldPath, path.join(backupDir, newName));
-    }
+    // Skip backup if the live DB is identical to the latest backup (slot 1).
+    // This prevents churn on syncs that don't change any data on disk.
+    const latestBackup = buFiles.find((f) => f.num === 1);
+    if (latestBackup) {
+      const [liveHash, backupHash] = await Promise.all([
+        md5File(sourceDbPath),
+        md5File(path.join(backupDir, latestBackup.name)),
+      ]);
+      if (liveHash && liveHash === backupHash) {
+        console.log(`[API Backup] Skipping — DB unchanged (md5: ${liveHash})`);
+        // Fall through to the Prisma transaction without creating a backup.
+      } else {
+        // Rotate: rename N → N+1 (process highest first to avoid clobbering)
+        for (const { name, num } of buFiles) {
+          const oldPath = path.join(backupDir, name);
+          const newName = name.replace(/^\d+_/, `${num + 1}_`);
+          await fs.rename(oldPath, path.join(backupDir, newName));
+        }
 
-    // Write new backup as slot 1
-    const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
-    await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
-    console.log(`[API Backup] Rolling backup created: ${slot1Name} (total backups: ${buFiles.length + 1}, ${totalWorkouts} workouts)`);
+        // Write new backup as slot 1
+        const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
+        await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
+        console.log(`[API Backup] Rolling backup created: ${slot1Name} (total backups: ${buFiles.length + 1}, ${totalWorkouts} workouts)`);
+      }
+    } else {
+      // No existing backups at all — always create the first one
+      const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
+      await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
+      console.log(`[API Backup] First backup created: ${slot1Name} (${totalWorkouts} workouts)`);
+    }
   } catch (backupError) {
     console.log("[API Backup] Skipping backup:", backupError);
   }
