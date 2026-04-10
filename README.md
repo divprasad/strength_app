@@ -9,7 +9,7 @@ The product is meant to cover the full workout logging loop:
 - Manage a reusable exercise library and muscle groups
 - Start a workout session for a chosen date
 - Add exercises and log sets quickly during the session
-- Review completed sessions in history
+- Review completed sessions in history (including a Gym Session Cost Tracker metric)
 - See weekly analytics and progress trends
 - Export data in structured formats
 
@@ -25,7 +25,7 @@ The app is functionally complete, fully installable as a PWA, and deployable via
 - **Local-First Database:** The main source of truth is Browser IndexedDB via Dexie. Local interactions have 0ms latency.
 - **Background Sync Engine:** A robust background queue automatically bundles offline changes and pushes them to the SQLite Database (`Prisma`), resolving conflicts using a secure "Client Payload Wins" strategy with automatic orphaned row deletion.
 - **Automated DB Backups:** Every successful server sync creates a rolling numbered backup (`1_strength_diary_DATE_VOLkg_BU.db`, `2_…`, etc.) in `prisma/backups/`. Newest is always slot 1; old backups shift up. Infinite history, never deleted.
-- History, analytics, export, and import are present. Pulling/Bootstrapping directly from the server is supported via the Settings panel.
+- Settings, history, analytics, and data export/import are fully functional. This includes a synchronized Settings schema (Volume Multipliers, UI App Scale, Gym Fee Cost Tracker) pulled directly from the server during bootstrap.
 - Typecheck, lint, build, and unit tests pass locally. Playwright End-to-End coverage is available to certify the critical flow scenarios.
 
 ## Detailed Documentation

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { subDays, eachDayOfInterval, format } from "date-fns";
-import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Play, Clock } from "lucide-react";
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Trash2, ChevronDown, ChevronUp, Plus, Check, RotateCcw, PenLine, Dumbbell, Archive, Play, Clock, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,6 @@ import type { Exercise, MuscleGroup, SetEntry, Workout } from "@/types/domain";
 import { formatDurationLong, formatTimeOfDay, computeDurationSeconds } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 
 /* ─── helpers ─── */
 
@@ -654,9 +653,9 @@ export function WorkoutLogger() {
               })
             )
           ) : (
-            <div className="rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm p-6 text-center">
-              <EmptyState title="No exercises yet" description="Add one below to start." />
-            </div>
+            <p className="px-1 py-2 text-sm text-muted-foreground/60 text-center">
+              No exercises yet — add one below to start.
+            </p>
           )}
 
           {/* ── Inline Exercise Picker (always at bottom) ── */}
@@ -735,46 +734,134 @@ function InlineExercisePicker({
       <button
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/30 bg-card/40 backdrop-blur-sm px-4 py-3 text-sm text-muted-foreground transition-all duration-200 ease-spring hover:border-primary/20 hover:bg-card/60 hover:text-foreground disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-primary/25 bg-primary/5 px-4 py-4 text-sm font-semibold text-primary/80 transition-all duration-200 ease-spring hover:border-primary/40 hover:bg-primary/10 hover:text-primary active:scale-[0.98] disabled:opacity-50"
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-5 w-5" />
         Add Exercise
       </button>
 
-      {/* Bottom sheet — pill-button grid, no search, no keyboard */}
-      <BottomSheet isOpen={open} onClose={close} title="Add Exercise">
-        {available.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            All exercises already added
+      {/* Full-screen exercise picker modal */}
+      {open && (
+        <ExercisePickerModal
+          groups={groups}
+          available={available}
+          onAdd={(id) => { onAdd(id); close(); }}
+          onClose={close}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXERCISE PICKER MODAL
+   Full-screen portal overlay — bypasses CSS stacking context issues
+   that cause fixed/BottomSheet to render at wrong position on mobile.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ExercisePickerModal({
+  groups,
+  available,
+  onAdd,
+  onClose,
+}: {
+  groups: { cat: string; exs: Exercise[] }[];
+  available: Exercise[];
+  onAdd: (exerciseId: string) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Lock body scroll while open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  // Filter groups by search term
+  const filteredGroups = useMemo(() => {
+    if (!search.trim()) return groups;
+    const q = search.toLowerCase();
+    return groups
+      .map(({ cat, exs }) => ({
+        cat,
+        exs: exs.filter((ex) => ex.name.toLowerCase().includes(q)),
+      }))
+      .filter(({ exs }) => exs.length > 0);
+  }, [groups, search]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/30 shrink-0">
+        <h2 className="text-base font-semibold tracking-tight">Add Exercise</h2>
+        <button
+          onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Close exercise picker"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="px-4 py-2.5 shrink-0 border-b border-border/20">
+        <input
+          ref={searchRef}
+          type="text"
+          placeholder="Search exercises…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-border/30 bg-muted/30 px-3 py-2 text-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-colors placeholder:text-muted-foreground/50"
+          autoComplete="off"
+          autoCorrect="off"
+        />
+      </div>
+
+      {/* Scrollable exercise list */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+        {filteredGroups.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {available.length === 0
+              ? "All exercises already added"
+              : "No exercises match your search"}
           </p>
         ) : (
-          <div className="px-4 py-3 space-y-5 stagger-children">
-            {groups.map(({ cat, exs }) => (
-              <div key={cat}>
-                <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  {cat}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {exs.map((ex) => (
-                    <button
-                      key={ex.id}
-                      onClick={() => { onAdd(ex.id); close(); }}
-                      className="rounded-full border border-border/30 bg-card/50 backdrop-blur-sm px-3.5 py-2 text-sm font-medium
-                                 hover:border-primary/20 hover:bg-primary/8 hover:text-primary
-                                 active:scale-95 transition-all duration-200 ease-spring"
-                    >
-                      {ex.name}
-                    </button>
-                  ))}
-                </div>
+          filteredGroups.map(({ cat, exs }) => (
+            <div key={cat}>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {cat}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {exs.map((ex) => (
+                  <button
+                    key={ex.id}
+                    onClick={() => onAdd(ex.id)}
+                    className="rounded-full border border-border/30 bg-card/50 backdrop-blur-sm px-3.5 py-2 text-sm font-medium
+                               hover:border-primary/20 hover:bg-primary/8 hover:text-primary
+                               active:scale-95 transition-all duration-200 ease-spring"
+                  >
+                    {ex.name}
+                  </button>
+                ))}
               </div>
-            ))}
-            {/* Safe area bottom padding */}
-            <div className="h-4" />
-          </div>
+            </div>
+          ))
         )}
-      </BottomSheet>
-    </>
+        {/* Safe area bottom padding */}
+        <div className="h-20" />
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1213,10 +1300,14 @@ function WorkoutExerciseCard({
           <div className="min-w-0 flex-1 pl-1">
             <p className="text-[13px] font-medium text-foreground/80 truncate">{title}</p>
           </div>
-          <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" onClick={onStart}>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onStart}
+              className="flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 active:scale-95 transition-all duration-150"
+            >
               <Play className="h-3 w-3 fill-current" />
-            </Button>
+              Start
+            </button>
             {onDelete && (
               <Button size="icon" variant="ghost" onClick={onDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1348,8 +1439,9 @@ function WorkoutExerciseCard({
           )}
 
           {/* Smart Quick Add */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="space-y-2 pt-1">
+            {/* Row 1: Steppers */}
+            <div className="flex items-center gap-2">
               <StepperInput
                 value={reps}
                 onChange={setReps}
@@ -1370,12 +1462,13 @@ function WorkoutExerciseCard({
                 size="md"
               />
             </div>
-            <div className="flex items-center gap-1.5 ml-auto">
-              <Button onClick={addSet} className="h-10 rounded-full px-4 text-sm">
+            {/* Row 2: Log + Repeat buttons — full width, below steppers */}
+            <div className="flex items-center gap-2">
+              <Button onClick={addSet} className="h-11 flex-1 rounded-full text-sm font-semibold">
                 Log
               </Button>
               {lastSet && (
-                <Button variant="secondary" onClick={quickRepeat} className="h-10 rounded-full px-3 text-sm" title="Repeat last set">
+                <Button variant="secondary" onClick={quickRepeat} className="h-11 rounded-full px-4 text-sm" title="Repeat last set">
                   <RotateCcw className="h-3.5 w-3.5" />
                 </Button>
               )}

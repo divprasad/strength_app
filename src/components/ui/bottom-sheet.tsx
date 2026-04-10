@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,10 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ isOpen, onClose, title, children, className }: BottomSheetProps) {
+  // SSR guard — portal requires document to exist
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   // Lock body scroll while sheet is open
   useEffect(() => {
     if (!isOpen) return;
@@ -29,9 +34,9 @@ export function BottomSheet({ isOpen, onClose, title, children, className }: Bot
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       {/* Backdrop */}
       <div
@@ -71,6 +76,7 @@ export function BottomSheet({ isOpen, onClose, title, children, className }: Bot
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

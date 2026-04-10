@@ -39,7 +39,7 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 
 1. **All mutations go through Dexie first.** Components never call `fetch()` for writes. The repository writes to IndexedDB, then calls `enqueueSync(workoutId)`.
 2. **The sync engine is the only network writer.** `syncEngine.ts` drains the `syncQueue` table and POSTs `WorkoutBundle` payloads to the API. Failed jobs get `status: "failed"` and increment `retryCount`.
-3. **Bootstrap pulls server → client.** On app load, `bootstrapFromServer()` fetches muscles, exercises, and workouts from the API and bulk-puts them into Dexie in a single atomic transaction. If the server is unreachable, the app falls back to local seed data.
+3. **Bootstrap pulls server → client.** On app load, `bootstrapFromServer()` fetches muscles, exercises, workouts, and settings configurations from the API and bulk-puts them into Dexie in a single atomic transaction. If the server is unreachable, the app falls back to local seed data.
 4. **Garbage collection is server-side.** When a workout sync arrives, the API route diffs incoming exercise/set IDs against existing rows and deletes orphans within the same `$transaction`. This prevents zombie rows from regenerating on the next pull.
 
 ---
@@ -61,6 +61,7 @@ It writes all user data to Browser IndexedDB (Dexie) for zero-latency interactio
 | Command palette | ✅ Implemented | `Cmd+K` global navigation and quick actions |
 | Analytics | ✅ Present | Weekly volume, muscle distribution, gym session cost tracker |
 | Export/Import | ✅ Present | JSON export, server bootstrap pull from Settings |
+| Settings sync | ✅ Active | Prisma `Settings` schema pulls app scale, volume multipliers, and gym fees |
 | CI | ✅ Active | `lint`, `typecheck`, `test:unit`, `build` on push; E2E manual |
 
 ### Known areas needing attention

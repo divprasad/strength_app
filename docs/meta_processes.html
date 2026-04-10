@@ -52,7 +52,7 @@
             <section class="space-y-4">
                 <h2 class="text-2xl font-bold border-b border-slate-100 pb-2">Database Backups</h2>
                 <p class="text-slate-700">Because a Local-First environment can aggressively overwrite server data, automatic structural backups are built directly into the sync pipeline.</p>
-                <p class="text-slate-700">Whenever a device successfully pushes new mutations to the Next.js API, the server executes an instantaneous filesystem copy of <code>dev.db</code> before applying the transaction. These backups are stored locally in the <code>/prisma/</code> directory with exact timestamp definitions, providing the user an easy rollback vector if local data corruption is inadvertently pushed upstream.</p>
+                <p class="text-slate-700">Whenever a device successfully pushes new mutations to the Next.js API, the server executes an instantaneous filesystem copy of <code>dev.db</code> before applying the transaction. These backups are stored locally in the <code>/prisma/backups/</code> directory following an infinite rolling numbering scheme (e.g., <code>1_strength_diary_[DATE]_[VOL]kg_BU.db</code>, where the newest is always slot 1). This provides the user an easy rollback vector if local data corruption is inadvertently pushed upstream.</p>
             </section>
 
             <section class="space-y-4">
