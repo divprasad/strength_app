@@ -15,6 +15,26 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Filter out defaultCache rules that conflict with our custom handlers.
+// The default "pages-rsc", "pages-rsc-prefetch", "pages", and "others" rules
+// use NetworkFirst with NO networkTimeoutSeconds, causing them to hang
+// indefinitely offline. We replace them with our own timeout-aware versions.
+const EXCLUDED_CACHES = new Set([
+  "pages-rsc",
+  "pages-rsc-prefetch",
+  "pages",
+  "others",
+]);
+
+const filteredDefaultCache = defaultCache.filter((rule) => {
+  // Each defaultCache rule has a handler with a cacheName property.
+  // We need to access it via the internal _cacheName on the strategy.
+  const cacheName =
+    (rule.handler as { cacheName?: string })?.cacheName ??
+    (rule.handler as { _cacheName?: string })?._cacheName;
+  return !cacheName || !EXCLUDED_CACHES.has(cacheName);
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
@@ -51,13 +71,19 @@ const serwist = new Serwist({
       }),
     },
 
-    // ── Next.js RSC (React Server Component) payloads ───────────────────
-    // These are the data payloads for client-side navigation (?_rsc=...).
-    // Cache them so navigating between pages works offline too.
-    // Timeout is kept very low (1s) so offline taps feel instant.
+    // ── All RSC requests (header-based AND param-based) ─────────────────
+    // Next.js uses RSC payloads for client-side navigation. These come in
+    // two flavours:
+    //   1. Prefetch:   ?_rsc=... param + RSC:1 + Next-Router-Prefetch:1 headers
+    //   2. Navigation: RSC:1 header only (no _rsc param)
+    //
+    // We catch BOTH here with a 1s timeout so the bottom nav responds
+    // instantly when offline.
     {
-      matcher({ url }) {
-        return url.searchParams.has("_rsc");
+      matcher({ request, url }) {
+        return (
+          request.headers.get("RSC") === "1" || url.searchParams.has("_rsc")
+        );
       },
       handler: new NetworkFirst({
         cacheName: "offline-rsc-cache",
@@ -83,8 +109,49 @@ const serwist = new Serwist({
       }),
     },
 
+    // ── Same-origin HTML pages ──────────────────────────────────────────
+    // Replaces defaultCache's "pages" rule (which had no timeout).
+    {
+      matcher({ request, url: { pathname }, sameOrigin }) {
+        return (
+          request.headers.get("Content-Type")?.includes("text/html") &&
+          sameOrigin &&
+          !pathname.startsWith("/api/")
+        );
+      },
+      handler: new NetworkFirst({
+        cacheName: "pages",
+        networkTimeoutSeconds: 2,
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 32,
+            maxAgeSeconds: 24 * 60 * 60,
+          }),
+        ],
+      }),
+    },
+
+    // ── Same-origin catch-all ───────────────────────────────────────────
+    // Replaces defaultCache's "others" rule (which had no timeout).
+    {
+      matcher({ url: { pathname }, sameOrigin }) {
+        return sameOrigin && !pathname.startsWith("/api/");
+      },
+      handler: new NetworkFirst({
+        cacheName: "others",
+        networkTimeoutSeconds: 2,
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 32,
+            maxAgeSeconds: 24 * 60 * 60,
+          }),
+        ],
+      }),
+    },
+
     // ── Default asset caching (JS chunks, CSS, images, fonts, etc.) ─────
-    ...defaultCache,
+    // Filtered to exclude rules we've replaced above.
+    ...filteredDefaultCache,
   ],
 });
 
