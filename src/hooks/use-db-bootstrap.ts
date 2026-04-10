@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureBootstrapped } from "@/lib/db";
+import { ensureBootstrapped, db } from "@/lib/db";
 import { bootstrapFromServer } from "@/lib/sync";
 
 /** Race a promise against a timeout. Rejects with "Timeout" if ms elapses. */
@@ -32,8 +32,28 @@ const LOCAL_BOOTSTRAP_TIMEOUT_MS = 10_000;
  * Absolute maximum time we will show "Preparing local database…" before
  * giving up and rendering the app anyway. This is a hard safety net —
  * the app may be degraded but at least the user isn't stuck forever.
+ * Set to 35s (5s slack over SERVER_BOOTSTRAP_TIMEOUT_MS) so a double
+ * failure (server + local) doesn't leave the user waiting 45s.
  */
-const HARD_DEADLINE_MS = 45_000;
+const HARD_DEADLINE_MS = 35_000;
+
+/**
+ * Returns true if Dexie already has usable local data (exercises loaded
+ * from a previous server bootstrap). Uses IDB primary key count — O(1),
+ * no table scan, completes in <1ms.
+ *
+ * We check exercises (not workouts or settings) because exercises are the
+ * critical dependency — without them the exercise picker is empty and
+ * logging is impossible. Settings can be defaulted; workouts can be absent.
+ */
+async function hasLocalData(): Promise<boolean> {
+  try {
+    const count = await db.exercises.count();
+    return count > 0;
+  } catch {
+    return false;
+  }
+}
 
 export function useDbBootstrap() {
   const [ready, setReady] = useState(false);
@@ -53,16 +73,48 @@ export function useDbBootstrap() {
     }, HARD_DEADLINE_MS);
 
     async function initDb() {
+      // ── Fast path: already have local data ──────────────────────────────
+      // If Dexie already contains exercises from a previous session,
+      // unlock the UI immediately and run the server sync in the background.
+      // This is the normal path for any return visit (online or offline).
+      const localReady = await hasLocalData();
+
+      if (localReady) {
+        // Ensure settings row exists (instant — local Dexie read only)
+        try {
+          await withTimeout(ensureBootstrapped(), LOCAL_BOOTSTRAP_TIMEOUT_MS);
+        } catch {
+          // Non-fatal — app still works with default settings
+        }
+
+        // Unlock UI now, without waiting for the network
+        clearTimeout(hardDeadline);
+        if (mounted) setReady(true);
+
+        // Kick off server sync in the background (best-effort, fire-and-forget).
+        // useLiveQuery will auto-rerender when Dexie updates with fresh data.
+        bootstrapFromServer().catch((err) => {
+          console.warn(
+            "[bootstrap] Background server sync failed:",
+            err instanceof Error ? err.message : err
+          );
+        });
+
+        return;
+      }
+
+      // ── Cold start: no local data — must fetch from server ──────────────
+      // First install (or after clearing browser data). Without exercises
+      // the exercise picker is empty and the app is unusable, so we block.
       try {
-        // 1. Try pulling canonical data from the server (with timeout).
-        //    This is the primary source of truth for muscles, exercises and workouts.
+        // 1. Pull canonical data from the server.
         await withTimeout(bootstrapFromServer(), SERVER_BOOTSTRAP_TIMEOUT_MS);
 
-        // 2. Ensure local settings are initialized (won't wipe anything)
+        // 2. Ensure local settings are initialized.
         await withTimeout(ensureBootstrapped(), LOCAL_BOOTSTRAP_TIMEOUT_MS);
       } catch (err) {
         // Server unreachable, timed out, or errored.
-        // Fall back to local seed so the app is still usable.
+        // Fall back to local seed so the app renders with default data.
         const reason = err instanceof Error ? err.message : String(err);
         console.warn(
           `[bootstrap] Server bootstrap failed (${reason}), initializing local data only.`
@@ -71,7 +123,7 @@ export function useDbBootstrap() {
         try {
           await withTimeout(ensureBootstrapped(), LOCAL_BOOTSTRAP_TIMEOUT_MS);
         } catch (localErr) {
-          // Even local bootstrap failed/timed out — log it but don't block the UI
+          // Even local bootstrap failed/timed out — log it but don't block the UI.
           const localReason = localErr instanceof Error ? localErr.message : String(localErr);
           console.error(
             `[bootstrap] Local bootstrap also failed (${localReason}). ` +

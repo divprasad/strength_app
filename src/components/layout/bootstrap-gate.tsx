@@ -23,7 +23,7 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
         <p className="text-sm text-muted-foreground">Preparing local database…</p>
         {showSlowHint && (
           <p className="max-w-xs text-center text-xs text-muted-foreground/60">
-            First load can be slow while the server compiles. Hang tight…
+            Setting up for the first time — fetching your data from the server…
           </p>
         )}
       </div>
