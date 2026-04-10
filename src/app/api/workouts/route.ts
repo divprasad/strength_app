@@ -5,14 +5,71 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
-/** Returns the MD5 hex digest of a file, or null if the file can't be read. */
-async function md5File(filePath: string): Promise<string | null> {
-  try {
-    const buf = await fs.readFile(filePath);
-    return crypto.createHash("md5").update(buf).digest("hex");
-  } catch {
-    return null;
-  }
+/**
+ * Computes a content fingerprint from the actual user data in the DB.
+ * Captures things that only change when meaningful data changes:
+ *   - record counts (new workout, set, exercise, muscle, setting)
+ *   - latest createdAt per table (new record added)
+ *   - latest set content (reps/weight edited)
+ *   - latest workout status (workout completed)
+ *   - latest exercise name (exercise renamed)
+ *
+ * Immune to: SQLite WAL checkpointing, Prisma @updatedAt no-op touches,
+ * background sync heartbeats that upsert identical data.
+ */
+async function contentFingerprint(): Promise<string> {
+  const [
+    workoutCount,
+    setCount,
+    exerciseCount,
+    muscleCount,
+    settingsCount,
+    latestWorkout,
+    latestSet,
+    latestExercise,
+    latestMuscle,
+  ] = await Promise.all([
+    prisma.workout.count(),
+    prisma.setEntry.count(),
+    prisma.exercise.count(),
+    prisma.muscleGroup.count(),
+    prisma.settings.count(),
+    prisma.workout.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, status: true },
+    }),
+    prisma.setEntry.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, weight: true, reps: true },
+    }),
+    prisma.exercise.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { name: true, createdAt: true },
+    }),
+    prisma.muscleGroup.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { name: true, createdAt: true },
+    }),
+  ]);
+
+  const raw = [
+    workoutCount,
+    setCount,
+    exerciseCount,
+    muscleCount,
+    settingsCount,
+    latestWorkout?.createdAt ?? "",
+    latestWorkout?.status ?? "",
+    latestSet?.createdAt ?? "",
+    latestSet?.weight ?? "",
+    latestSet?.reps ?? "",
+    latestExercise?.name ?? "",
+    latestExercise?.createdAt ?? "",
+    latestMuscle?.name ?? "",
+    latestMuscle?.createdAt ?? "",
+  ].join("|");
+
+  return crypto.createHash("md5").update(raw).digest("hex");
 }
 
 type Payload = {
@@ -77,35 +134,42 @@ export async function POST(request: NextRequest) {
       .filter((f) => f.num > 0 && f.name.endsWith("_BU.db"))
       .sort((a, b) => b.num - a.num); // highest number first
 
-    // Skip backup if the live DB is identical to the latest backup (slot 1).
-    // This prevents churn on syncs that don't change any data on disk.
-    const latestBackup = buFiles.find((f) => f.num === 1);
-    if (latestBackup) {
-      const [liveHash, backupHash] = await Promise.all([
-        md5File(sourceDbPath),
-        md5File(path.join(backupDir, latestBackup.name)),
-      ]);
-      if (liveHash && liveHash === backupHash) {
-        console.log(`[API Backup] Skipping — DB unchanged (md5: ${liveHash})`);
-        // Fall through to the Prisma transaction without creating a backup.
-      } else {
-        // Rotate: rename N → N+1 (process highest first to avoid clobbering)
-        for (const { name, num } of buFiles) {
-          const oldPath = path.join(backupDir, name);
-          const newName = name.replace(/^\d+_/, `${num + 1}_`);
-          await fs.rename(oldPath, path.join(backupDir, newName));
-        }
+    // ── Content-fingerprint guard ─────────────────────────────────────────
+    // Compare a semantic fingerprint of the actual data (counts + createdAt +
+    // key field values) against the last saved fingerprint in backups/.fingerprint.
+    // This is immune to SQLite internal churn (@updatedAt no-ops, WAL checkpoints).
+    const fingerprintFile = path.join(backupDir, ".fingerprint");
+    const currentFingerprint = await contentFingerprint();
+    let savedFingerprint: string | null = null;
+    try {
+      savedFingerprint = (await fs.readFile(fingerprintFile, "utf-8")).trim();
+    } catch {
+      // No fingerprint file yet — first run
+    }
 
-        // Write new backup as slot 1
-        const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
-        await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
-        console.log(`[API Backup] Rolling backup created: ${slot1Name} (total backups: ${buFiles.length + 1}, ${totalWorkouts} workouts)`);
-      }
+    if (savedFingerprint === currentFingerprint) {
+      console.log(`[API Backup] Skipping — data unchanged (fingerprint: ${currentFingerprint})`);
+      // Fall through to the Prisma transaction without creating a backup.
     } else {
-      // No existing backups at all — always create the first one
+      // Data has meaningfully changed — rotate and create a new backup.
+      // Rotate: rename N → N+1 (process highest first to avoid clobbering)
+      for (const { name, num } of buFiles) {
+        const oldPath = path.join(backupDir, name);
+        const newName = name.replace(/^\d+_/, `${num + 1}_`);
+        await fs.rename(oldPath, path.join(backupDir, newName));
+      }
+
+      // Write new backup as slot 1
       const slot1Name = `1_strength_diary_${lastWorkoutDate}_${lastWorkoutVolume}kg_BU.db`;
       await fs.copyFile(sourceDbPath, path.join(backupDir, slot1Name));
-      console.log(`[API Backup] First backup created: ${slot1Name} (${totalWorkouts} workouts)`);
+
+      // Persist the new fingerprint
+      await fs.writeFile(fingerprintFile, currentFingerprint, "utf-8");
+
+      const isFirst = buFiles.length === 0;
+      console.log(`[API Backup] ${
+        isFirst ? "First" : "Rolling"
+      } backup created: ${slot1Name} (fingerprint: ${currentFingerprint}, total: ${buFiles.length + 1} backups, ${totalWorkouts} workouts)`);
     }
   } catch (backupError) {
     console.log("[API Backup] Skipping backup:", backupError);
