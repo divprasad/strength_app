@@ -54,18 +54,31 @@ const serwist = new Serwist({
     // ── Next.js RSC (React Server Component) payloads ───────────────────
     // These are the data payloads for client-side navigation (?_rsc=...).
     // Cache them so navigating between pages works offline too.
+    // Timeout is kept very low (1s) so offline taps feel instant.
     {
       matcher({ url }) {
         return url.searchParams.has("_rsc");
       },
       handler: new NetworkFirst({
         cacheName: "offline-rsc-cache",
-        networkTimeoutSeconds: 3,
+        networkTimeoutSeconds: 1,
         plugins: [
           new ExpirationPlugin({
             maxEntries: 100,
             maxAgeSeconds: 30 * 24 * 60 * 60,
           }),
+          // If both network and cache miss (route never visited online),
+          // return an empty response. This causes Next.js to fall back to
+          // a full-page navigation, which the navigate handler above will
+          // catch and serve from the precached root "/".
+          {
+            handlerDidError: async () => {
+              return new Response("", {
+                status: 200,
+                headers: { "Content-Type": "text/x-component" },
+              });
+            },
+          },
         ],
       }),
     },
