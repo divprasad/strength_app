@@ -5,14 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { APP_NAME } from "@/lib/constants";
+
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
 import { db } from "@/lib/db";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeToggle, PaletteToggle } from "@/components/layout/theme-controls";
-import { CommandPalette } from "@/components/layout/command-palette";
+
 import { ScaleControl } from "@/components/layout/scale-control";
 
 // At lg+ all 6 are shown inline. At md, only primaryLinks are shown + ⋯ overflow.
@@ -72,15 +72,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto max-w-6xl px-4 py-3 md:px-6 md:py-3.5">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/30 bg-card/80 px-4 py-2.5 shadow-e2 backdrop-blur-xl md:px-5">
             <div className="min-w-0">
-              <p className="text-lg font-semibold tracking-[-0.04em] md:text-xl">{APP_NAME}</p>
-              <p className="text-[11px] font-medium text-muted-foreground/60 md:text-xs">get jackd</p>
+              <p className="text-xl font-bold tracking-[-0.04em] text-foreground md:text-2xl">get jackdd</p>
             </div>
 
             <div className="flex items-center gap-1.5 md:gap-2.5">
               <ScaleControl />
               <ThemeToggle />
               <PaletteToggle />
-              <CommandPalette />
+              {/* <CommandPalette /> */}
 
               {/* ── Desktop nav ── */}
               <nav className="hidden md:flex items-center gap-1.5">

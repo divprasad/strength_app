@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Exercise } from "@/types/domain";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
     const exercises = await prisma.exercise.findMany();
     return NextResponse.json({ exercises });
   } catch (error) {
-    console.error("Failed to fetch exercises:", error);
+    logger.error("exercises", error);
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  console.log(`[SYNC] Attempting to sync ${exercises.length} exercises. IDs:`, exercises.map(e => e.id));
+  logger.info("exercises", `Syncing ${exercises.length} exercises`);
 
   try {
     await prisma.$transaction(
@@ -56,21 +57,21 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    logger.info("exercises", `Synced ${exercises.length} exercises OK`);
     return NextResponse.json({ status: "ok", count: exercises.length });
   } catch (error) {
-    console.error("Failed to sync exercises:", error);
-    if (error instanceof Error) {
-      console.error("Prisma error detail:", error.message);
-    }
+    logger.error("exercises", error);
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
+
 export async function DELETE() {
   try {
     await prisma.exercise.deleteMany();
+    logger.warn("exercises", "All exercises cleared");
     return NextResponse.json({ status: "ok", message: "All exercises cleared" });
   } catch (error) {
-    console.error("Failed to clear exercises:", error);
+    logger.error("exercises", error);
     return NextResponse.json({ error: "Clear failed" }, { status: 500 });
   }
 }

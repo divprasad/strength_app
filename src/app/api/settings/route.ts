@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_SETTINGS = {
   id: "default",
@@ -16,7 +17,7 @@ export async function GET() {
     const settings = await prisma.settings.findUnique({ where: { id: "default" } });
     return NextResponse.json({ settings: settings ?? DEFAULT_SETTINGS });
   } catch (error) {
-    console.error("[Settings API] GET failed:", error);
+    logger.error("settings", error);
     return NextResponse.json({ settings: DEFAULT_SETTINGS });
   }
 }
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    logger.info("settings", `Settings saved (scale=${settings.appScale}, gymFee=${settings.gymFee})`);
     return NextResponse.json({ settings });
   } catch (error) {
-    console.error("[Settings API] POST failed:", error);
+    logger.error("settings", error);
     return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
   }
 }

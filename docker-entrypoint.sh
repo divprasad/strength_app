@@ -20,15 +20,21 @@ set -e
 PRISMA_VOLUME="/app/prisma"
 MIGRATIONS_STAGING="/app/prisma_migrations_staging"
 DB_PATH="${PRISMA_VOLUME}/strength_diary.db"
+LOG_DIR="/app/logs"
+LOG_FILE="${LOG_DIR}/app.log"
 
-# ── One-time typo migration: dairy → diary ────────────────────────────────────
-OLD_DB="${PRISMA_VOLUME}/strength_dairy.db"
-if [ -f "$OLD_DB" ] && [ ! -f "$DB_PATH" ]; then
-  echo "[entrypoint] Migrating strength_dairy.db → strength_diary.db (one-time rename)..."
-  mv "$OLD_DB" "$DB_PATH"
-fi
+# ── Ensure log directory exists and is writable ───────────────────────────────
+mkdir -p "${LOG_DIR}"
+chown nextjs:nodejs "${LOG_DIR}" 2>/dev/null || true
 
-echo "[entrypoint] Syncing fresh migration files into volume..."
+# Helper: append a timestamped line to app.log (best-effort)
+log() {
+  echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] [INFO] [entrypoint] $1" | tee -a "${LOG_FILE}" || true
+}
+
+
+
+log "Syncing fresh migration files into volume..."
 # Ensure the migrations directory exists in the volume
 mkdir -p "${PRISMA_VOLUME}/migrations"
 
@@ -46,7 +52,7 @@ cp /app/prisma_schema/migration_lock.toml "${PRISMA_VOLUME}/migrations/migration
 FRESH_DB=false
 if [ ! -f "${DB_PATH}" ]; then
   FRESH_DB=true
-  echo "[entrypoint] No existing strength_diary.db found — fresh install."
+  log "No existing strength_diary.db found — fresh install."
 fi
 
 # ── Ensure strength_diary.db is writable by the nextjs user ──────────────────
@@ -54,7 +60,7 @@ fi
 # Handles the case where strength_diary.db was seeded by a macOS host (UID 501) or a
 # previous container with a mismatched UID, making it unwritable at runtime.
 if [ -f "${DB_PATH}" ]; then
-  echo "[entrypoint] Fixing ownership of strength_diary.db..."
+  log "Fixing ownership of strength_diary.db..."
   chown nextjs:nodejs "${DB_PATH}"
   chmod 664 "${DB_PATH}"
 fi
@@ -64,17 +70,17 @@ mkdir -p "${PRISMA_VOLUME}/backups"
 chown nextjs:nodejs "${PRISMA_VOLUME}/backups"
 
 # ── Apply migrations ─────────────────────────────────────────────────────────
-echo "[entrypoint] Running prisma migrate deploy..."
+log "Running prisma migrate deploy..."
 cd /app
 prisma migrate deploy --schema="${PRISMA_VOLUME}/schema.prisma"
 
 # ── Seed on fresh install only ───────────────────────────────────────────────
 if [ "$FRESH_DB" = "true" ]; then
-  echo "[entrypoint] Fresh database detected — seeding default data..."
+  log "Fresh database detected — seeding default data..."
   npx tsx prisma/seed.ts
 else
-  echo "[entrypoint] Existing database found — skipping seed."
+  log "Existing database found — skipping seed."
 fi
 
-echo "[entrypoint] Starting Next.js server as nextjs user..."
+log "Starting Next.js server as nextjs user..."
 exec su-exec nextjs node server.js

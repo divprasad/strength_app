@@ -9,7 +9,7 @@ import { ThemeProvider } from "@/components/layout/theme-provider";
 export const metadata: Metadata = {
   title: "Strength Log",
   description: "Mobile-first personal strength workout tracker",
-  manifest: "/manifest.json",
+  // manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

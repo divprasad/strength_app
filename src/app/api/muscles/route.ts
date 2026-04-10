@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { MuscleGroup } from "@/types/domain";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
     const muscles = await prisma.muscleGroup.findMany();
     return NextResponse.json({ muscles });
   } catch (error) {
-    console.error("Failed to fetch muscles:", error);
+    logger.error("muscles", error);
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  console.log(`[SYNC] Attempting to sync ${muscleGroups.length} muscles. IDs:`, muscleGroups.map(m => m.id));
+  logger.info("muscles", `Syncing ${muscleGroups.length} muscle groups`);
 
   try {
     await prisma.$transaction(
@@ -43,21 +44,21 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    logger.info("muscles", `Synced ${muscleGroups.length} muscle groups OK`);
     return NextResponse.json({ status: "ok", count: muscleGroups.length });
   } catch (error) {
-    console.error("Failed to sync muscles:", error);
-    if (error instanceof Error) {
-      console.error("Prisma error detail:", error.message);
-    }
+    logger.error("muscles", error);
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
+
 export async function DELETE() {
   try {
     await prisma.muscleGroup.deleteMany();
+    logger.warn("muscles", "All muscle groups cleared");
     return NextResponse.json({ status: "ok", message: "All muscles cleared" });
   } catch (error) {
-    console.error("Failed to clear muscles:", error);
+    logger.error("muscles", error);
     return NextResponse.json({ error: "Clear failed" }, { status: 500 });
   }
 }

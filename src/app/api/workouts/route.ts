@@ -4,6 +4,7 @@ import type { WorkoutBundle } from "@/types/domain";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { logger } from "@/lib/logger";
 
 /**
  * Computes a content fingerprint from the actual user data in the DB.
@@ -108,8 +109,6 @@ type Payload = {
 export async function POST(request: NextRequest) {
   const payload = (await request.json()) as Payload;
   const { bundle, userId } = payload;
-  console.log("[API DEBUG] CWD:", process.cwd());
-  console.log("[API DEBUG] DATABASE_URL:", process.env.DATABASE_URL);
 
   if (!bundle) {
     return NextResponse.json({ error: "Missing bundle" }, { status: 400 });
@@ -175,7 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (savedFingerprint === currentFingerprint) {
-      console.log(`[API Backup] Skipping — data unchanged (fingerprint: ${currentFingerprint})`);
+      logger.info("backup", `Skipping — data unchanged (fingerprint: ${currentFingerprint})`);
       // Fall through to the Prisma transaction without creating a backup.
     } else {
       // Data has meaningfully changed — rotate and create a new backup.
@@ -194,12 +193,12 @@ export async function POST(request: NextRequest) {
       await fs.writeFile(fingerprintFile, currentFingerprint, "utf-8");
 
       const isFirst = buFiles.length === 0;
-      console.log(`[API Backup] ${
+      logger.info("backup", `${
         isFirst ? "First" : "Rolling"
-      } backup created: ${slot1Name} (fingerprint: ${currentFingerprint}, total: ${buFiles.length + 1} backups, ${totalWorkouts} workouts)`);
+      } backup created: ${slot1Name} (total: ${buFiles.length + 1}, workouts: ${totalWorkouts})`);
     }
   } catch (backupError) {
-    console.log("[API Backup] Skipping backup:", backupError);
+    logger.warn("backup", `Skipping backup: ${backupError}`);
   }
 
   try {
@@ -332,16 +331,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    logger.info("workouts", `Synced workout ${bundle.workout.id} (action: ${payload.action})`);
     return NextResponse.json({ status: "ok", action: payload.action });
   } catch (error) {
-    console.error("Failed to persist workout:", error);
+    logger.error("workouts", error);
     return NextResponse.json({ error: "Persistence failed" }, { status: 500 });
   }
 }
 
 export async function GET() {
-  console.log("[API DEBUG GET] CWD:", process.cwd());
-  console.log("[API DEBUG GET] DATABASE_URL:", process.env.DATABASE_URL);
   try {
     const workouts = await prisma.workout.findMany({
       include: {
@@ -361,7 +359,7 @@ export async function GET() {
 
     return NextResponse.json({ workouts });
   } catch (error) {
-    console.error("Failed to fetch workouts:", error);
+    logger.error("workouts", error);
     return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
@@ -390,9 +388,10 @@ export async function DELETE(request: NextRequest) {
       prisma.workoutExercise.deleteMany(),
       prisma.workout.deleteMany()
     ]);
+    logger.warn("workouts", "All workouts cleared");
     return NextResponse.json({ status: "ok", message: "All workouts cleared" });
   } catch (error) {
-    console.error("Failed to clear workouts:", error);
+    logger.error("workouts", error);
     return NextResponse.json({ error: "Clear failed" }, { status: 500 });
   }
 }

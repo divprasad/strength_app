@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 export interface ComboboxOption {
   value: string;
@@ -26,8 +27,6 @@ export function Combobox({
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
 
@@ -38,25 +37,6 @@ export function Combobox({
           o.label.toLowerCase().includes(query.toLowerCase())
         );
 
-  // Close on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  // Focus input when opened
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 10);
-    }
-  }, [open]);
-
   const handleSelect = useCallback(
     (optionValue: string) => {
       onChange(optionValue);
@@ -66,16 +46,6 @@ export function Combobox({
     [onChange]
   );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setOpen(false);
-      setQuery("");
-    }
-    if (e.key === "Enter" && filtered.length > 0) {
-      handleSelect(filtered[0].value);
-    }
-  };
-
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange("");
@@ -84,7 +54,7 @@ export function Combobox({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       {/* Trigger button */}
       <button
         type="button"
@@ -123,41 +93,43 @@ export function Combobox({
         </div>
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div
-          className={cn(
-            "absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-border/70 bg-card/95 shadow-e3",
-            "animate-in fade-in-0 zoom-in-95 duration-150"
-          )}
-        >
+      {/* Bottom Sheet Dropdown */}
+      <BottomSheet
+        isOpen={open}
+        onClose={() => {
+          setOpen(false);
+          setQuery("");
+        }}
+        title={placeholder}
+      >
+        <div className="flex flex-col h-full max-h-[70vh]">
           {/* Search input */}
-          <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2.5">
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type to filter..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+          <div className="sticky top-0 z-10 bg-card/98 px-4 pb-3 pt-2 border-b border-border/50">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 h-4 w-4 text-muted-foreground/60" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Type to filter..."
+                className="w-full rounded-xl border border-border/50 bg-background/50 py-2.5 pl-9 pr-8 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 text-muted-foreground/50 hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Options list */}
-          <div className="max-h-[240px] overflow-y-auto py-1">
+          <div className="px-2 py-2 overflow-y-auto min-h-0">
             {filtered.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted-foreground/60">
-                No exercises found.
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground/60">
+                No options found.
               </p>
             ) : (
               filtered.map((option) => {
@@ -168,15 +140,15 @@ export function Combobox({
                     type="button"
                     onClick={() => handleSelect(option.value)}
                     className={cn(
-                      "flex w-full items-center justify-between px-4 py-2.5 text-sm text-left transition-colors",
+                      "flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-left text-sm transition-colors",
                       isSelected
-                        ? "bg-primary/8 text-primary font-medium"
-                        : "text-foreground hover:bg-accent/50"
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-foreground hover:bg-accent/50 active:bg-accent/70"
                     )}
                   >
                     <span className="truncate">{option.label}</span>
                     {isSelected && (
-                      <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <Check className="ml-2 h-4 w-4 shrink-0 text-primary" />
                     )}
                   </button>
                 );
@@ -184,7 +156,7 @@ export function Combobox({
             )}
           </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 }

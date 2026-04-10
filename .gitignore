@@ -40,7 +40,15 @@ pnpm-debug.log*
 *.db
 *.db-*
 prisma/*.backup-*
-/backups/
+/backups/              # legacy root-level backups (pre-rolling-backup-system)
+/prisma/backups/       # legacy prisma/backups (pre-bind-mount)
+
+# live production data (docker bind mount — never commit)
+/db/*
+!/db/README.md
+
+# app logs (docker bind-mount)
+/logs/
 
 # data output
 /data/

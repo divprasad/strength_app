@@ -4,6 +4,7 @@ import {
   type PrecacheEntry,
   type SerwistGlobalConfig,
   NetworkFirst,
+  StaleWhileRevalidate,
   ExpirationPlugin,
 } from "serwist";
 
@@ -77,25 +78,24 @@ const serwist = new Serwist({
     //   1. Prefetch:   ?_rsc=... param + RSC:1 + Next-Router-Prefetch:1 headers
     //   2. Navigation: RSC:1 header only (no _rsc param)
     //
-    // We catch BOTH here with a 1s timeout so the bottom nav responds
-    // instantly when offline.
+    // We catch BOTH here with StaleWhileRevalidate so the bottom nav responds
+    // instantly offline. The background fetch ensures the cache stays fresh.
     {
       matcher({ request, url }) {
         return (
           request.headers.get("RSC") === "1" || url.searchParams.has("_rsc")
         );
       },
-      handler: new NetworkFirst({
+      handler: new StaleWhileRevalidate({
         cacheName: "offline-rsc-cache",
-        networkTimeoutSeconds: 1,
         plugins: [
           new ExpirationPlugin({
             maxEntries: 100,
             maxAgeSeconds: 30 * 24 * 60 * 60,
           }),
-          // If both network and cache miss (route never visited online),
+          // If both network and cache miss (route never visited),
           // return an empty response. This causes Next.js to fall back to
-          // a full-page navigation, which the navigate handler above will
+          // a full-page navigation, which the navigate handler below will
           // catch and serve from the precached root "/".
           {
             handlerDidError: async () => {
@@ -119,9 +119,8 @@ const serwist = new Serwist({
           !pathname.startsWith("/api/")
         );
       },
-      handler: new NetworkFirst({
+      handler: new StaleWhileRevalidate({
         cacheName: "pages",
-        networkTimeoutSeconds: 2,
         plugins: [
           new ExpirationPlugin({
             maxEntries: 32,

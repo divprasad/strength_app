@@ -8,13 +8,13 @@ services:
     expose:
       - "3000" # Exposes to Caddy internally, no longer binds directly to the machine's ports
     volumes:
-      # Named volume: survives container teardown and rebuilds.
-      # Maps to /app/prisma inside the container, which is where
-      # process.cwd()/prisma/strength_diary.db resolves — matching the backup
-      # path logic in src/app/api/workouts/route.ts.
-      - db-data:/app/prisma
-      # Rolling backups mapped directly to your Mac
-      - ./prisma/backups:/app/prisma/backups
+      # Bind mount: DB, migrations, schema, and backups are all visible
+      # directly at ./db/ in the repo root on the host machine.
+      # ./db/strength_diary.db  ← live production database
+      # ./db/backups/           ← rolling numbered backups
+      - ./db:/app/prisma
+      # App log file — tail -f logs/app.log from the repo root
+      - ./logs:/app/logs
     environment:
       - NODE_ENV=production
       # file:./strength_diary.db is relative to the schema location (/app/prisma),
@@ -35,6 +35,5 @@ services:
       - strength-log
 
 volumes:
-  db-data:
   caddy_data:
   caddy_config:

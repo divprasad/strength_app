@@ -168,19 +168,13 @@ export function AnalyticsView() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid gap-3 grid-cols-3">
+      <div className="grid gap-3 grid-cols-2">
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{totalLabel}</p>
           <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] tabular-nums animate-count-up">
             {Math.round(metrics?.totalVolume ?? 0).toLocaleString()}
           </p>
           <p className="text-[10px] text-muted-foreground/50">kg</p>
-        </div>
-
-        <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Muscles</p>
-          <p className="mt-1.5 text-2xl font-bold tracking-[-0.04em] animate-count-up">{muscleRows.length}</p>
-          <p className="text-[10px] text-muted-foreground/50">tracked</p>
         </div>
 
         <div className="rounded-2xl border border-border/30 bg-card/75 p-4 text-center shadow-e1 backdrop-blur-lg overflow-hidden">
