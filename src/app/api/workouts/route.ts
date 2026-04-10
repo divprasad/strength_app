@@ -7,12 +7,17 @@ import crypto from "crypto";
 
 /**
  * Computes a content fingerprint from the actual user data in the DB.
- * Captures things that only change when meaningful data changes:
- *   - record counts (new workout, set, exercise, muscle, setting)
- *   - latest createdAt per table (new record added)
- *   - latest set content (reps/weight edited)
- *   - latest workout status (workout completed)
- *   - latest exercise name (exercise renamed)
+ *
+ * Uses aggregates over the full dataset so that edits to any record
+ * (not just the most recently created one) are detected.
+ *
+ * Covers:
+ *   - New/deleted workouts, sets, exercises, muscles (counts)
+ *   - Edits to reps or weight on ANY set (sum of all reps + sum of all weights)
+ *   - Workout completions (count of completed workouts)
+ *   - Settings value changes (gym fee, multipliers, scale)
+ *   - Exercise and muscle renames (hash of all names)
+ *   - Workout notes changes (hash of all notes)
  *
  * Immune to: SQLite WAL checkpointing, Prisma @updatedAt no-op touches,
  * background sync heartbeats that upsert identical data.
@@ -20,53 +25,75 @@ import crypto from "crypto";
 async function contentFingerprint(): Promise<string> {
   const [
     workoutCount,
-    setCount,
+    completedWorkoutCount,
+    setAgg,
     exerciseCount,
     muscleCount,
-    settingsCount,
-    latestWorkout,
-    latestSet,
-    latestExercise,
-    latestMuscle,
+    exercises,
+    muscles,
+    settings,
+    workoutNotes,
   ] = await Promise.all([
     prisma.workout.count(),
-    prisma.setEntry.count(),
+    prisma.workout.count({ where: { status: "completed" } }),
+    // Aggregate over ALL sets — catches any reps/weight edit anywhere
+    prisma.setEntry.aggregate({
+      _count: { id: true },
+      _sum: { reps: true, weight: true },
+    }),
     prisma.exercise.count(),
     prisma.muscleGroup.count(),
-    prisma.settings.count(),
-    prisma.workout.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true, status: true },
+    // All exercise names — catches any rename
+    prisma.exercise.findMany({ select: { id: true, name: true }, orderBy: { id: "asc" } }),
+    // All muscle names — catches any rename
+    prisma.muscleGroup.findMany({ select: { id: true, name: true }, orderBy: { id: "asc" } }),
+    // Settings actual values — catches gym fee / multiplier / scale changes
+    prisma.settings.findFirst({
+      select: {
+        volumePrimaryMultiplier: true,
+        volumeSecondaryMultiplier: true,
+        gymFee: true,
+        gymFeePeriodDays: true,
+        gymFeeTargetPerSession: true,
+        appScale: true,
+      },
     }),
-    prisma.setEntry.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true, weight: true, reps: true },
-    }),
-    prisma.exercise.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { name: true, createdAt: true },
-    }),
-    prisma.muscleGroup.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { name: true, createdAt: true },
-    }),
+    // Workout notes — catches note edits on any workout
+    prisma.workout.findMany({ select: { id: true, notes: true }, orderBy: { id: "asc" } }),
   ]);
+
+  const exerciseNameHash = crypto
+    .createHash("md5")
+    .update(exercises.map((e) => `${e.id}:${e.name}`).join(","))
+    .digest("hex");
+
+  const muscleNameHash = crypto
+    .createHash("md5")
+    .update(muscles.map((m) => `${m.id}:${m.name}`).join(","))
+    .digest("hex");
+
+  const notesHash = crypto
+    .createHash("md5")
+    .update(workoutNotes.map((w) => `${w.id}:${w.notes ?? ""}`).join(","))
+    .digest("hex");
 
   const raw = [
     workoutCount,
-    setCount,
+    completedWorkoutCount,
+    setAgg._count.id,
+    setAgg._sum.reps ?? 0,
+    setAgg._sum.weight ?? 0,
     exerciseCount,
     muscleCount,
-    settingsCount,
-    latestWorkout?.createdAt ?? "",
-    latestWorkout?.status ?? "",
-    latestSet?.createdAt ?? "",
-    latestSet?.weight ?? "",
-    latestSet?.reps ?? "",
-    latestExercise?.name ?? "",
-    latestExercise?.createdAt ?? "",
-    latestMuscle?.name ?? "",
-    latestMuscle?.createdAt ?? "",
+    exerciseNameHash,
+    muscleNameHash,
+    notesHash,
+    settings?.volumePrimaryMultiplier ?? "",
+    settings?.volumeSecondaryMultiplier ?? "",
+    settings?.gymFee ?? "",
+    settings?.gymFeePeriodDays ?? "",
+    settings?.gymFeeTargetPerSession ?? "",
+    settings?.appScale ?? "",
   ].join("|");
 
   return crypto.createHash("md5").update(raw).digest("hex");
